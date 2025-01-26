@@ -1,0 +1,45 @@
+import os
+
+Import('env')
+with open(env['PROJECT_TOOL_S']) as f:
+    exec(f.read())
+
+# env.Append(CXXFLAGS=['-O3', '-fopenmp', '-std=c++17'])
+SRCS = append_srcs_dir(ADir('src'))
+INCLUDE = [ADir('include'), ADir('.')]
+PRIVATE_INCLUDE = []
+REQUIREMENTS = ['pthread', 'utilities', 'eventpp', 'StackFlow']
+STATIC_LIB = []
+DYNAMIC_LIB = []
+DEFINITIONS = []
+DEFINITIONS_PRIVATE = []
+LDFLAGS = []
+LINK_SEARCH_PATH = []
+STATIC_FILES = []
+
+DEFINITIONS += ['-O3', '-fopenmp', '-std=c++17']
+LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
+LINK_SEARCH_PATH += [ADir('../static_lib')]
+
+INCLUDE += [ADir('../include')]
+INCLUDE += [ADir('src/runner') ] 
+
+#LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
+#LDFLAGS += ['-l:libcargs.a'] 
+
+STATIC_FILES += Glob('mode_*.json')
+
+env['COMPONENTS'].append({'target':'llm_exttts',
+                          'SRCS':SRCS,
+                          'INCLUDE':INCLUDE,
+                          'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
+                          'REQUIREMENTS':REQUIREMENTS,
+                          'STATIC_LIB':STATIC_LIB,
+                          'DYNAMIC_LIB':DYNAMIC_LIB,
+                          'DEFINITIONS':DEFINITIONS,
+                          'DEFINITIONS_PRIVATE':DEFINITIONS_PRIVATE,
+                          'LDFLAGS':LDFLAGS,
+                          'LINK_SEARCH_PATH':LINK_SEARCH_PATH,
+                          'STATIC_FILES':STATIC_FILES,
+                          'REGISTER':'project'
+                          })
