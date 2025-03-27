@@ -220,6 +220,13 @@ def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1'):
     os.makedirs(os.path.join(deb_folder, 'opt/m5stack/bin'), exist_ok = True)
     os.makedirs(os.path.join(deb_folder, 'DEBIAN'), exist_ok = True)
     # shutil.copytree(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'deb_overlay'), deb_folder)
+    if package_name == 'llm-openai-api':
+        m5module_dir = os.path.join(src_folder, 'ModuleLLM-OpenAI-Plugin')
+        if os.path.exists(m5module_dir):
+            shutil.copytree(m5module_dir, os.path.join(deb_folder, 'opt/m5stack/bin/ModuleLLM-OpenAI-Plugin'))
+        openai_api_dir = os.path.join(src_folder, 'openai-api')
+        if os.path.exists(openai_api_dir):
+            shutil.copytree(openai_api_dir, os.path.join(deb_folder, 'opt/m5stack/lib/openai-api'))
     shutil.copy2(os.path.join(src_folder, package_name.replace("-", "_")), os.path.join(deb_folder, 'opt/m5stack/bin', package_name.replace("-", "_")))
     ext_scripts_files = glob.glob(os.path.join(src_folder, package_name + "_*"))
     if ext_scripts_files:
@@ -318,6 +325,7 @@ if __name__ == "__main__":
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', version, src_folder, revision],
         'llm-vad':[create_bin_deb,'llm-vad', version, src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', version, src_folder, revision],
+        'llm-openai-api':[create_bin_deb,'llm-openai-api', version, src_folder, revision],
         'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
         'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', data_version, src_folder, revision],
         'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17', data_version, src_folder, revision],
