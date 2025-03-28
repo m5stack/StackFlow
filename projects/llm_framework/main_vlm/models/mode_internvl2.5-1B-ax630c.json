@@ -1,6 +1,7 @@
 {
     "mode":"internvl2.5-1B-ax630c",
     "type":"vlm",
+    "homepage":"https://huggingface.co/OpenGVLab/InternVL2_5-1B-MPO",
     "capabilities":[
         "text_generation",
         "chat"

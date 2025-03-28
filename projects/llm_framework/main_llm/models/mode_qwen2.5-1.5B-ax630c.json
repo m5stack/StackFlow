@@ -1,6 +1,7 @@
 {
     "mode":"qwen2.5-1.5B-ax630c",
     "type":"llm",
+    "homepage":"https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct",
     "capabilities":[
         "text_generation",
         "chat"

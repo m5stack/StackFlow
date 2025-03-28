@@ -1,6 +1,7 @@
 {
     "mode":"sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01",
     "type":"kws",
+    "homepage":"https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2",
     "capabilities":[
         "Keyword_spotting",
         "Chinese"

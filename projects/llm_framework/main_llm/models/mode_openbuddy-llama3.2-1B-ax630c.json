@@ -1,6 +1,7 @@
 {
     "mode":"openbuddy-llama3.2-1B-ax630c",
     "type":"llm",
+    "homepage":"https://huggingface.co/OpenBuddy/openbuddy-llama3.2-1b-v23.1-131k",
     "capabilities":[
         "text_generation",
         "chat"

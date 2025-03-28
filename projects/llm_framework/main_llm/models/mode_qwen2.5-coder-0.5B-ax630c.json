@@ -1,6 +1,7 @@
 {
     "mode":"qwen2.5-coder-0.5B-ax630c",
     "type":"llm",
+    "homepage":"https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct",
     "capabilities":[
         "text_generation",
         "code_generation"

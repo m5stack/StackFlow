@@ -1,6 +1,7 @@
 {
     "mode":"qwen2.5-0.5B-prefill-20e",
     "type":"llm",
+    "homepage":"https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct",
     "capabilities":[
         "text_generation",
         "chat"

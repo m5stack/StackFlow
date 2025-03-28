@@ -1,6 +1,7 @@
 {
     "mode":"sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23",
     "type":"asr",
+    "homepage":"https://github.com/k2-fsa/icefall/tree/master/egs/librispeech/ASR/pruned_transducer_stateless7_streaming",
     "capabilities":[
         "Automatic_Speech_Recognition",
         "Chinese"

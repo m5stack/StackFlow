@@ -1,6 +1,7 @@
 {
     "mode": "single_speaker_fast",
     "type": "tts",
+    "homepage":"https://github.com/huakunyang/SummerTTS",
     "capabilities": [
         "tts",
         "Chinese"

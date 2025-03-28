@@ -1,6 +1,7 @@
 {
   "mode": "silero_vad",
   "type": "vad",
+  "homepage":"https://github.com/snakers4/silero-vad",
   "capabilities": [
     "Voice_activity_detection"
   ],

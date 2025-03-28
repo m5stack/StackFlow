@@ -1,6 +1,7 @@
 {
     "mode":"depth_anything",
     "type":"cv",
+    "homepage":"https://github.com/DepthAnything/Depth-Anything-V2",
     "capabilities":[
         "Segmentation"
     ],

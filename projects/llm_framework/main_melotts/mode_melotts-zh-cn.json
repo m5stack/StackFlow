@@ -1,8 +1,10 @@
 {
     "mode": "melotts_zh-cn",
     "type": "tts",
+    "homepage":"https://huggingface.co/myshell-ai/MeloTTS-Chinese",
     "capabilities": [
-        "tts"
+        "tts",
+        "Chinese"
     ],
     "input_type": [
         "tts.utf-8"
