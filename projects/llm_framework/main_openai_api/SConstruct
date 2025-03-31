@@ -17,19 +17,10 @@ LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
-down_path = check_wget_down("https://github.com/Abandon-ht/ModuleLLM-OpenAI-Plugin/archive/1077efbe201ea3f29517f5ce4a0cfc3b04c25d1d.zip", 'M5Module-LLM_OpenAI_API.zip')
 
-old_dir_name = 'ModuleLLM-OpenAI-Plugin-1077efbe201ea3f29517f5ce4a0cfc3b04c25d1d'
-new_dir_name = 'ModuleLLM-OpenAI-Plugin'
-
-old_dir_path = os.path.join(down_path, old_dir_name)
-new_dir_path = os.path.join(down_path, new_dir_name)
-
+ModuleLLMOpenAIPluginPath = wget_github_commit('https://github.com/Abandon-ht/ModuleLLM-OpenAI-Plugin.git', '1077efbe201ea3f29517f5ce4a0cfc3b04c25d1d', True)
 python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-openai-api-python-venv_v1.5.tar.gz", 'm5stack_llm-llm-openai-api-python-venv_v1.5.tar.gz')
 
-
-if os.path.exists(old_dir_path):
-    os.rename(old_dir_path, new_dir_path)
 
 DEFINITIONS += ['-O3', '-fopenmp', '-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
@@ -38,8 +29,7 @@ LINK_SEARCH_PATH += [ADir('../static_lib')]
 STATIC_FILES += Glob('mode_*.json')
 
 
-# STATIC_FILES += [os.path.join(down_path, 'M5Module-LLM_OpenAI_API-e3c467b8d8e5e0605b17436a5c5361f9ec1a7e96')]
-STATIC_FILES += [new_dir_path]
+STATIC_FILES += [ModuleLLMOpenAIPluginPath]
 STATIC_FILES += [os.path.join(python_venv, 'openai-api')]
 
 env['COMPONENTS'].append({'target':'llm_openai_api',
