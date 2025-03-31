@@ -53,6 +53,43 @@ Response JSON:
 - created: Message creation time, UNIX time.
 - work_id: Successfully created work_id unit.
 
+## inference
+
+### streaming input
+
+```json
+{
+    "request_id": "2",
+    "work_id": "melotts.1003",
+    "action": "inference",
+    "object": "melotts.utf-8.stream",
+    "data": {
+        "delta": "What's ur name?",
+        "index": 0,
+        "finish": true
+    }
+}
+```
+- object: The data type transmitted is melotts.utf-8.stream, indicating a streaming input from the user's UTF-8.
+- delta: Segment data of the streaming input.
+- index: Index of the segment in the streaming input.
+- finish: A flag indicating whether the streaming input has completed.
+
+### non-streaming input
+
+```json
+{
+    "request_id": "2",
+    "work_id": "melotts.1003",
+    "action": "inference",
+    "object": "melotts.utf-8",
+    "data": "What's ur name?"
+}
+```
+
+- object: The data type transmitted is melotts.utf-8, indicating a non-streaming input from the user's UTF-8.
+- data: Data for non-streaming input.
+
 ## link
 
 Link the output of the upper-level unit.

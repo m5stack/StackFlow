@@ -51,6 +51,42 @@
 - created：消息创建时间，unix 时间。
 - work_id：返回成功创建的 work_id 单元。
 
+## inference
+
+### 流式输入
+
+```json
+{
+    "request_id": "2",
+    "work_id": "melotts.1003",
+    "action": "inference",
+    "object": "melotts.utf-8.stream",
+    "data": {
+        "delta": "今天天气真好！",
+        "index": 0,
+        "finish": true
+    }
+}
+```
+- object：传输的数据类型为 `melotts.utf-8.stream` 代表的是从用户 utf-8 的流式输入
+- delta：流式输入的分段数据
+- index：流式输入的分段索引
+- finish:流式输入是否完成的标志位
+
+### 非流式输入
+
+```json
+{
+    "request_id": "2",
+    "work_id": "melotts.1003",
+    "action": "inference",
+    "object": "melotts.utf-8",
+    "data": "今天天气真好！"
+}
+```
+- object：传输的数据类型为 `melotts.utf-8` 代表的是从用户 utf-8 的非流式输入
+- data：非流式输入的数据
+
 ## link
 
 链接上级单元的输出。
