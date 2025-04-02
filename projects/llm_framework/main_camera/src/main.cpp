@@ -132,7 +132,7 @@ public:
             return true;
         }
         enstream_ = (response_format_.find("stream") != std::string::npos);
-        yuv_dist_ = cv::Mat(frame_height_, frame_width_, CV_8UC2);
+        yuv_dist_ = cv::Mat(frame_height_, frame_width_, CV_8UC2, cv::Scalar(0, 128));
         if(devname_.find("/dev/video") != std::string::npos){
             hal_camera_open = camera_open;
             hal_camera_close = camera_close;
