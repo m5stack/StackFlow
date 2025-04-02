@@ -1,6 +1,7 @@
 {
     "mode": "whisper-base",
     "type": "asr",
+    "homepage":"https://huggingface.co/openai/whisper-base",
     "capabilities": [
         "Automatic_Speech_Recognition",
         "English",

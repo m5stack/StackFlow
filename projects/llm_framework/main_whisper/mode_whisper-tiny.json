@@ -1,6 +1,7 @@
 {
     "mode": "whisper-tiny",
     "type": "asr",
+    "homepage":"https://huggingface.co/openai/whisper-tiny",
     "capabilities": [
         "Automatic_Speech_Recognition",
         "English",

@@ -1,0 +1,35 @@
+{
+    "mode":"qwen2.5-1.5B-Int4-ax630c",
+    "type":"llm",
+    "homepage":"https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GPTQ-Int4",
+    "capabilities":[
+        "text_generation",
+        "chat"
+    ],
+    "input_type":[
+        "llm.utf-8",
+        "llm.utf-8.stream",
+        "llm.chat_completion",
+        "llm.chat_completion.stream"
+    ],
+    "output_type":[
+        "llm.utf-8",
+        "llm.utf-8.stream"
+    ],
+    "mode_param":{
+        "tokenizer_type":2,
+        "filename_tokenizer_model":"http://localhost:8080",
+        "filename_tokens_embed":"model.embed_tokens.weight.bfloat16.bin",
+        "filename_post_axmodel":"qwen2_post.axmodel",
+        "template_filename_axmodel":"qwen2_p128_l%d_together.axmodel",
+        "b_use_topk":false,
+        "b_bos":false,
+        "b_eos":false,
+        "axmodel_num":28,
+        "tokens_embed_num":151936,
+        "tokens_embed_size":1536,
+        "b_use_mmap_load_embed":true,
+        "b_dynamic_load_axmodel_layer":false,
+        "ext_scripts":["tokenizer_qwen2.5-1.5B-Int4-ax630c.py"]
+    }
+}

@@ -1,6 +1,7 @@
 {
     "mode":"yolo11n",
     "type":"cv",
+    "homepage":"https://github.com/ultralytics/ultralytics",
     "capabilities":[
         "Detection"
     ],
