@@ -1,6 +1,7 @@
 {
     "mode":"yolo11n-hand-pose",
     "type":"cv",
+    "homepage":"https://github.com/ultralytics/ultralytics",
     "capabilities":[
         "Pose"
     ],
