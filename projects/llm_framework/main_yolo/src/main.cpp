@@ -11,6 +11,12 @@
 #include <fstream>
 #include <semaphore.h>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
+#include "thread_safe_list.h"
+#ifdef ENABLE_BACKWARD
+#define BACKWARD_HAS_DW 1
+#include "backward.hpp"
+#include "backward.h"
+#endif
 
 using namespace StackFlows;
 
@@ -36,7 +42,12 @@ typedef struct {
     float nms_threshold  = 0.45;
 } yolo_config;
 
-typedef std::function<void(const std::vector<nlohmann::json> &data, bool finish)> task_callback_t;
+typedef struct {
+    cv::Mat inference_src;
+    bool inference_bgr2rgb;
+} inference_async_par;
+
+typedef std::function<void(const nlohmann::json &data, bool finish)> task_callback_t;
 
 #define CONFIG_AUTO_SET(obj, key)             \
     if (config_body.contains(#key))           \
@@ -47,7 +58,6 @@ typedef std::function<void(const std::vector<nlohmann::json> &data, bool finish)
 class llm_task {
 private:
 public:
-    enum inference_status { INFERENCE_NONE = 0, INFERENCE_RUNNING };
     yolo_config mode_config_;
     std::string model_;
     std::unique_ptr<EngineWrapper> yolo_;
@@ -59,13 +69,8 @@ public:
     static int ax_init_flage_;
     task_callback_t out_callback_;
     std::atomic_bool camera_flage_;
-    std::mutex inference_mtx_;
-    sem_t inference_semaphore;
-    std::atomic_int inference_status_;
     std::unique_ptr<std::thread> inference_run_;
-    std::atomic_bool is_running_;
-    cv::Mat _inference_src;
-    bool _inference_bgr2rgb;
+    thread_safe::list<inference_async_par> async_list_;
 
     bool parse_config(const nlohmann::json &config_body)
     {
@@ -138,11 +143,14 @@ public:
         return 0;
     }
 
-    std::string format_float(double value, int decimal_places)
+    std::string format_float(float value, int decimal_places)
     {
-        std::ostringstream out;
-        out << std::fixed << std::setprecision(decimal_places) << value;
-        return out.str();
+        char buffer[64];
+        int ret = snprintf(buffer, sizeof(buffer), "%.*f", decimal_places, value);
+        if (ret < 0 || ret >= static_cast<int>(sizeof(buffer))) {
+            return std::string("0inf");
+        }
+        return std::string(buffer);
     }
 
     void set_output(task_callback_t out_callback)
@@ -188,25 +196,27 @@ public:
 
     void run()
     {
-        sem_wait(&inference_semaphore);
-        while (is_running_) {
+        inference_async_par par;
+        for (;;) {
             {
-                inference(_inference_src, _inference_bgr2rgb);
-                inference_status_--;
-                sem_wait(&inference_semaphore);
+                par = async_list_.get();
+                if (par.inference_src.empty()) break;
+                inference(par.inference_src, par.inference_bgr2rgb);
             }
         }
     }
 
     int inference_async(cv::Mat &src, bool bgr2rgb = true)
     {
-        if (inference_status_ == INFERENCE_NONE) {
-            _inference_src     = src;
-            _inference_bgr2rgb = bgr2rgb;
-            inference_status_  = INFERENCE_RUNNING;
-            sem_post(&inference_semaphore);
+        if (async_list_.size() < 3) {
+            inference_async_par par;
+            par.inference_src     = src.clone();
+            par.inference_bgr2rgb = bgr2rgb;
+            async_list_.put(par);
+        } else {
+            SLOGE("inference list is full\n");
         }
-        return inference_status_;
+        return async_list_.size();
     }
 
     bool inference(cv::Mat &src, bool bgr2rgb = true)
@@ -225,34 +235,47 @@ public:
             yolo_->Post_Process(img_mat, mode_config_.img_w, mode_config_.img_h, mode_config_.cls_num,
                                 mode_config_.point_num, mode_config_.pron_threshold, mode_config_.nms_threshold,
                                 objects, mode_config_.model_type);
-            std::vector<nlohmann::json> yolo_output;
-            for (size_t i = 0; i < objects.size(); i++) {
-                const detection::Object &obj = objects[i];
-                nlohmann::json output;
-                output["class"]      = mode_config_.cls_name[obj.label];
-                output["confidence"] = format_float(obj.prob, 2);
-                output["bbox"]       = nlohmann::json::array();
-                output["bbox"].push_back(format_float(obj.rect.x, 2));
-                output["bbox"].push_back(format_float(obj.rect.y, 2));
-                output["bbox"].push_back(format_float(obj.rect.x + obj.rect.width, 2));
-                output["bbox"].push_back(format_float(obj.rect.y + obj.rect.height, 2));
-                if (mode_config_.model_type == "segment") {
-                    std::vector<std::string> formatted_mask_feat;
-                    for (const auto &mask : obj.mask_feat) {
-                        formatted_mask_feat.push_back(format_float(mask, 2));
+            nlohmann::json yolo_output = nlohmann::json::array();
+            if (response_format_.compare(0, 10, "yolo.boxV2") == 0) {
+                nlohmann::json out_obj;
+                for (auto obj : objects) {
+                    out_obj["class"]      = mode_config_.cls_name[obj.label];
+                    out_obj["confidence"] = obj.prob;
+                    out_obj["bbox"]       = {obj.rect.x, obj.rect.y, obj.rect.width, obj.rect.height};
+                    if (mode_config_.model_type == "segment") {
+                        out_obj["mask"] = nlohmann::json::array();
+                        std::copy(obj.mask_feat.begin(), obj.mask_feat.end(), std::back_inserter(out_obj["mask"]));
                     }
-                    output["mask"] = formatted_mask_feat;
-                }
-                if (mode_config_.model_type == "pose") {
-                    std::vector<std::string> formatted_kps_feat;
-                    for (const auto &kps : obj.kps_feat) {
-                        formatted_kps_feat.push_back(format_float(kps, 2));
+                    if (mode_config_.model_type == "pose") {
+                        out_obj["kps"] = nlohmann::json::array();
+                        std::copy(obj.kps_feat.begin(), obj.kps_feat.end(), std::back_inserter(out_obj["kps"]));
                     }
-                    output["kps"] = formatted_kps_feat;
+                    if (mode_config_.model_type == "obb") out_obj["angle"] = obj.angle;
+                    yolo_output.push_back(out_obj);
+                    if (out_callback_) out_callback_(out_obj, false);
                 }
-                if (mode_config_.model_type == "obb") output["angle"] = obj.angle;
-                yolo_output.push_back(output);
-                if (out_callback_) out_callback_(yolo_output, false);
+            } else {
+                for (auto obj : objects) {
+                    nlohmann::json output;
+                    output["class"]      = mode_config_.cls_name[obj.label];
+                    output["confidence"] = format_float(obj.prob, 2);
+                    output["bbox"]       = {format_float(obj.rect.x, 2), format_float(obj.rect.y, 2),
+                                            format_float(obj.rect.x + obj.rect.width, 2),
+                                            format_float(obj.rect.y + obj.rect.height, 2)};
+                    if (mode_config_.model_type == "segment") {
+                        output["mask"] = nlohmann::json::array();
+                        std::transform(obj.mask_feat.begin(), obj.mask_feat.end(), std::back_inserter(output["mask"]),
+                                       [&](float x) { return format_float(x, 2); });
+                    }
+                    if (mode_config_.model_type == "pose") {
+                        output["kps"] = nlohmann::json::array();
+                        std::transform(obj.kps_feat.begin(), obj.kps_feat.end(), std::back_inserter(output["kps"]),
+                                       [&](float x) { return format_float(x, 2); });
+                    }
+                    if (mode_config_.model_type == "obb") output["angle"] = obj.angle;
+                    yolo_output.push_back(output);
+                    if (out_callback_) out_callback_(output, false);
+                }
             }
             if (out_callback_) out_callback_(yolo_output, true);
         } catch (...) {
@@ -292,20 +315,31 @@ public:
 
     llm_task(const std::string &workid)
     {
-        inference_status_ = INFERENCE_NONE;
-        sem_init(&inference_semaphore, 0, 0);
         _ax_init();
-        is_running_    = true;
         inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
+    }
+
+    void start()
+    {
+        if (!inference_run_) {
+            inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
+        }
+    }
+
+    void stop()
+    {
+        if (inference_run_) {
+            inference_async_par par;
+            async_list_.put(par);
+            inference_run_->join();
+            inference_run_.reset();
+        }
     }
 
     ~llm_task()
     {
-        is_running_ = false;
-        sem_post(&inference_semaphore);
-        if (inference_run_) inference_run_->join();
+        stop();
         _ax_deinit();
-        sem_destroy(&inference_semaphore);
     }
 };
 int llm_task::ax_init_flage_ = 0;
@@ -323,8 +357,7 @@ public:
     }
 
     void task_output(const std::weak_ptr<llm_task> llm_task_obj_weak,
-                     const std::weak_ptr<llm_channel_obj> llm_channel_weak, const std::vector<nlohmann::json> &data,
-                     bool finish)
+                     const std::weak_ptr<llm_channel_obj> llm_channel_weak, const nlohmann::json &data, bool finish)
     {
         auto llm_task_obj = llm_task_obj_weak.lock();
         auto llm_channel  = llm_channel_weak.lock();
@@ -596,6 +629,7 @@ public:
             send("None", "None", error_body, work_id);
             return -1;
         }
+        llm_task_[work_id_num]->stop();
         auto llm_channel = get_channel(work_id_num);
         llm_channel->stop_subscriber("");
         llm_task_.erase(work_id_num);
@@ -610,6 +644,7 @@ public:
             if (iteam == llm_task_.end()) {
                 break;
             }
+            iteam->second->stop();
             get_channel(iteam->first)->stop_subscriber("");
             iteam->second.reset();
             llm_task_.erase(iteam->first);

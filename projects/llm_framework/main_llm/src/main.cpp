@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <semaphore.h>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
+#include "thread_safe_list.h"
 using namespace StackFlows;
 #ifdef ENABLE_BACKWARD
 #define BACKWARD_HAS_DW 1
@@ -58,11 +59,9 @@ public:
     task_callback_t out_callback_;
     bool enoutput_;
     bool enstream_;
-    sem_t inference_semaphore;
-    std::atomic_int inference_status_;
+
     std::unique_ptr<std::thread> inference_run_;
-    std::atomic_bool is_running_;
-    std::string _inference_msg;
+    thread_safe::list<std::string> async_list_;
 
     void set_output(task_callback_t out_callback)
     {
@@ -223,24 +222,26 @@ public:
 
     void run()
     {
-        sem_wait(&inference_semaphore);
-        while (is_running_) {
+        std::string par;
+        for (;;) {
             {
-                inference(_inference_msg);
-                inference_status_--;
-                sem_wait(&inference_semaphore);
+                par = async_list_.get();
+                if (par.empty()) break;
+                inference(par);
             }
         }
     }
 
     int inference_async(const std::string &msg)
     {
-        if (inference_status_ == INFERENCE_NONE) {
-            _inference_msg    = msg;
-            inference_status_ = INFERENCE_RUNNING;
-            sem_post(&inference_semaphore);
+        if (msg.empty()) return -1;
+        if (async_list_.size() < 3) {
+            std::string par = msg;
+            async_list_.put(par);
+        } else {
+            SLOGE("inference list is full\n");
         }
-        return inference_status_;
+        return async_list_.size();
     }
 
     void inference(const std::string &msg)
@@ -286,7 +287,8 @@ public:
 
     bool pause()
     {
-        lLaMa_->Stop();
+        if(lLaMa_)
+            lLaMa_->Stop();
         return true;
     }
 
@@ -314,17 +316,31 @@ public:
 
     llm_task(const std::string &workid) : tokenizer_server_flage_(false), port_(getNextPort())
     {
-        inference_status_ = INFERENCE_NONE;
-        sem_init(&inference_semaphore, 0, 0);
-        is_running_    = true;
         inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
     }
 
+    void start()
+    {
+        if (!inference_run_) {
+            inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
+        }
+    }
+
+    void stop()
+    {
+        if (inference_run_) {
+            std::string par;
+            async_list_.put(par);
+            if(lLaMa_)
+                lLaMa_->Stop();
+            inference_run_->join();
+            inference_run_.reset();
+        }
+    }    
+
     ~llm_task()
     {
-        is_running_ = false;
-        sem_post(&inference_semaphore);
-        if (inference_run_) inference_run_->join();
+        stop();
         if (tokenizer_pid_ != -1) {
             kill(tokenizer_pid_, SIGTERM);
             waitpid(tokenizer_pid_, nullptr, WNOHANG);
@@ -332,7 +348,6 @@ public:
         if (lLaMa_) {
             lLaMa_->Deinit();
         }
-        sem_destroy(&inference_semaphore);
     }
 };
 
@@ -647,10 +662,9 @@ public:
             send("None", "None", error_body, work_id);
             return -1;
         }
-        task_pause(llm_task_[work_id_num], get_channel(work_id_num));
+        llm_task_[work_id_num]->stop();
         auto llm_channel = get_channel(work_id_num);
         llm_channel->stop_subscriber("");
-        llm_task_[work_id_num]->lLaMa_->Stop();
         llm_task_.erase(work_id_num);
         send("None", "None", LLM_NO_ERROR, work_id);
         return 0;
@@ -663,6 +677,7 @@ public:
             if (iteam == llm_task_.end()) {
                 break;
             }
+            iteam->second->stop();
             get_channel(iteam->first)->stop_subscriber("");
             iteam->second.reset();
             llm_task_.erase(iteam->first);

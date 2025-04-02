@@ -8,7 +8,8 @@
         "yolo.jpeg.base64"
     ],
     "output_type":[
-        "yolo.yolobox"
+        "yolo.box",
+        "yolo.boxV2"
     ],
     "mode_param":{
         "yolo_model":"yolo11n-pose.axmodel",
