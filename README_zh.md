@@ -17,6 +17,7 @@
 * [环境要求](#环境要求)
 * [编译](#编译)
 * [安装](#安装)
+* [在线安装](#在线安装)
 * [升级](#升级)
 * [运行](#运行)
 * [配置](#配置)
@@ -95,6 +96,24 @@ dpkg -i ./llm-xxx_1.4-m5stack1_arm64.deb
 # 安装模型包
 dpkg -i ./llm-xxx_1.4-m5stack1_arm64.deb
 # 注意 lib-llm_1.4-m5stack1_arm64.deb 和 llm-sys_1.4-m5stack1_arm64.deb 的安装顺序，其他 llm 单元和模型包的安装顺序没有要求。
+```
+
+## 在线安装 ##
+在线安装需要联网,请保持网络畅通，模型包较大，请酌情安装使用。
+```bash
+# 添加 apt 密钥和源
+wget -qO /etc/apt/keyrings/StackFlow.gpg https://repo.llm.m5stack.com/m5stack-apt-repo/key/StackFlow.gpg
+echo 'deb [arch=arm64 signed-by=/etc/apt/keyrings/StackFlow.gpg] https://repo.llm.m5stack.com/m5stack-apt-repo jammy ax630c' > /etc/apt/sources.list.d/StackFlow.list
+# 更新 apt 源
+apt update
+# 首先安装动态库依赖
+apt install lib-llm
+# 然后安装 llm-sys 主单元
+apt install llm-sys
+# 安装其他 llm 单元
+apt install llm-xxx
+# 安装模型包
+apt install llm-model-xxx
 ```
 
 ## 升级

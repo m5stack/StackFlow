@@ -15,6 +15,7 @@
 * [SystemRequirements](#SystemRequirements)
 * [Compile](#Compile)
 * [Installation](#Installation)
+* [OnlineInstallation](#OnlineInstallation)
 * [Upgrade](#Upgrade)
 * [Run](#Run)
 * [Configuration](#Configuration)
@@ -43,7 +44,7 @@ Main working modes of the StackFlow voice assistant:
 After startup, KWS, ASR, LLM, TTS, and AUDIO are configured to work collaboratively. When KWS detects a keyword in the audio obtained from the AUDIO unit, it sends a wake-up signal. At this point, ASR starts working, recognizing the audio data from AUDIO and publishing the results to its output channel. Once LLM receives the text data converted by ASR, it begins reasoning and publishes the results to its output channel. TTS, upon receiving the results from LLM, starts voice synthesis and plays the synthesized audio data according to the configuration.
 
 
-## Demo
+## Demo ##
 - [StackFlow continuous speech recognition](./projects/llm_framework/README.md)
 - [StackFlow LLM large model awakening dialogue](./projects/llm_framework/README.md)
 - [StackFlow TTS voice synthesis playback](./projects/llm_framework/README.md)
@@ -95,7 +96,26 @@ dpkg -i ./llm-xxx_1.4-m5stack1_arm64.deb
 # Note the installation order of lib-llm_1.4-m5stack1_arm64.deb and llm-sys_1.4-m5stack1_arm64.deb. The installation order of other llm units and model packages is not required.
 ```
 
-## Upgrade
+## OnlineInstallation ##
+Online installation requires an active internet connection. Please ensure network connectivity. The model package is relatively large, so install and use it as needed.
+
+```bash
+# Add apt key and source
+wget -qO /etc/apt/keyrings/StackFlow.gpg https://repo.llm.m5stack.com/m5stack-apt-repo/key/StackFlow.gpg
+echo 'deb [arch=arm64 signed-by=/etc/apt/keyrings/StackFlow.gpg] https://repo.llm.m5stack.com/m5stack-apt-repo jammy ax630c' > /etc/apt/sources.list.d/StackFlow.list
+# Update apt sources
+apt update
+# First install dynamic library dependencies
+apt install lib-llm
+# Then install the main llm-sys unit
+apt install llm-sys
+# Install other llm units
+apt install llm-xxx
+# Install the model package
+apt install llm-model-xxx
+```
+
+## Upgrade ##
 When upgrading, you can either upgrade the AI unit individually or upgrade the entire StackFlow framework.  
 When upgrading a single unit, you can upgrade via an SD card or manually install using the `dpkg` command. It's important to note that for minor version packages, you can install the upgrade package individually, but for major version upgrades, all llm units must be installed completely.  
 Command line upgrade package:
@@ -122,12 +142,12 @@ Both types of configuration files use the JSON format and are located in multipl
 ## Interface ##
 StackFlow can be accessed via UART and TCP ports. The default baud rate for the UART port is 115200, and the default port for the TCP port is 10001. Parameters can be modified through configuration files.
 
-## Contribution
+## Contribution ##
 
 * If you like this project, please give it a star first;
 * To report a bug, please go to the [issue page](https://github.com/m5stack/StackFlow/issues);
 * If you want to contribute code, feel free to fork it and then submit a pull request;
 
-## Star History
+## Star History ##
 
 [![Star History Chart](https://api.star-history.com/svg?repos=m5stack/StackFlow&type=Date)](https://star-history.com/#m5stack/StackFlow&Date)
