@@ -32,6 +32,26 @@ STATIC_FILES += Glob('mode_*.json')
 STATIC_FILES += [ModuleLLMOpenAIPluginPath]
 STATIC_FILES += [os.path.join(python_venv, 'openai-api')]
 
+IGNORE_FILES = []
+IGNORE_FILES += ['openai-api']
+IGNORE_FILES += [os.path.basename(ModuleLLMOpenAIPluginPath)]
+
+
+import json
+if not os.path.exists('../dist'):
+    os.makedirs('../dist')
+ignore = {'ignore':[]}
+try:
+    with open('../dist/fileignore', 'a+') as f:
+        f.seek(0)
+        ignore = json.load(f)
+except:
+    pass
+ignore['ignore'] += IGNORE_FILES
+ignore['ignore'] = list(set(ignore['ignore']))
+with open('../dist/fileignore', 'w') as f:
+    json.dump(ignore, f, indent=4)
+
 env['COMPONENTS'].append({'target':'llm_openai_api',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,

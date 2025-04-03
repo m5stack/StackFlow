@@ -27,16 +27,27 @@ def create_lib_deb(package_name, version, src_folder, revision = 'm5stack1'):
     if os.path.exists(deb_folder):
         shutil.rmtree(deb_folder)
     os.makedirs(deb_folder, exist_ok = True)
-
+    fileignore = {'ignore':[]}
+    try:
+        with open(os.path.join(src_folder, 'fileignore'), 'r') as f:
+            fileignore = json.load(f)
+    except:
+        pass
     for item in os.listdir(src_folder):
-        if item.startswith('llm_') or item.startswith('tokenizer_') or item.startswith('llm-kws_'):
+        if item.startswith('llm_') or item.startswith('tokenizer_') or item.startswith('llm-kws_') or item.startswith('mode_') or item in fileignore['ignore']:
             continue
         elif item.startswith('lib'):
             os.makedirs(os.path.join(deb_folder, 'opt/m5stack/lib'), exist_ok = True)
             shutil.copy2(os.path.join(src_folder, item), os.path.join(deb_folder, 'opt/m5stack/lib', item))
-        elif not item.startswith('mode_'):
+        else:
             os.makedirs(os.path.join(deb_folder, 'opt/m5stack/share'), exist_ok = True)
-            shutil.copy2(os.path.join(src_folder, item), os.path.join(deb_folder, 'opt/m5stack/share', item))
+            source_path = os.path.join(src_folder, item)
+            target_path = os.path.join(deb_folder, 'opt/m5stack/share', item)
+            if os.path.isfile(source_path):
+                shutil.copy2(source_path, target_path)
+            elif os.path.isdir(source_path):
+                shutil.copytree(source_path, target_path)
+
     # os.makedirs(os.path.join(deb_folder, 'opt/m5stack/data'), exist_ok = True)
 
     # zip_file = 'm5stack_scripts.tar.gz'
@@ -287,6 +298,7 @@ if __name__ == "__main__":
 
     if "clean" in sys.argv:
         os.system('rm ./*.deb')
+        os.system('find . -maxdepth 1 -type d ! -name "." -exec rm -rf {} +')
         exit(0)
     if "distclean" in sys.argv:
         os.system('rm ./*.deb m5stack_* -rf')
@@ -308,19 +320,60 @@ if __name__ == "__main__":
     else:
         cpu_count = cpu_count - 2
     # cpu_count = 50
-
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
+# 添加新模型版本号从 0.1 版本号开始累加
+# 当单元和前单元不兼容时提升大版本号
+# 当模型和前模型不兼容时提升大版本号
+# 加速单元和模型单元的大版本号保持一致，以有的更新暂不改变，从2025年 04月 03日开始
+# Start adding new model version numbers from the 0.1 version number.
+# Increment the major version number when units and previous units are incompatible
+# Increment the major version number when models and previous models are incompatible
+# Keep the major version numbers of acceleration units and model units consistent, with some updates not changing them, starting from April 3, 2025.
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
+# 添加新模型版本号从 0.1 版本号开始累加
+# 当单元和前单元不兼容时提升大版本号
+# 当模型和前模型不兼容时提升大版本号
+# 加速单元和模型单元的大版本号保持一致，以有的更新暂不改变，从2025年 04月 03日开始
+# Start adding new model version numbers from the 0.1 version number.
+# Increment the major version number when units and previous units are incompatible
+# Increment the major version number when models and previous models are incompatible
+# Keep the major version numbers of acceleration units and model units consistent, with some updates not changing them, starting from April 3, 2025.
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
+# 添加新模型版本号从 0.1 版本号开始累加
+# 当单元和前单元不兼容时提升大版本号
+# 当模型和前模型不兼容时提升大版本号
+# 加速单元和模型单元的大版本号保持一致，以有的更新暂不改变，从2025年 04月 03日开始
+# Start adding new model version numbers from the 0.1 version number.
+# Increment the major version number when units and previous units are incompatible
+# Increment the major version number when models and previous models are incompatible
+# Keep the major version numbers of acceleration units and model units consistent, with some updates not changing them, starting from April 3, 2025.
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
+#################################################注意################################################
     Tasks = {
         'lib-llm':[create_lib_deb,'lib-llm', 1.6, src_folder, revision],
         'llm-sys':[create_bin_deb,'llm-sys', version, src_folder, revision],
         'llm-audio':[create_bin_deb,'llm-audio', version, src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', version, src_folder, revision],
         'llm-asr':[create_bin_deb,'llm-asr', version, src_folder, revision],
-        'llm-llm':[create_bin_deb,'llm-llm', version, src_folder, revision],
+        'llm-llm':[create_bin_deb,'llm-llm', '1.6', src_folder, revision],
         'llm-tts':[create_bin_deb,'llm-tts', version, src_folder, revision],
         'llm-melotts':[create_bin_deb,'llm-melotts', version, src_folder, revision],
-        'llm-camera':[create_bin_deb,'llm-camera', version, src_folder, revision],
+        'llm-camera':[create_bin_deb,'llm-camera', '1.6', src_folder, revision],
         'llm-vlm':[create_bin_deb,'llm-vlm', version, src_folder, revision],
-        'llm-yolo':[create_bin_deb,'llm-yolo', version, src_folder, revision],
+        'llm-yolo':[create_bin_deb,'llm-yolo', '1.6', src_folder, revision],
         'llm-skel':[create_bin_deb,'llm-skel', version, src_folder, revision],
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', version, src_folder, revision],
         'llm-vad':[create_bin_deb,'llm-vad', version, src_folder, revision],
