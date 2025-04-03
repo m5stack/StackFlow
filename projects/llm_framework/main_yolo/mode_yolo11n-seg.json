@@ -1,5 +1,5 @@
 {
-    "mode":"yolo11s-seg",
+    "mode":"yolo11n-seg",
     "type":"cv",
     "homepage":"https://github.com/ultralytics/ultralytics",
     "capabilities":[
