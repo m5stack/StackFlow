@@ -391,7 +391,7 @@ if __name__ == "__main__":
         'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
         'llm-model-yolo11n-pose':[create_data_deb,'llm-model-yolo11n-pose', '0.3', src_folder, revision],
         'llm-model-yolo11n-hand-pose':[create_data_deb,'llm-model-yolo11n-hand-pose', '0.3', src_folder, revision],
-        'llm-model-yolo11n-seg':[create_data_deb,'llm-model-yolo11n-seg', data_version, src_folder, revision],
+        'llm-model-yolo11n-seg':[create_data_deb,'llm-model-yolo11n-seg', '0.3', src_folder, revision],
         'llm-model-depth-anything-ax630c':[create_data_deb,'llm-model-depth-anything-ax630c', '0.3', src_folder, revision],
         'llm-model-whisper-tiny':[create_data_deb,'llm-model-whisper-tiny', '0.3', src_folder, revision],
         'llm-model-whisper-base':[create_data_deb,'llm-model-whisper-base', '0.3', src_folder, revision],
