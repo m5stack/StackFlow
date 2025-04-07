@@ -16,7 +16,7 @@ Send JSON:
   "action": "setup",
   "object": "asr.setup",
   "data": {
-    "model": "sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23",
+    "model": "sherpa-ncnn-streaming-zipformer-20M-2023-02-17",
     "response_format": "asr.utf-8.stream",
     "input": "sys.pcm",
     "enoutput": true,
@@ -34,7 +34,7 @@ Send JSON:
 - work_id: For configuration units, it is `asr`.
 - action: The method to be called is `setup`.
 - object: The type of data being transmitted is `asr.setup`.
-- model: The model used is the Chinese model `sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23`.
+- model: The model used is the Chinese model `sherpa-ncnn-streaming-zipformer-20M-2023-02-17`.
 - response_format: The result format is `asr.utf-8.stream`, a UTF-8 stream output.
 - input: The input is `sys.pcm`, representing system audio.
 - enoutput: Whether to enable user result output.
@@ -109,7 +109,7 @@ Example:
   "action": "setup",
   "object": "asr.setup",
   "data": {
-    "model": "sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23",
+    "model": "sherpa-ncnn-streaming-zipformer-20M-2023-02-17",
     "response_format": "asr.utf-8.stream",
     "input": [
       "sys.pcm",
@@ -310,7 +310,7 @@ Response JSON:
     "inputs_": [
       "sys.pcm"
     ],
-    "model": "sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23",
+    "model": "sherpa-ncnn-streaming-zipformer-20M-2023-02-17",
     "response_format": "asr.utf-8-stream"
   },
   "error": {
