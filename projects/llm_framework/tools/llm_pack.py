@@ -68,23 +68,23 @@ def create_lib_deb(package_name, version, src_folder, revision = 'm5stack1'):
     # if os.path.exists(zip_file_extrpath):
     #     shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'opt/m5stack/scripts'))
 
-    zip_file = 'm5stack_dist-packages.tar.gz'
-    down_url = 'https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_dist-packages.tar.gz'
-    zip_file_extrpath = 'm5stack_dist-packages'
-    if not os.path.exists(zip_file_extrpath):
-        # Downloading via HTTP (more common)
-        if not os.path.exists(zip_file):
-            response = requests.get(down_url)
-            if response.status_code == 200:
-                with open(zip_file, 'wb') as file:
-                    file.write(response.content)
-            else:
-                print("{} down failed".format(down_url))
-        with tarfile.open(zip_file, 'r:gz') as tar:
-            tar.extractall(path=zip_file_extrpath)
-        print("The {} download successful.".format(down_url))
-    if os.path.exists(zip_file_extrpath):
-        shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'usr/local/lib/python3.10/dist-packages'))
+    # zip_file = 'm5stack_dist-packages.tar.gz'
+    # down_url = 'https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_dist-packages.tar.gz'
+    # zip_file_extrpath = 'm5stack_dist-packages'
+    # if not os.path.exists(zip_file_extrpath):
+    #     # Downloading via HTTP (more common)
+    #     if not os.path.exists(zip_file):
+    #         response = requests.get(down_url)
+    #         if response.status_code == 200:
+    #             with open(zip_file, 'wb') as file:
+    #                 file.write(response.content)
+    #         else:
+    #             print("{} down failed".format(down_url))
+    #     with tarfile.open(zip_file, 'r:gz') as tar:
+    #         tar.extractall(path=zip_file_extrpath)
+    #     print("The {} download successful.".format(down_url))
+    # if os.path.exists(zip_file_extrpath):
+    #     shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'usr/local/lib/python3.10/dist-packages'))
 
     os.makedirs(os.path.join(deb_folder, 'DEBIAN'), exist_ok = True)
     with open(os.path.join(deb_folder, 'DEBIAN/control'),'w') as f:
@@ -238,6 +238,18 @@ def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1'):
         openai_api_dir = os.path.join(src_folder, 'openai-api')
         if os.path.exists(openai_api_dir):
             shutil.copytree(openai_api_dir, os.path.join(deb_folder, 'opt/m5stack/lib/openai-api'))
+    if package_name == 'llm-kws':
+        sherpa_dir = os.path.join(src_folder, 'sherpa-onnx')
+        if os.path.exists(sherpa_dir):
+            shutil.copytree(sherpa_dir, os.path.join(deb_folder, 'opt/m5stack/lib/sherpa-onnx'))
+    if package_name == 'llm-llm':
+        llm_dir = os.path.join(src_folder, 'llm')
+        if os.path.exists(llm_dir):
+            shutil.copytree(llm_dir, os.path.join(deb_folder, 'opt/m5stack/lib/llm'))
+    if package_name == 'llm-vlm':
+        vlm_dir = os.path.join(src_folder, 'vlm')
+        if os.path.exists(vlm_dir):
+            shutil.copytree(vlm_dir, os.path.join(deb_folder, 'opt/m5stack/lib/vlm'))
     shutil.copy2(os.path.join(src_folder, package_name.replace("-", "_")), os.path.join(deb_folder, 'opt/m5stack/bin', package_name.replace("-", "_")))
     ext_scripts_files = glob.glob(os.path.join(src_folder, package_name + "_*"))
     if ext_scripts_files:
@@ -253,7 +265,8 @@ def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1'):
         f.write(f'Original-Maintainer: m5stack <m5stack@m5stack.com>\n')
         f.write(f'Section: llm-module\n')
         f.write(f'Priority: optional\n')
-        f.write(f'Depends: lib-llm\n')
+        # f.write(f'Depends: lib-llm\n')
+        f.write(f'Depends: lib-llm (>= 1.7)\n')
         f.write(f'Homepage: https://www.m5stack.com\n')
         f.write(f'Description: llm-module\n')
         f.write(f' bsp.\n')
@@ -363,12 +376,12 @@ if __name__ == "__main__":
 #################################################注意################################################
 #################################################注意################################################
     Tasks = {
-        'lib-llm':[create_lib_deb,'lib-llm', 1.6, src_folder, revision],
+        'lib-llm':[create_lib_deb,'lib-llm', 1.7, src_folder, revision],
         'llm-sys':[create_bin_deb,'llm-sys', version, src_folder, revision],
         'llm-audio':[create_bin_deb,'llm-audio', version, src_folder, revision],
-        'llm-kws':[create_bin_deb,'llm-kws', version, src_folder, revision],
+        'llm-kws':[create_bin_deb,'llm-kws', '1.6', src_folder, revision],
         'llm-asr':[create_bin_deb,'llm-asr', version, src_folder, revision],
-        'llm-llm':[create_bin_deb,'llm-llm', '1.6', src_folder, revision],
+        'llm-llm':[create_bin_deb,'llm-llm', '1.7', src_folder, revision],
         'llm-tts':[create_bin_deb,'llm-tts', version, src_folder, revision],
         'llm-melotts':[create_bin_deb,'llm-melotts', version, src_folder, revision],
         'llm-camera':[create_bin_deb,'llm-camera', '1.6', src_folder, revision],
@@ -378,37 +391,39 @@ if __name__ == "__main__":
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', version, src_folder, revision],
         'llm-vad':[create_bin_deb,'llm-vad', version, src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', version, src_folder, revision],
-        'llm-openai-api':[create_bin_deb,'llm-openai-api', version, src_folder, revision],
-        'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
-        'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', data_version, src_folder, revision],
-        'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17', data_version, src_folder, revision],
-        'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23', data_version, src_folder, revision],
-        'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
-        'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
-        'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', data_version, src_folder, revision],
-        'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', data_version, src_folder, revision],
-        'llm-model-melotts-zh-cn':[create_data_deb,'llm-model-melotts-zh-cn', '0.4', src_folder, revision],
-        'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
-        'llm-model-yolo11n-pose':[create_data_deb,'llm-model-yolo11n-pose', '0.3', src_folder, revision],
-        'llm-model-yolo11n-hand-pose':[create_data_deb,'llm-model-yolo11n-hand-pose', '0.3', src_folder, revision],
-        'llm-model-yolo11n-seg':[create_data_deb,'llm-model-yolo11n-seg', '0.3', src_folder, revision],
-        'llm-model-depth-anything-ax630c':[create_data_deb,'llm-model-depth-anything-ax630c', '0.3', src_folder, revision],
-        'llm-model-whisper-tiny':[create_data_deb,'llm-model-whisper-tiny', '0.3', src_folder, revision],
-        'llm-model-whisper-base':[create_data_deb,'llm-model-whisper-base', '0.3', src_folder, revision],
-        'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.3', src_folder, revision],
-        'llm-model-qwen2.5-0.5B-prefill-20e':[create_data_deb,'llm-model-qwen2.5-0.5B-prefill-20e', data_version, src_folder, revision],
-        'llm-model-qwen2.5-0.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-0.5B-p256-ax630c', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-0.5B-Int4-ax630c':[create_data_deb,'llm-model-qwen2.5-0.5B-Int4-ax630c', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-1.5B-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-ax630c', '0.3', src_folder, revision],
-        'llm-model-qwen2.5-1.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-p256-ax630c', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-1.5B-Int4-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-Int4-ax630c', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-coder-0.5B-ax630c':[create_data_deb,'llm-model-qwen2.5-coder-0.5B-ax630c', data_version, src_folder, revision],
-        'llm-model-llama3.2-1B-prefill-ax630c':[create_data_deb,'llm-model-llama3.2-1B-prefill-ax630c', data_version, src_folder, revision],
-        'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],
-        'llm-model-openbuddy-llama3.2-1B-ax630c':[create_data_deb,'llm-model-openbuddy-llama3.2-1B-ax630c', data_version, src_folder, revision],
-        'llm-model-internvl2.5-1B-ax630c':[create_data_deb,'llm-model-internvl2.5-1B-ax630c', '0.4', src_folder, revision],
-        'llm-model-deepseek-r1-1.5B-ax630c':[create_data_deb,'llm-model-deepseek-r1-1.5B-ax630c', '0.3', src_folder, revision],
-        'llm-model-deepseek-r1-1.5B-p256-ax630c':[create_data_deb,'llm-model-deepseek-r1-1.5B-p256-ax630c', '0.4', src_folder, revision],
+        'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.6', src_folder, revision],
+        # 'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
+        # 'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', data_version, src_folder, revision],
+        # 'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17', data_version, src_folder, revision],
+        # 'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23', data_version, src_folder, revision],
+        # 'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
+        # 'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
+        # 'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', data_version, src_folder, revision],
+        # 'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', data_version, src_folder, revision],
+        # 'llm-model-melotts-zh-cn':[create_data_deb,'llm-model-melotts-zh-cn', '0.4', src_folder, revision],
+        # 'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
+        # 'llm-model-yolo11n-pose':[create_data_deb,'llm-model-yolo11n-pose', '0.3', src_folder, revision],
+        # 'llm-model-yolo11n-hand-pose':[create_data_deb,'llm-model-yolo11n-hand-pose', '0.3', src_folder, revision],
+        # 'llm-model-yolo11n-seg':[create_data_deb,'llm-model-yolo11n-seg', '0.3', src_folder, revision],
+        # 'llm-model-depth-anything-ax630c':[create_data_deb,'llm-model-depth-anything-ax630c', '0.3', src_folder, revision],
+        # 'llm-model-whisper-tiny':[create_data_deb,'llm-model-whisper-tiny', '0.3', src_folder, revision],
+        # 'llm-model-whisper-base':[create_data_deb,'llm-model-whisper-base', '0.3', src_folder, revision],
+        # 'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.3', src_folder, revision],
+        # 'llm-model-qwen2.5-0.5B-prefill-20e':[create_data_deb,'llm-model-qwen2.5-0.5B-prefill-20e', data_version, src_folder, revision],
+        # 'llm-model-qwen2.5-0.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-0.5B-p256-ax630c', '0.4', src_folder, revision],
+        # 'llm-model-qwen2.5-0.5B-Int4-ax630c':[create_data_deb,'llm-model-qwen2.5-0.5B-Int4-ax630c', '0.4', src_folder, revision],
+        # 'llm-model-qwen2.5-1.5B-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-ax630c', '0.3', src_folder, revision],
+        # 'llm-model-qwen2.5-1.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-p256-ax630c', '0.4', src_folder, revision],
+        # 'llm-model-qwen2.5-1.5B-Int4-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-Int4-ax630c', '0.4', src_folder, revision],
+        # 'llm-model-qwen2.5-coder-0.5B-ax630c':[create_data_deb,'llm-model-qwen2.5-coder-0.5B-ax630c', data_version, src_folder, revision],
+        # 'llm-model-llama3.2-1B-prefill-ax630c':[create_data_deb,'llm-model-llama3.2-1B-prefill-ax630c', data_version, src_folder, revision],
+        # 'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],
+        # 'llm-model-openbuddy-llama3.2-1B-ax630c':[create_data_deb,'llm-model-openbuddy-llama3.2-1B-ax630c', data_version, src_folder, revision],
+        # 'llm-model-internvl2.5-1B-ax630c':[create_data_deb,'llm-model-internvl2.5-1B-ax630c', '0.4', src_folder, revision],
+        # 'llm-model-internvl2.5-1B-364-ax630c':[create_data_deb,'llm-model-internvl2.5-1B-364-ax630c', '0.4', src_folder, revision],
+        # 'llm-model-deepseek-r1-1.5B-ax630c':[create_data_deb,'llm-model-deepseek-r1-1.5B-ax630c', '0.3', src_folder, revision],
+        # 'llm-model-deepseek-r1-1.5B-p256-ax630c':[create_data_deb,'llm-model-deepseek-r1-1.5B-p256-ax630c', '0.4', src_folder, revision],
+        'llm-model-smolvlm-256M-ax630c':[create_data_deb,'llm-model-smolvlm-256M-ax630c', '0.4', src_folder, revision],
         # 'llm-model-qwen2-0.5B-prefill-20e':[create_data_deb,'llm-model-qwen2-0.5B-prefill-20e', data_version, src_folder, revision],
         # 'llm-model-qwen2-1.5B-prefill-20e':[create_data_deb,'llm-model-qwen2-1.5B-prefill-20e', data_version, src_folder, revision]
     }
