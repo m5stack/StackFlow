@@ -385,7 +385,7 @@ if __name__ == "__main__":
         'llm-tts':[create_bin_deb,'llm-tts', version, src_folder, revision],
         'llm-melotts':[create_bin_deb,'llm-melotts', version, src_folder, revision],
         'llm-camera':[create_bin_deb,'llm-camera', '1.6', src_folder, revision],
-        'llm-vlm':[create_bin_deb,'llm-vlm', version, src_folder, revision],
+        'llm-vlm':[create_bin_deb,'llm-vlm', '1.6', src_folder, revision],
         'llm-yolo':[create_bin_deb,'llm-yolo', '1.6', src_folder, revision],
         'llm-skel':[create_bin_deb,'llm-skel', version, src_folder, revision],
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', version, src_folder, revision],
