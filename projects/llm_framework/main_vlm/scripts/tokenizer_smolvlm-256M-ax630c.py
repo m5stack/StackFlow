@@ -81,7 +81,7 @@ class Tokenizer_Http:
         return input_ids["input_ids"]
 
     def encode_vpm(self, prompt, content="Please describe the image shortly."):
-        prompt = f"<|im_start|>User:<image>{content}<end_of_utterance>\nAssistant:"
+        prompt = f"<|im_start|>User:<image>{prompt}<end_of_utterance>\nAssistant:"
         text = [prompt]
         image_rows = [[0]]
         image_cols = [[0]]
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     args.add_argument("--host", type=str, default="localhost")
     args.add_argument("--port", type=int, default=8080)
     args.add_argument('--model_id', type=str, default='internvl2_tokenizer')
-    args.add_argument('--content', type=str, default='你是由上海人工智能实验室联合商汤科技开发的书生多模态大模型，英文名叫InternVL, 是一个有用无害的人工智能助手。')
+    args.add_argument('--content', type=str, default='')
     args = args.parse_args()
 
     tokenizer = Tokenizer_Http(args.model_id)
