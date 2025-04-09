@@ -15,11 +15,13 @@
   "action": "setup",
   "object": "camera.setup",
   "data": {
-    "response_format": "camera.raw",
+    "response_format": "image.yuyv422.base64",
     "input": "/dev/video0",
     "enoutput": false,
     "frame_width": 320,
-    "frame_height": 320
+    "frame_height": 320,
+    "enable_webstream":false,
+    "rtsp":"rtsp.1280x720.h265"
   }
 }
 ```
@@ -28,11 +30,13 @@
 - work_id：配置单元时，为 `camera`。
 - action：调用的方法为 `setup`。
 - object：传输的数据类型为 `camera.setup`。
-- response_format：返回结果为 `camera.raw`，是 yuv422 格式。
-- input：读取的设备名。
+- response_format：返回结果为 `image.yuyv422.base64`，是 yuyv422 格式。可选 image.jpeg.base64 格式输出。
+- input：读取的设备名。示例："/dev/video0", "axera_single_sc850sl"
 - frame_width：输出的视频帧宽。
 - frame_height：输出的视频帧高。
 - enoutput：是否起用用户结果输出。如果不需要获取摄像头图片，请不要开启该参数，视频流会增加信道的通信压力。
+- enable_webstream：是否启用 webstream 流输出，webstream 会监听 tcp:8989 端口，一但收到客户端连接，将会以 HTTP 协议 multipart/x-mixed-replace 类型推送 jpeg 图片。
+- rtsp：是否启用 rtsp 流输出，rtsp 会建立一个 rtsp://{DevIp}:8554/axstream0 RTSP TCP 服务端，可使用RTSP 协议向该端口拉取视频流。视频流的格式为 1280x720 H265。注意，该视频流只在 AX630C MIPI 摄像头上有效，UVC 摄像头无法使用 RTSP。
 
 响应 json：
 
@@ -136,7 +140,7 @@ error::code 为 0 表示执行成功。
   "created": 1731652344,
   "data": {
     "enoutput": false,
-    "response_format": "camera.raw",
+    "response_format": "image.yuyv422.base64",
     "input": "/dev/video0",
     "frame_width": 320,
     "frame_height": 320
