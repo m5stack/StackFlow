@@ -159,6 +159,7 @@ public:
                 if (!tokenizer_server_flage_.load()) {
                     tokenizer_pid_ = fork();
                     if (tokenizer_pid_ == 0) {
+                        setenv("PYTHONPATH", "/opt/m5stack/lib/llm/site-packages", 1);
                         execl("/usr/bin/python3", "python3", tokenizer_file.c_str(), "--host", "localhost", "--port",
                               std::to_string(port_).c_str(), "--model_id", (base_model + "tokenizer").c_str(),
                               "--content", ("'" + prompt_ + "'").c_str(), nullptr);
