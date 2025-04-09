@@ -212,6 +212,7 @@ public:
                     SLOGW("config file :%s miss", file_name.c_str());
                     continue;
                 }
+                SLOGI("config file :%s read", file_name.c_str());
                 config_file >> file_body;
                 config_file.close();
                 break;
@@ -533,8 +534,17 @@ public:
         _ax_init();
     }
 
+    void start()
+    {
+    }
+
+    void stop()
+    {
+    }
+
     ~llm_task()
     {
+        stop();
         _ax_deinit();
         buffer_destroy(pcmdata);
     }
@@ -957,6 +967,7 @@ public:
             send("None", "None", error_body, work_id);
             return -1;
         }
+        llm_task_[work_id_num]->stop();
         auto llm_channel = get_channel(work_id_num);
         llm_channel->stop_subscriber("");
         if (llm_task_[work_id_num]->audio_flage_) {
@@ -974,6 +985,7 @@ public:
             if (iteam == llm_task_.end()) {
                 break;
             }
+            iteam->second->stop();
             if (iteam->second->audio_flage_) {
                 unit_call("audio", "cap_stop", "None");
             }

@@ -707,7 +707,7 @@ int sys_reset(int com_id, const nlohmann::json &json_obj)
 
 int sys_version(int com_id, const nlohmann::json &json_obj)
 {
-    usr_out(json_obj["request_id"], json_obj["work_id"], std::string("v1.4"), com_id);
+    usr_out(json_obj["request_id"], json_obj["work_id"], std::string("v1.5"), com_id);
     int out = 0;
     return out;
 }
