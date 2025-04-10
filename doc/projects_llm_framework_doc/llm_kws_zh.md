@@ -19,7 +19,8 @@
     "response_format": "kws.bool",
     "input": "sys.pcm",
     "enoutput": true,
-    "kws": "你好你好"
+    "kws": "你好你好",
+    "enwake_audio": true
   }
 }
 ```
@@ -33,6 +34,7 @@
 - input：输入的为 `sys.pcm`,代表的是系统音频。
 - enoutput：是否起用用户结果输出。
 - kws：中文唤醒词为 `"你好你好"`。
+- enwake_audio：是否起用唤醒音频输出。默认是 true
 
 响应 json：
 

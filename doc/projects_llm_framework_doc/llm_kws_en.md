@@ -20,7 +20,8 @@ Send JSON:
     "response_format": "kws.bool",
     "input": "sys.pcm",
     "enoutput": true,
-    "kws": "HELLO"
+    "kws": "HELLO",
+    "enwake_audio": true
   }
 }
 ```
@@ -34,6 +35,7 @@ Send JSON:
 - input: The input is `sys.pcm`, representing system audio.
 - enoutput: Whether to enable user result output.
 - kws: The Chinese wake-up word is `"你好你好"`.
+- enwake_audio: Whether to enable wake-up audio output. Default is true.
 
 Response JSON:
 
