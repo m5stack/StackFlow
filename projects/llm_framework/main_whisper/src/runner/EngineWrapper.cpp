@@ -12,11 +12,13 @@
 
 #include <cstdlib>
 
-#if defined(CHIP_AX650)
+#include <global_config.h>
+
+#if defined(CONFIG_AX_650N_MSP_ENABLED)
 static const char *strAlgoModelType[AX_ENGINE_MODEL_TYPE_BUTT] = {"3.6T", "7.2T", "18T"};
 #endif
 
-#if defined(CHIP_AX630C) || defined(CHIP_AX620Q)
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 static const char *strAlgoModelType[AX_ENGINE_MODEL_TYPE_BUTT] = {"HalfOCM", "FullOCM"};
 #endif
 
@@ -128,7 +130,7 @@ static AX_S32 CheckModelVNpu(const std::string &strModel, const AX_ENGINE_MODEL_
 }
 #endif
 
-#if defined(CHIP_AX630C) || defined(CHIP_AX620Q)
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 static AX_S32 CheckModelVNpu(const std::string &strModel, const AX_ENGINE_MODEL_TYPE_T &eModelType, const AX_S32 &nNpuType, AX_U32 &nNpuSet) {
     AX_ENGINE_NPU_ATTR_T stNpuAttr;
     memset(&stNpuAttr, 0x00, sizeof(stNpuAttr));
