@@ -408,6 +408,7 @@ if __name__ == "__main__":
         'llm-model-depth-anything-ax630c':[create_data_deb,'llm-model-depth-anything-ax630c', '0.3', src_folder, revision],
         'llm-model-whisper-tiny':[create_data_deb,'llm-model-whisper-tiny', '0.3', src_folder, revision],
         'llm-model-whisper-base':[create_data_deb,'llm-model-whisper-base', '0.3', src_folder, revision],
+        'llm-model-whisper-small':[create_data_deb,'llm-model-whisper-small', '0.3', src_folder, revision],
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.3', src_folder, revision],
         'llm-model-qwen2.5-0.5B-prefill-20e':[create_data_deb,'llm-model-qwen2.5-0.5B-prefill-20e', data_version, src_folder, revision],
         'llm-model-qwen2.5-0.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-0.5B-p256-ax630c', '0.4', src_folder, revision],
