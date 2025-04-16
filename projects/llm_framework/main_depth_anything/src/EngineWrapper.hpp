@@ -10,27 +10,14 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+#include <cstring>
+#include <array>
 #include <cstdint>
 #include <opencv2/opencv.hpp>
+
 #include "ax_engine_api.h"
-
-#ifndef UNUSE_STRUCT_OBJECT
-namespace detection {
-typedef struct Object {
-    cv::Rect_<float> rect;
-    int label;
-    float prob;
-    cv::Point2f landmark[5];
-    /* for yolov5-seg */
-    cv::Mat mask;
-    std::vector<float> mask_feat;
-    std::vector<float> kps_feat;
-    /* for yolov8-obb */
-    float angle;
-} Object;
-
-}  // namespace detection
-#endif
 
 class EngineWrapper {
 public:
@@ -47,16 +34,18 @@ public:
 
     int SetInput(void* pInput, int index);
 
-    int RunSync();
-
-    int Post_Process(cv::Mat& mat, std::string& model_type, std::string& byteString);
+    int Run();
 
     int GetOutput(void* pOutput, int index);
 
     int GetInputSize(int index);
     int GetOutputSize(int index);
 
+    void* GetOutputPtr(int index);
+
     int Release();
+
+    int Post_Process(cv::Mat& mat, std::string& model_type, std::string& byteString);
 
 protected:
     bool m_hasInit;

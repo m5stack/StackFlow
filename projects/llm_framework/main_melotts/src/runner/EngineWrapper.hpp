@@ -33,12 +33,14 @@ public:
 
     int SetInput(void* pInput, int index);
 
-    int RunSync();
+    int Run();
 
     int GetOutput(void* pOutput, int index);
 
     int GetInputSize(int index);
     int GetOutputSize(int index);
+
+    void* GetOutputPtr(int index);
 
     int Release();
 

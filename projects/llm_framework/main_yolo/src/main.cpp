@@ -228,7 +228,7 @@ public:
             common::get_input_data_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, bgr2rgb);
             cv::Mat img_mat(mode_config_.img_h, mode_config_.img_w, CV_8UC3, image.data());
             yolo_->SetInput((void *)image.data(), 0);
-            if (0 != yolo_->RunSync()) {
+            if (0 != yolo_->Run()) {
                 SLOGE("Run yolo model failed!\n");
                 throw std::string("yolo_ RunSync error");
             }

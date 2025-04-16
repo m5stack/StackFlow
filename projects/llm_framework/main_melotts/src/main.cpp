@@ -29,7 +29,7 @@ using namespace StackFlows;
 int main_exit_flage = 0;
 static void __sigint(int iSigNo)
 {
-    SLOGW("llm_sys will be exit!");
+    SLOGW("llm_melotts will be exit!");
     main_exit_flage = 1;
 }
 
@@ -277,7 +277,7 @@ public:
                 }
                 decoder_->SetInput(zp.data(), 0);
                 decoder_->SetInput(g_matrix.data(), 1);
-                if (0 != decoder_->RunSync()) {
+                if (0 != decoder_->Run()) {
                     printf("Run decoder model failed!\n");
                     throw std::string("decoder_ RunSync error");
                 }
@@ -362,10 +362,7 @@ public:
     ~llm_task()
     {
         stop();
-        if (decoder_) {
-            decoder_->Release();
-            // decoder_.reset();
-        }
+        if (decoder_) decoder_->Release();
         _ax_deinit();
     }
 };
@@ -672,7 +669,7 @@ public:
 
     int exit(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_tts::exit:%s", data.c_str());
+        SLOGI("llm_melotts::exit:%s", data.c_str());
 
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);

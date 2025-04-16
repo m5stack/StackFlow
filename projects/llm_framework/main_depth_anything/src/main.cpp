@@ -198,11 +198,10 @@ public:
             common::get_input_data_no_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, bgr2rgb);
             cv::Mat img_mat(mode_config_.img_h, mode_config_.img_w, CV_8UC3, image.data());
             depth_anything_->SetInput((void *)image.data(), 0);
-            if (0 != depth_anything_->RunSync()) {
+            if (0 != depth_anything_->Run()) {
                 SLOGE("Run depth_anything model failed!\n");
                 throw std::string("depth_anything_ RunSync error");
             }
-            std::vector<detection::Object> objects;
             std::string depth_anything_output;
             depth_anything_->Post_Process(img_mat, mode_config_.model_type, depth_anything_output);
             if (out_callback_) out_callback_(depth_anything_output, true);
