@@ -259,9 +259,6 @@ public:
     ~llm_task()
     {
         stop();
-        if (recognizer_stream_) {
-            recognizer_stream_.reset();
-        }
         buffer_destroy(pcmdata);
     }
 };

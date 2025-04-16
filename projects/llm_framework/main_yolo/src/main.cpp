@@ -340,6 +340,7 @@ public:
     ~llm_task()
     {
         stop();
+        if (yolo_) yolo_->Release();
         _ax_deinit();
     }
 };

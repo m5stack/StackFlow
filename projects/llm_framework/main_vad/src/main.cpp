@@ -228,9 +228,6 @@ public:
     ~llm_task()
     {
         stop();
-        if (vad_) {
-            vad_.reset();
-        }
         buffer_destroy(pcmdata);
     }
 };

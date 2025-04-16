@@ -177,9 +177,11 @@ public:
             temp_awake_key.close();
             std::ostringstream awake_key_compile_cmd;
             if (file_exists("/opt/m5stack/scripts/text2token.py"))
-                awake_key_compile_cmd << "PYTHONPATH=/opt/m5stack/lib/sherpa-onnx/site-packages /usr/bin/python3 /opt/m5stack/scripts/text2token.py ";
+                awake_key_compile_cmd << "PYTHONPATH=/opt/m5stack/lib/sherpa-onnx/site-packages /usr/bin/python3 "
+                                         "/opt/m5stack/scripts/text2token.py ";
             else if (file_exists("/opt/m5stack/scripts/llm-kws_text2token.py"))
-                awake_key_compile_cmd << "PYTHONPATH=/opt/m5stack/lib/sherpa-onnx/site-packages /usr/bin/python3 /opt/m5stack/scripts/llm-kws_text2token.py ";
+                awake_key_compile_cmd << "PYTHONPATH=/opt/m5stack/lib/sherpa-onnx/site-packages /usr/bin/python3 "
+                                         "/opt/m5stack/scripts/llm-kws_text2token.py ";
             else {
                 SLOGE("text2token.py or llm-kws_text2token.py not found!");
             }
@@ -267,9 +269,6 @@ public:
     ~llm_task()
     {
         stop();
-        if (spotter_stream_) {
-            spotter_stream_.reset();
-        }
         buffer_destroy(pcmdata);
     }
 };
