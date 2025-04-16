@@ -256,6 +256,7 @@ public:
     ~llm_task()
     {
         stop();
+        if (depth_anything_) depth_anything_->Release();
         _ax_deinit();
     }
 };
