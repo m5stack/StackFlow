@@ -2,6 +2,8 @@
     "mode":"qwen2.5-0.5B-p256-ax630c",
     "type":"llm",
     "homepage":"https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct",
+    "compile_flage":"pulsar2 llm_build --input_path Qwen/Qwen2-0.5B-Instruct/ --output_path Qwen/Qwen2-0.5B-w8a16/ --kv_cache_len 1023 --hidden_state_type bf16 --prefill_len 256 --chip AX620E",
+    "pulsar_version":"3.4-983bb35e",
     "capabilities":[
         "text_generation",
         "chat"

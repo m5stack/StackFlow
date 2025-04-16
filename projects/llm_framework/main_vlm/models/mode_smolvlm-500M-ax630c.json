@@ -2,6 +2,8 @@
     "mode":"smolvlm-500M-ax630c",
     "type":"vlm",
     "homepage":"https://huggingface.co/HuggingFaceTB/SmolVLM-500M-Instruct",
+    "compile_flage":"pulsar2 build --input HuggingFaceTB/SmolVLM-500M-w8a16/SmolVLM-500M-Instruct_vision.onnx --config AXERA/SmolVLM-256M-Instruct.axera/model_convert/config.json --output_dir HuggingFaceTB/SmolVLM-500M-w8a16/build-output --output_name SmolVLM-500M-Instruct_vision.axmodel --target_hardware AX620E --compiler.check 0 --npu_mode NPU2",
+    "pulsar_version":"3.4-983bb35e",    
     "capabilities":[
         "text_generation",
         "chat"
