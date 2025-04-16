@@ -260,7 +260,7 @@ public:
             positional_embedding.resize(mode_config_.whisper_n_text_ctx * WHISPER_N_TEXT_STATE);
             FILE *fp = fopen(mode_config_.positional_embedding.c_str(), "rb");
             if (!fp) {
-                printf("Open %s failed!\n", mode_config_.positional_embedding.c_str());
+                SLOGE("Open %s failed!\n", mode_config_.positional_embedding.c_str());
                 return -3;
             }
             fread(positional_embedding.data(), sizeof(float), mode_config_.whisper_n_text_ctx * WHISPER_N_TEXT_STATE,
@@ -282,15 +282,15 @@ public:
             decoder_main_ = std::make_unique<DecoderMain>();
             decoder_loop_ = std::make_unique<DecoderLoop>();
             if (0 != encoder_->Init(mode_config_.encoder.c_str())) {
-                printf("encoder init failed!\n");
+                SLOGE("encoder init failed!\n");
                 return -4;
             }
             if (0 != decoder_main_->Init(mode_config_.decoder_main.c_str())) {
-                printf("Init decoder_main model failed!\n");
+                SLOGE("Init decoder_main model failed!\n");
                 return -5;
             }
             if (0 != decoder_loop_->Init(mode_config_.decoder_loop.c_str())) {
-                printf("Init decoder_main model failed!\n");
+                SLOGE("Init decoder_main model failed!\n");
                 return -6;
             }
         } catch (...) {
@@ -316,6 +316,7 @@ public:
             if (endpoint_flage_) return;
         }
         endpoint_flage_ = true;
+        buffer_resize(pcmdata, 0);
         buffer_write_char(pcmdata, raw.c_str(), raw.length());
         buffer_position_set(pcmdata, 0);
         count = 0;
@@ -391,7 +392,7 @@ public:
             return;
         }
         end = get_current_time();
-        printf("Encoder run take %.2f ms\n", (end - start));
+        SLOGI("Encoder run take %.2f ms\n", (end - start));
 
         // detect language
         SOT_SEQUENCE[1] = detect_language(language_);
@@ -417,7 +418,7 @@ public:
         supress_tokens(logits, true);
 
         max_token_id = argmax(logits);
-        printf("First token: %d \t take %.2fms\n", max_token_id, (end - start));
+        SLOGI("First token: %d \t take %.2fms\n", max_token_id, (end - start));
         mode_config_.neg_inf = -std::numeric_limits<float>::infinity();
         std::vector<float> mask(mode_config_.whisper_n_text_ctx);
         for (int n = 0; n < mode_config_.whisper_n_text_ctx - offset - 1; n++) {
@@ -446,7 +447,7 @@ public:
 
             ret = decoder_loop_->Run();
             if (ret) {
-                printf("decoder_loop run failed!\n");
+                SLOGE("decoder_loop run failed!\n");
                 return;
             }
 
@@ -461,11 +462,11 @@ public:
             max_token_id = argmax(logits);
             end          = get_current_time();
 
-            printf("Next Token: %d \t take %.2fms\n", max_token_id, (end - start));
+            SLOGI("Next Token: %d \t take %.2fms\n", max_token_id, (end - start));
         }
 
         end_all = get_current_time();
-        printf("All take %.2f ms\n", (end_all - start_all));
+        SLOGI("All take %.2f ms\n", (end_all - start_all));
 
         std::string s;
         for (const auto i : results) {
@@ -476,12 +477,10 @@ public:
         }
 
         if (mode_config_.language == "en" || mode_config_.language == "ja") {
-            printf("Result: %s\n", s.c_str());
             if (out_callback_) out_callback_(s, true);
         } else {
             const opencc::SimpleConverter converter(mode_config_.t2s.c_str());
             std::string simple_str = converter.Convert(s);
-            printf("Result: %s\n", simple_str.c_str());
             if ((!simple_str.empty()) && out_callback_) {
                 out_callback_(simple_str, true);
             }
@@ -545,6 +544,9 @@ public:
     ~llm_task()
     {
         stop();
+        if (encoder_) encoder_->Release();
+        if (decoder_main_) decoder_main_->Release();
+        if (decoder_loop_) decoder_loop_->Release();
         _ax_deinit();
         buffer_destroy(pcmdata);
     }
@@ -821,6 +823,7 @@ public:
                     });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("whisper") != std::string::npos) {
+                    if (input.find("stream.base64") != std::string::npos) llm_task_obj->delay_audio_frame_ = 0;
                     llm_channel->subscriber_work_id(
                         "", std::bind(&llm_whisper::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                                       std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
