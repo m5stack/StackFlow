@@ -544,6 +544,9 @@ public:
     ~llm_task()
     {
         stop();
+        if (encoder_) encoder_->Release();
+        if (decoder_main_) decoder_main_->Release();
+        if (decoder_loop_) decoder_loop_->Release();
         _ax_deinit();
         buffer_destroy(pcmdata);
     }
