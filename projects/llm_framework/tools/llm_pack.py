@@ -9,6 +9,7 @@ import shutil
 import concurrent.futures
 import json
 import glob
+from datetime import datetime
 '''
 {package_name}_{version}-{revision}_{architecture}.deb
 lib-llm_1.0-m5stack1_arm64.deb
@@ -96,6 +97,7 @@ def create_lib_deb(package_name, version, src_folder, revision = 'm5stack1'):
         f.write(f'Section: llm-module\n')
         f.write(f'Priority: optional\n')
         f.write(f'Homepage: https://www.m5stack.com\n')
+        f.write(f'Packaged-Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
         f.write(f'Description: llm-module\n')
         f.write(f' bsp.\n')
     with open(os.path.join(deb_folder, 'DEBIAN/postinst'),'w') as f:
@@ -148,7 +150,7 @@ def create_lib_deb(package_name, version, src_folder, revision = 'm5stack1'):
     shutil.rmtree(deb_folder)
     return package_name + " creat success!"
 
-def create_data_deb(package_name, version, src_folder, revision = 'm5stack1'):
+def create_data_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.6)'):
     deb_file = f"{package_name}_{version}-{revision}_arm64.deb"
     deb_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debian-{}'.format(package_name))
     if os.path.exists(deb_folder):
@@ -201,12 +203,13 @@ def create_data_deb(package_name, version, src_folder, revision = 'm5stack1'):
         f.write(f'Original-Maintainer: m5stack <m5stack@m5stack.com>\n')
         f.write(f'Section: llm-module\n')
         f.write(f'Priority: optional\n')
-        f.write(f'Depends: lib-llm (>= 1.6)\n')
+        f.write(f'Depends: {depends}\n')
         f.write(f'Homepage: https://www.m5stack.com\n')
         if deb_file.startswith('llm-model-'):
             deb_name = deb_file[:deb_file.find('_')]
             old_deb_name = deb_name.replace('model-','').lower()
-            f.write(f'Conflicts: {old_deb_name}\n')        
+            f.write(f'Conflicts: {old_deb_name}\n')   
+        f.write(f'Packaged-Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')     
         f.write(f'Description: llm-module\n')
         f.write(f' bsp.\n')
     with open(os.path.join(deb_folder, 'DEBIAN/postinst'),'w') as f:
@@ -222,7 +225,17 @@ def create_data_deb(package_name, version, src_folder, revision = 'm5stack1'):
     shutil.rmtree(deb_folder)
     return package_name + " creat success!"
 
-def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1'):
+def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.7)'):
+    bin_files = glob.glob(os.path.join(src_folder, package_name.replace("-", "_") + "-*"))
+    version_info = 0.0
+    print(os.path.join(src_folder, package_name + "-*"))
+    if bin_files:
+        for bin_file in bin_files:
+            version_info = float(bin_file.split('-')[-1])
+            if float(bin_file.split('-')[-1]) > version_info:
+                version_info = float(bin_file.split('-')[-1])
+        version = str(version_info)
+
     deb_file = f"{package_name}_{version}-{revision}_arm64.deb"
     deb_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debian-{}'.format(package_name))
     # os.makedirs(deb_folder, exist_ok=True)
@@ -250,7 +263,11 @@ def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1'):
         vlm_dir = os.path.join(src_folder, 'vlm')
         if os.path.exists(vlm_dir):
             shutil.copytree(vlm_dir, os.path.join(deb_folder, 'opt/m5stack/lib/vlm'))
-    shutil.copy2(os.path.join(src_folder, package_name.replace("-", "_")), os.path.join(deb_folder, 'opt/m5stack/bin', package_name.replace("-", "_")))
+    
+    bin_file_name = package_name.replace("-", "_")
+    if version_info != 0.0:
+        bin_file_name = package_name.replace("-", "_") + f'-{version}'
+    shutil.copy2(os.path.join(src_folder, bin_file_name), os.path.join(deb_folder, 'opt/m5stack/bin', bin_file_name))
     ext_scripts_files = glob.glob(os.path.join(src_folder, package_name + "_*"))
     if ext_scripts_files:
         os.makedirs(os.path.join(deb_folder, 'opt/m5stack/scripts'), exist_ok = True)
@@ -266,8 +283,9 @@ def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1'):
         f.write(f'Section: llm-module\n')
         f.write(f'Priority: optional\n')
         # f.write(f'Depends: lib-llm\n')
-        f.write(f'Depends: lib-llm (>= 1.7)\n')
+        f.write(f'Depends: {depends}\n')
         f.write(f'Homepage: https://www.m5stack.com\n')
+        f.write(f'Packaged-Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
         f.write(f'Description: llm-module\n')
         f.write(f' bsp.\n')
     with open(os.path.join(deb_folder, 'DEBIAN/postinst'),'w') as f:
@@ -289,7 +307,7 @@ def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1'):
             f.write(f'Requires=llm-sys.service\n')
         f.write(f'\n')
         f.write(f'[Service]\n')
-        f.write(f'ExecStart=/opt/m5stack/bin/{package_name.replace("-", "_")}\n')
+        f.write(f'ExecStart=/opt/m5stack/bin/{bin_file_name}\n')
         f.write(f'WorkingDirectory=/opt/m5stack\n')
         f.write(f'Restart=always\n')
         f.write(f'RestartSec=1\n')
@@ -333,64 +351,22 @@ if __name__ == "__main__":
     else:
         cpu_count = cpu_count - 2
     # cpu_count = 50
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
-# 添加新模型版本号从 0.1 版本号开始累加
-# 当单元和前单元不兼容时提升大版本号
-# 当模型和前模型不兼容时提升大版本号
-# 加速单元和模型单元的大版本号保持一致，以有的更新暂不改变，从2025年 04月 03日开始
-# Start adding new model version numbers from the 0.1 version number.
-# Increment the major version number when units and previous units are incompatible
-# Increment the major version number when models and previous models are incompatible
-# Keep the major version numbers of acceleration units and model units consistent, with some updates not changing them, starting from April 3, 2025.
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
-# 添加新模型版本号从 0.1 版本号开始累加
-# 当单元和前单元不兼容时提升大版本号
-# 当模型和前模型不兼容时提升大版本号
-# 加速单元和模型单元的大版本号保持一致，以有的更新暂不改变，从2025年 04月 03日开始
-# Start adding new model version numbers from the 0.1 version number.
-# Increment the major version number when units and previous units are incompatible
-# Increment the major version number when models and previous models are incompatible
-# Keep the major version numbers of acceleration units and model units consistent, with some updates not changing them, starting from April 3, 2025.
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
-# 添加新模型版本号从 0.1 版本号开始累加
-# 当单元和前单元不兼容时提升大版本号
-# 当模型和前模型不兼容时提升大版本号
-# 加速单元和模型单元的大版本号保持一致，以有的更新暂不改变，从2025年 04月 03日开始
-# Start adding new model version numbers from the 0.1 version number.
-# Increment the major version number when units and previous units are incompatible
-# Increment the major version number when models and previous models are incompatible
-# Keep the major version numbers of acceleration units and model units consistent, with some updates not changing them, starting from April 3, 2025.
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
-#################################################注意################################################
     Tasks = {
-        'lib-llm':[create_lib_deb,'lib-llm', 1.7, src_folder, revision],
+        'lib-llm':[create_lib_deb,'lib-llm', '1.7', src_folder, revision],
         'llm-sys':[create_bin_deb,'llm-sys', version, src_folder, revision],
         'llm-audio':[create_bin_deb,'llm-audio', version, src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', '1.6', src_folder, revision],
         'llm-asr':[create_bin_deb,'llm-asr', version, src_folder, revision],
         'llm-llm':[create_bin_deb,'llm-llm', '1.7', src_folder, revision],
         'llm-tts':[create_bin_deb,'llm-tts', version, src_folder, revision],
-        'llm-melotts':[create_bin_deb,'llm-melotts', version, src_folder, revision],
-        'llm-camera':[create_bin_deb,'llm-camera', '1.6', src_folder, revision],
+        'llm-melotts':[create_bin_deb,'llm-melotts', '1.6', src_folder, revision],
+        'llm-camera':[create_bin_deb,'llm-camera', '1.7', src_folder, revision, 'lib-llm'],
         'llm-vlm':[create_bin_deb,'llm-vlm', '1.6', src_folder, revision],
         'llm-yolo':[create_bin_deb,'llm-yolo', '1.6', src_folder, revision],
         'llm-skel':[create_bin_deb,'llm-skel', version, src_folder, revision],
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', version, src_folder, revision],
         'llm-vad':[create_bin_deb,'llm-vad', version, src_folder, revision],
-        'llm-whisper':[create_bin_deb,'llm-whisper', version, src_folder, revision],
+        'llm-whisper':[create_bin_deb,'llm-whisper', '1.6', src_folder, revision],
         'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.6', src_folder, revision],
         'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
         'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', data_version, src_folder, revision],

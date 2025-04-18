@@ -38,7 +38,7 @@
 #include "remote_action.h"
 #include <simdjson.h>
 #include "hv/ifconfig.h"
-
+#include <glob.h>
 #include "StackFlowUtil.h"
 
 void usr_print_error(const std::string &request_id, const std::string &work_id, const std::string &error_msg,
@@ -707,7 +707,26 @@ int sys_reset(int com_id, const nlohmann::json &json_obj)
 
 int sys_version(int com_id, const nlohmann::json &json_obj)
 {
-    usr_out(json_obj["request_id"], json_obj["work_id"], std::string("v1.5"), com_id);
+    usr_out(json_obj["request_id"], json_obj["work_id"], std::string("v1.6"), com_id);
+
+    int out = 0;
+    return out;
+}
+
+int sys_version2(int com_id, const nlohmann::json &json_obj)
+{
+    nlohmann::json data_body = nlohmann::json::array();
+    glob_t glob_result;
+    int ret = glob("/opt/m5stack/bin/llm_*-*", GLOB_TILDE, NULL, &glob_result);  // 匹配所有.txt文件
+    if (ret == 0) {
+        for (size_t i = 0; i < glob_result.gl_pathc; i++) {
+            const char *separator = strrchr(glob_result.gl_pathv[i], '/');
+            const char *filename  = (separator != NULL) ? separator + 1 : glob_result.gl_pathv[i];
+            data_body.push_back(std::string(filename));
+        }
+    }
+    globfree(&glob_result);
+    usr_out(json_obj["request_id"], json_obj["work_id"], data_body, com_id);
     int out = 0;
     return out;
 }
@@ -739,6 +758,7 @@ void server_work()
     key_sql["sys.rmmode"]    = sys_rmmode;
     key_sql["sys.unit_call"] = sys_unit_call;
     key_sql["sys.cmminfo"]   = sys_cmminfo;
+    key_sql["sys.version2"]  = sys_version2;
 }
 
 void server_stop_work()

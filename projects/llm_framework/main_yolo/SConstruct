@@ -39,7 +39,7 @@ STATIC_FILES += Glob('mode_*.json')
 #                 AFile('../static_lib/libbz2.so.1.0')]
 # DEFINITIONS += ["-DENABLE_BACKWARD"]
 
-env['COMPONENTS'].append({'target':'llm_yolo',
+env['COMPONENTS'].append({'target':'llm_yolo-1.7',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

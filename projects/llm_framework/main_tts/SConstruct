@@ -27,7 +27,7 @@ INCLUDE += [ADir('src/runner/eigen-3.4.0'), ADir('src/runner/src/tn/header'), AD
 
 STATIC_FILES += Glob('mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_tts',
+env['COMPONENTS'].append({'target':'llm_tts-1.5',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

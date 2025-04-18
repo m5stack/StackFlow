@@ -68,7 +68,7 @@ STATIC_LIB += static_file * 4
 STATIC_FILES += [AFile('camera.json')]
 STATIC_FILES += Glob('mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_camera',
+env['COMPONENTS'].append({'target':'llm_camera-1.7',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

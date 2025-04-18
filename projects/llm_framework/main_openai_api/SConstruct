@@ -52,7 +52,7 @@ ignore['ignore'] = list(set(ignore['ignore']))
 with open('../dist/fileignore', 'w') as f:
     json.dump(ignore, f, indent=4)
 
-env['COMPONENTS'].append({'target':'llm_openai_api',
+env['COMPONENTS'].append({'target':'llm_openai_api-1.6',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
