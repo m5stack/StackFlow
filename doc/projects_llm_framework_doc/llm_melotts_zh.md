@@ -15,7 +15,7 @@
   "action": "setup",
   "object": "melotts.setup",
   "data": {
-    "model": "melotts_zh-cn",
+    "model": "melotts-zh-cn",
     "response_format": "sys.pcm",
     "input": "tts.utf-8",
     "enoutput": false
@@ -27,7 +27,7 @@
 - work_id：配置单元时，为 `melotts`。
 - action：调用的方法为 `setup`。
 - object：传输的数据类型为 `melotts.setup`。
-- model：使用的模型为 `melotts_zh-cn` 中文模型。
+- model：使用的模型为 `melotts-zh-cn` 中文模型。
 - response_format：返回结果为 `sys.pcm`, 系统音频数据，并直接发送到 llm-audio 模块进行播放。
 - input：输入的为 `tts.utf-8`,代表的是从用户输入。
 - enoutput：是否起用用户结果输出。
@@ -134,7 +134,7 @@ error::code 为 0 表示执行成功。
   "action": "setup",
   "object": "melotts.setup",
   "data": {
-    "model": "melotts_zh-cn",
+    "model": "melotts-zh-cn",
     "response_format": "sys.pcm",
     "input": [
       "tts.utf-8",
@@ -328,7 +328,7 @@ error::code 为 0 表示执行成功。
     "inputs_": [
       "tts.utf-8"
     ],
-    "model": "melotts_zh-cn",
+    "model": "melotts-zh-cn",
     "response_format": "sys.pcm"
   },
   "error": {

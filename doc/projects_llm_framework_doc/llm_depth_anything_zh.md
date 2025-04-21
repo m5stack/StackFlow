@@ -27,7 +27,7 @@ depth_anything 视觉单元，用于提供图片深度信息。
 - work_id：配置单元时，为 `depth_anything`。
 - action：调用的方法为 `setup`。
 - object：传输的数据类型为 `depth_anything.setup`。
-- model：使用的模型为 `depth_anything` 模型。
+- model：使用的模型为 `depth-anything-ax630c` 模型。
 - response_format：返回结果为 `jpeg.base64.stream`。
 - input：输入的为 `camera.1001`，代表的是从 camera 单元内部输入，详见 camera 单位文档。
 - enoutput：是否启用用户结果输出。

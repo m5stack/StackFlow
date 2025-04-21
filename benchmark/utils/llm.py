@@ -30,7 +30,6 @@ class LLMClient:
 
         while True:
             chunk = self.sock.recv(4096)
-            logging.info(f"Received chunk: {chunk}")
             response += chunk
 
             while b'\n' in response:
@@ -149,21 +148,14 @@ class LLMClient:
     def test(self, model, input_text):
         logging.info("Setting up...")
         setup_response = self.setup(model)
-        logging.info("Setup response: %s", setup_response)
 
         logging.info("Running inference...")
         inference_result = self.inference(input_text)
-        logging.info("Inference result: %s", inference_result)
 
         logging.info("Exiting...")
         exit_response = self.exit()
-        logging.info("Exit response: %s", exit_response)
 
-        return {
-            "setup_response": setup_response,
-            "inference_result": inference_result,
-            "exit_response": exit_response
-        }
+        return {}
 
 if __name__ == "__main__":
     host = "192.168.20.186"

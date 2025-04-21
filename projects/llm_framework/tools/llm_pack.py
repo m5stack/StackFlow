@@ -69,23 +69,23 @@ def create_lib_deb(package_name, version, src_folder, revision = 'm5stack1'):
     # if os.path.exists(zip_file_extrpath):
     #     shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'opt/m5stack/scripts'))
 
-    # zip_file = 'm5stack_dist-packages.tar.gz'
-    # down_url = 'https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_dist-packages.tar.gz'
-    # zip_file_extrpath = 'm5stack_dist-packages'
-    # if not os.path.exists(zip_file_extrpath):
-    #     # Downloading via HTTP (more common)
-    #     if not os.path.exists(zip_file):
-    #         response = requests.get(down_url)
-    #         if response.status_code == 200:
-    #             with open(zip_file, 'wb') as file:
-    #                 file.write(response.content)
-    #         else:
-    #             print("{} down failed".format(down_url))
-    #     with tarfile.open(zip_file, 'r:gz') as tar:
-    #         tar.extractall(path=zip_file_extrpath)
-    #     print("The {} download successful.".format(down_url))
-    # if os.path.exists(zip_file_extrpath):
-    #     shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'usr/local/lib/python3.10/dist-packages'))
+    zip_file = 'm5stack_dist-packages.tar.gz'
+    down_url = 'https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_dist-packages.tar.gz'
+    zip_file_extrpath = 'm5stack_dist-packages'
+    if not os.path.exists(zip_file_extrpath):
+        # Downloading via HTTP (more common)
+        if not os.path.exists(zip_file):
+            response = requests.get(down_url)
+            if response.status_code == 200:
+                with open(zip_file, 'wb') as file:
+                    file.write(response.content)
+            else:
+                print("{} down failed".format(down_url))
+        with tarfile.open(zip_file, 'r:gz') as tar:
+            tar.extractall(path=zip_file_extrpath)
+        print("The {} download successful.".format(down_url))
+    if os.path.exists(zip_file_extrpath):
+        shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'usr/local/lib/python3.10/dist-packages'))
 
     os.makedirs(os.path.join(deb_folder, 'DEBIAN'), exist_ok = True)
     with open(os.path.join(deb_folder, 'DEBIAN/control'),'w') as f:
@@ -374,9 +374,9 @@ if __name__ == "__main__":
         'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23', data_version, src_folder, revision],
         'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
         'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
-        'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', data_version, src_folder, revision],
-        'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', data_version, src_folder, revision],
-        'llm-model-melotts-zh-cn':[create_data_deb,'llm-model-melotts-zh-cn', '0.4', src_folder, revision],
+        'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
+        'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
+        'llm-model-melotts-zh-cn':[create_data_deb,'llm-model-melotts-zh-cn', '0.5', src_folder, revision],
         'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
         'llm-model-yolo11n-pose':[create_data_deb,'llm-model-yolo11n-pose', '0.3', src_folder, revision],
         'llm-model-yolo11n-hand-pose':[create_data_deb,'llm-model-yolo11n-hand-pose', '0.3', src_folder, revision],
