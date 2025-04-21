@@ -316,7 +316,7 @@ public:
             if (endpoint_flage_) return;
         }
         endpoint_flage_ = true;
-        buffer_resize(pcmdata, 0);
+        if (delay_audio_frame_ == 0) buffer_resize(pcmdata, 0);
         buffer_write_char(pcmdata, raw.c_str(), raw.length());
         buffer_position_set(pcmdata, 0);
         count = 0;
