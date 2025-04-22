@@ -26,7 +26,7 @@ REQUIREMENTS += ['ncnn', 'sherpa-ncnn-core']
 
 STATIC_FILES += Glob('mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_asr-1.5',
+env['COMPONENTS'].append({'target':'llm_asr-1.6',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
