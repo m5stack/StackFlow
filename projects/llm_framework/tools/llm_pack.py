@@ -377,6 +377,7 @@ if __name__ == "__main__":
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
         'llm-model-melotts-zh-cn':[create_data_deb,'llm-model-melotts-zh-cn', '0.5', src_folder, revision],
+        'llm-model-melotts-en-us':[create_data_deb,'llm-model-melotts-en-us', '0.5', src_folder, revision],
         'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
         'llm-model-yolo11n-pose':[create_data_deb,'llm-model-yolo11n-pose', '0.3', src_folder, revision],
         'llm-model-yolo11n-hand-pose':[create_data_deb,'llm-model-yolo11n-hand-pose', '0.3', src_folder, revision],
