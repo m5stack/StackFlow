@@ -18,6 +18,8 @@
 | llama3.2-1B-p256-ax630c         | 2601.11    | 4.49        | v0.4          | v1.8        |
 | openbuddy-llama3.2-1B-ax630c    | 891.02     | 4.52        | v0.2          | v1.8        |
 
+`The input text used by the llm test is "hello!“`
+
 ### VLM
 | model                           | ttft (ms)  | avg-token/s | image encode (ms) | model version | vlm version |
 |---------------------------------|------------|-------------|-------------------|---------------|-------------|
@@ -25,9 +27,13 @@
 | smolvlm-256M-ax630c             | 185.75     | 30.16       | 799.11            | v0.4          | v1.7        |
 | smolvlm-500M-ax630c             | 365.69     | 13.14       | 838.30            | v0.4          | v1.7        |
 
+`The image encoding test uses a jpg image with a size of 810*1080`
+
 ### STT
 | model              | encode (ms) | avg-decode (ms) | model version | whisper version |
 |--------------------|-------------|-----------------|---------------|-----------------|
 | whisper-tiny       | 248.0       | 32.54           | v0.4          | v1.7            |
 | whisper-base       | 660.31      | 51.11           | v0.4          | v1.7            |
 | whisper-small      | 1606.08     | 148.92          | v0.4          | v1.7            |
+
+`The STT test uses a 30-second wav English audio`
