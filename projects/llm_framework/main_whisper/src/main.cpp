@@ -192,6 +192,34 @@ public:
         return tv.tv_sec * 1000.0 + tv.tv_usec / 1000.0;
     }
 
+    bool is_valid_utf8(const std::string &str)
+    {
+        int bytes = 0;
+        for (unsigned char c : str) {
+            if (bytes == 0) {
+                if ((c >> 5) == 0b110)
+                    bytes = 1;
+                else if ((c >> 4) == 0b1110)
+                    bytes = 2;
+                else if ((c >> 3) == 0b11110)
+                    bytes = 3;
+                else if ((c >> 7))
+                    return false;
+            } else {
+                if ((c >> 6) != 0b10) return false;
+                bytes--;
+            }
+        }
+        return bytes == 0;
+    }
+
+    void fix_utf8_string(std::string &s)
+    {
+        while (!s.empty() && !is_valid_utf8(s)) {
+            s.pop_back();
+        }
+    }
+
     int load_model(const nlohmann::json &config_body)
     {
         if (parse_config(config_body)) {
@@ -316,7 +344,7 @@ public:
             if (endpoint_flage_) return;
         }
         endpoint_flage_ = true;
-        buffer_resize(pcmdata, 0);
+        if (delay_audio_frame_ == 0) buffer_resize(pcmdata, 0);
         buffer_write_char(pcmdata, raw.c_str(), raw.length());
         buffer_position_set(pcmdata, 0);
         count = 0;
@@ -475,7 +503,7 @@ public:
                           (uint32)mode_config_.token_tables[i].size(), str);
             s += str;
         }
-
+        fix_utf8_string(s);
         if (mode_config_.language == "en" || mode_config_.language == "ja") {
             if (out_callback_) out_callback_(s, true);
         } else {

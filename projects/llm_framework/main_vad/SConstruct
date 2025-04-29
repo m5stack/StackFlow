@@ -28,7 +28,7 @@ LDFLAGS += ['-l:libsherpa-onnx-core.a',
 
 STATIC_FILES += Glob('mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_vad-1.5',
+env['COMPONENTS'].append({'target':'llm_vad-1.6',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

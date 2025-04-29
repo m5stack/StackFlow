@@ -7,7 +7,7 @@ import logging
 
 from pathlib import Path
 
-from utils.llm import LLMClient
+from utils import LLMClient
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]

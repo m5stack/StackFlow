@@ -37,6 +37,7 @@ static std::string base_model_path_;
 static std::string base_model_config_path_;
 
 typedef struct {
+    std::string mode;
     std::string encoder;
     std::string decoder;
     std::string lexicon;
@@ -111,6 +112,9 @@ public:
         enstream_ = response_format_.find("stream") == std::string::npos ? false : true;
         return false;
     }
+
+    std::unordered_map<std::string, int> MELOTTS_LANG_IDS_MAP{
+        {"melotts-ja-jp", 1}, {"melotts-en-us", 2}, {"melotts_zh-cn", 3}, {"melotts-zh-cn", 3}};
 
     std::vector<int> intersperse(const std::vector<int> &lst, int item)
     {
@@ -251,10 +255,11 @@ public:
             std::vector<int> phones_bef, tones_bef;
             lexicon_->convert(msg_str, phones_bef, tones_bef);
             // Add blank between words
-            auto phones   = intersperse(phones_bef, 0);
-            auto tones    = intersperse(tones_bef, 0);
-            int phone_len = phones.size();
-            std::vector<int> langids(phone_len, 3);
+            auto phones          = intersperse(phones_bef, 0);
+            auto tones           = intersperse(tones_bef, 0);
+            int phone_len        = phones.size();
+            int MELOTTS_LANG_IDS = MELOTTS_LANG_IDS_MAP[mode_config_.mode];
+            std::vector<int> langids(phone_len, MELOTTS_LANG_IDS);
             auto encoder_output =
                 encoder_->Run(phones, tones, langids, g_matrix, mode_config_.noise_scale, mode_config_.noise_scale_w,
                               mode_config_.get_length_scale(), mode_config_.sdp_ratio);

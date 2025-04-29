@@ -119,9 +119,9 @@ Example:
     "endpoint_config.rule1.min_trailing_silence": 2.4,
     "endpoint_config.rule2.min_trailing_silence": 1.2,
     "endpoint_config.rule3.min_trailing_silence": 30.1,
-    "endpoint_config.rule1.must_contain_nonsilence": false,
-    "endpoint_config.rule2.must_contain_nonsilence": false,
-    "endpoint_config.rule3.must_contain_nonsilence": false
+    "endpoint_config.rule1.must_contain_nonsilence": true,
+    "endpoint_config.rule2.must_contain_nonsilence": true,
+    "endpoint_config.rule3.must_contain_nonsilence": true
   }
 }
 ```

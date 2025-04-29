@@ -27,7 +27,7 @@ Send JSON:
 - work_id: When configuring the unit, it is `depth_anything`.
 - action: The method called is `setup`.
 - object: The data type being transmitted is `depth_anything.setup`.
-- model: The model used is the `depth_anything` model.
+- model: The model used is the `depth-anything-ax630c` model.
 - response_format: The return result is `jpeg.base64.stream`.
 - input: The input is `camera.1001`, which refers to the input from the camera unit, as detailed in the camera unit
   documentation.

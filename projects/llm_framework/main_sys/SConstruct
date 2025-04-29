@@ -37,7 +37,7 @@ LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-
 
 STATIC_FILES += [AFile('sys_config.json')]
 REQUIREMENTS += ['simdjson_component']
-env['COMPONENTS'].append({'target':'llm_sys-1.5',
+env['COMPONENTS'].append({'target':'llm_sys-1.6',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

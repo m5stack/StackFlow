@@ -16,7 +16,7 @@ Send JSON:
   "action": "setup",
   "object": "melotts.setup",
   "data": {
-    "model": "melotts_zh-cn",
+    "model": "melotts-en-us",
     "response_format": "sys.pcm",
     "input": "tts.utf-8",
     "enoutput": false
@@ -28,7 +28,7 @@ Send JSON:
 - work_id: For configuration, it is `melotts`.
 - action: The method to be called is `setup`.
 - object: The data type being transmitted is `melotts.setup`.
-- model: The model being used is the Chinese model `melotts_zh-cn`.
+- model: The model being used is the English model `melotts-en-us`.
 - response_format: The result is returned as `sys.pcm`, system audio data, which is directly sent to the llm-audio
   module for playback.
 - input: The input is `tts.utf-8`, representing user input.
@@ -139,7 +139,7 @@ Example:
   "action": "setup",
   "object": "melotts.setup",
   "data": {
-    "model": "melotts_zh-cn",
+    "model": "melotts-en-us",
     "response_format": "sys.pcm",
     "input": [
       "tts.utf-8",
@@ -335,7 +335,7 @@ Response JSON:
     "inputs_": [
       "tts.utf-8"
     ],
-    "model": "melotts_zh-cn",
+    "model": "melotts-en-us",
     "response_format": "sys.pcm"
   },
   "error": {
