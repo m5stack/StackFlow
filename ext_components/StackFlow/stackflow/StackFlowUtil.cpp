@@ -358,7 +358,7 @@ std::string StackFlows::unit_call(const std::string &unit_name, const std::strin
 {
     std::string value;
     pzmq _call(unit_name);
-    _call.call_rpc_action(unit_action, data, [&value](pzmq *_pzmq, const std::string &raw) { value = raw; });
+    _call.call_rpc_action(unit_action, data, [&value](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) { value = raw->string(); });
     return value;
 }
 

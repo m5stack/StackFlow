@@ -25,7 +25,7 @@ int remote_call(int com_id, const std::string &json_str)
     std::string com_urls(com_url);
     RPC_PUSH_PARAM(send_data, com_urls, json_str);
     pzmq clent(work_unit);
-    return clent.call_rpc_action(action, send_data, [](pzmq *_pzmq, const std::string &val) {});
+    return clent.call_rpc_action(action, send_data, [](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &val) {});
 }
 
 void remote_action_work()

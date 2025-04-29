@@ -14,7 +14,8 @@ std::string llm_channel_obj::uart_push_url;
 #define RPC_PARSE_TO_PARAM_OLD(obj) \
     sample_json_str_get(obj, "zmq_com"), sample_unescapeString(sample_json_str_get(obj, "raw_data"))
 
-#define RPC_PARSE_TO_PARAM(obj) RPC_PARSE_TO_FIRST(obj), RPC_PARSE_TO_SECOND(obj)
+#define RPC_PARSE_TO_PARAM(obj)     RPC_PARSE_TO_FIRST(obj), RPC_PARSE_TO_SECOND(obj)
+#define PTR_RPC_PARSE_TO_PARAM(obj) PTR_RPC_PARSE_TO_FIRST(obj), PTR_RPC_PARSE_TO_SECOND(obj)
 
 llm_channel_obj::llm_channel_obj(const std::string &_publisher_url, const std::string &inference_url,
                                  const std::string &unit_name)
@@ -30,23 +31,24 @@ llm_channel_obj::~llm_channel_obj()
 }
 
 void llm_channel_obj::subscriber_event_call(const std::function<void(const std::string &, const std::string &)> &call,
-                                            pzmq *_pzmq, const std::string &raw)
+                                            pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw)
 {
+    auto _raw = raw->string();
     const char *user_inference_flage_str = "\"action\"";
-    std::size_t pos                      = raw.find(user_inference_flage_str);
+    std::size_t pos                      = _raw.find(user_inference_flage_str);
     while (true) {
         if (pos == std::string::npos) {
             break;
-        } else if ((pos > 0) && (raw[pos - 1] != '\\')) {
-            std::string zmq_com = sample_json_str_get(raw, "zmq_com");
+        } else if ((pos > 0) && (_raw[pos - 1] != '\\')) {
+            std::string zmq_com = sample_json_str_get(_raw, "zmq_com");
             if (!zmq_com.empty()) set_push_url(zmq_com);
-            request_id_ = sample_json_str_get(raw, "request_id");
-            work_id_    = sample_json_str_get(raw, "work_id");
+            request_id_ = sample_json_str_get(_raw, "request_id");
+            work_id_    = sample_json_str_get(_raw, "work_id");
             break;
         }
-        pos = raw.find(user_inference_flage_str, pos + sizeof(user_inference_flage_str));
+        pos = _raw.find(user_inference_flage_str, pos + sizeof(user_inference_flage_str));
     }
-    call(sample_json_str_get(raw, "object"), sample_json_str_get(raw, "data"));
+    call(sample_json_str_get(_raw, "object"), sample_json_str_get(_raw, "data"));
 }
 
 int llm_channel_obj::subscriber_work_id(const std::string &work_id,
@@ -236,9 +238,10 @@ void StackFlow::_sys_init(const std::string &zmq_url, const std::string &data)
     // todo:...
 }
 
-std::string StackFlow::_rpc_setup(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_setup(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_SETUP, RPC_PARSE_TO_PARAM(data));
+    auto _data = data->string();
+    event_queue_.enqueue(EVENT_SETUP, RPC_PARSE_TO_PARAM(_data));
     return std::string("None");
 }
 
@@ -270,9 +273,10 @@ int StackFlow::setup(const std::string &work_id, const std::string &object, cons
     return -1;
 }
 
-std::string StackFlow::_rpc_link(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_link(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_LINK, RPC_PARSE_TO_PARAM(data));
+    auto _data = data->string();
+    event_queue_.enqueue(EVENT_LINK, RPC_PARSE_TO_PARAM(_data));
     return std::string("None");
 }
 
@@ -301,9 +305,10 @@ void StackFlow::link(const std::string &work_id, const std::string &object, cons
     send("None", "None", error_body, work_id);
 }
 
-std::string StackFlow::_rpc_unlink(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_unlink(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_UNLINK, RPC_PARSE_TO_PARAM(data));
+    auto _data = data->string();
+    event_queue_.enqueue(EVENT_UNLINK, RPC_PARSE_TO_PARAM(_data));
     return std::string("None");
 }
 
@@ -332,9 +337,11 @@ void StackFlow::unlink(const std::string &work_id, const std::string &object, co
     send("None", "None", error_body, work_id);
 }
 
-std::string StackFlow::_rpc_work(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_work(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_WORK, RPC_PARSE_TO_PARAM(data));
+
+    auto _data = data->string();
+    event_queue_.enqueue(EVENT_WORK, RPC_PARSE_TO_PARAM(_data));
     return std::string("None");
 }
 
@@ -363,9 +370,12 @@ void StackFlow::work(const std::string &work_id, const std::string &object, cons
     send("None", "None", error_body, work_id);
 }
 
-std::string StackFlow::_rpc_exit(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_exit(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_EXIT, RPC_PARSE_TO_PARAM(data));
+
+
+    auto _data = data->string();
+    event_queue_.enqueue(EVENT_EXIT, RPC_PARSE_TO_PARAM(_data));
     return std::string("None");
 }
 
@@ -397,9 +407,12 @@ int StackFlow::exit(const std::string &work_id, const std::string &object, const
     return 0;
 }
 
-std::string StackFlow::_rpc_pause(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_pause(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_PAUSE, RPC_PARSE_TO_PARAM(data));
+
+
+    auto _data = data->string();
+    event_queue_.enqueue(EVENT_PAUSE, RPC_PARSE_TO_PARAM(_data));
     return std::string("None");
 }
 
@@ -428,9 +441,12 @@ void StackFlow::pause(const std::string &work_id, const std::string &object, con
     send("None", "None", error_body, work_id);
 }
 
-std::string StackFlow::_rpc_taskinfo(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_taskinfo(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_TASKINFO, RPC_PARSE_TO_PARAM(data));
+
+
+    auto _data = data->string();
+    event_queue_.enqueue(EVENT_TASKINFO, RPC_PARSE_TO_PARAM(_data));
     return std::string("None");
 }
 

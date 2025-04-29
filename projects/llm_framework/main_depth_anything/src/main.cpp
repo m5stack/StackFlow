@@ -419,8 +419,8 @@ public:
                         std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                         std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
                         llm_channel->subscriber(
-                            input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::string &raw) {
-                                this->task_camera_data(_llm_task_obj, _llm_channel, raw);
+                            input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                                this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
                             });
                     }
                 }
@@ -466,8 +466,8 @@ public:
                 std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                 std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
                 llm_channel->subscriber(input_url,
-                                        [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::string &raw) {
-                                            this->task_camera_data(_llm_task_obj, _llm_channel, raw);
+                                        [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                                            this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
                                         });
             }
             llm_task_obj->inputs_.push_back(data);

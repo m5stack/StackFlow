@@ -389,10 +389,11 @@ public:
         return LLM_NONE;
     }
 
-    std::string play(pzmq *_pzmq, const std::string &rawdata)
+    std::string play(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
-        std::string zmq_url    = RPC_PARSE_TO_FIRST(rawdata);
-        std::string audio_json = RPC_PARSE_TO_SECOND(rawdata);
+        auto _rawdata = rawdata->string();
+        std::string zmq_url    = RPC_PARSE_TO_FIRST(_rawdata);
+        std::string audio_json = RPC_PARSE_TO_SECOND(_rawdata);
         std::string ret_val =
             parse_data(sample_json_str_get(audio_json, "object"), sample_json_str_get(audio_json, "data"));
         request_id_ = sample_json_str_get(audio_json, "request_id");
@@ -400,29 +401,31 @@ public:
         return ret_val;
     }
 
-    std::string play_raw(pzmq *_pzmq, const std::string &rawdata)
+    std::string play_raw(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
-        if (rawdata.empty()) return std::string("rawdata empty");
-        _play(rawdata);
+        auto _rawdata = rawdata->string();
+        if (_rawdata.empty()) return std::string("rawdata empty");
+        _play(_rawdata);
         return LLM_NONE;
     }
 
-    std::string enqueue_play(pzmq *_pzmq, const std::string &rawdata)
+    std::string enqueue_play(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         audio_clear_flage_ = false;
-        event_queue_.enqueue(EVENT_QUEUE_PLAY, rawdata, "");
+        event_queue_.enqueue(EVENT_QUEUE_PLAY, rawdata->string(), "");
         return LLM_NONE;
     }
 
-    std::string audio_status(pzmq *_pzmq, const std::string &rawdata)
+    std::string audio_status(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
-        if (rawdata == "play") {
+        std::string _rawdata = rawdata->string();
+        if (_rawdata == "play") {
             if (ax_play_status()) {
                 return std::string("None");
             } else {
                 return std::string("Runing");
             }
-        } else if (rawdata == "cap") {
+        } else if (_rawdata == "cap") {
             if (ax_cap_status()) {
                 return std::string("None");
             } else {
@@ -447,19 +450,19 @@ public:
         }
     }
 
-    std::string play_stop(pzmq *_pzmq, const std::string &rawdata)
+    std::string play_stop(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         _play_stop();
         return LLM_NONE;
     }
 
-    std::string queue_play_stop(pzmq *_pzmq, const std::string &rawdata)
+    std::string queue_play_stop(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         audio_clear_flage_ = true;
         return LLM_NONE;
     }
 
-    std::string cap(pzmq *_pzmq, const std::string &rawdata)
+    std::string cap(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         if (cap_status_ == 0) {
             _cap();
@@ -468,7 +471,7 @@ public:
         return sys_pcm_cap_channel;
     }
 
-    std::string cap_stop(pzmq *_pzmq, const std::string &rawdata)
+    std::string cap_stop(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         if (cap_status_ > 0) {
             cap_status_--;
@@ -479,7 +482,7 @@ public:
         return LLM_NONE;
     }
 
-    std::string cap_stop_all(pzmq *_pzmq, const std::string &rawdata)
+    std::string cap_stop_all(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         cap_status_ = 0;
         _cap_stop();

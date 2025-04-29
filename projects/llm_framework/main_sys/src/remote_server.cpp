@@ -171,9 +171,9 @@ int c_sys_release_unit(char const *unit)
     return sys_release_unit(unit);
 }
 
-std::string rpc_allocate_unit(pzmq *_pzmq, const std::string &raw)
+std::string rpc_allocate_unit(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw)
 {
-    unit_data *unit_info = sys_allocate_unit(raw);
+    unit_data *unit_info = sys_allocate_unit(raw->string());
     std::string send_data;
     std::string send_data1;
     std::string str_port = std::to_string(unit_info->port_);
@@ -182,29 +182,29 @@ std::string rpc_allocate_unit(pzmq *_pzmq, const std::string &raw)
     return send_data;
 }
 
-std::string rpc_release_unit(pzmq *_pzmq, const std::string &raw)
+std::string rpc_release_unit(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw)
 {
-    sys_release_unit(raw);
+    sys_release_unit(raw->string());
     return "Success";
 }
 
-std::string rpc_sql_select(pzmq *_pzmq, const std::string &raw)
+std::string rpc_sql_select(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw)
 {
-    return sys_sql_select(raw);
+    return sys_sql_select(raw->string());
 }
 
-std::string rpc_sql_set(pzmq *_pzmq, const std::string &raw)
+std::string rpc_sql_set(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw)
 {
-    std::string key = sample_json_str_get(raw, "key");
-    std::string val = sample_json_str_get(raw, "val");
+    std::string key = sample_json_str_get(raw->string(), "key");
+    std::string val = sample_json_str_get(raw->string(), "val");
     if (key.empty()) return "False";
     sys_sql_set(key, val);
     return "Success";
 }
 
-std::string rpc_sql_unset(pzmq *_pzmq, const std::string &raw)
+std::string rpc_sql_unset(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw)
 {
-    sys_sql_unset(raw);
+    sys_sql_unset(raw->string());
     return "Success";
 }
 
