@@ -1,9 +1,9 @@
 {
     "mode": "melotts-zh-cn",
     "type": "tts",
-    "homepage":"https://huggingface.co/myshell-ai/MeloTTS-Chinese",
-    "compile_flage":"pulsar2 build --input decoder.onnx --config config_decoder_u16.json --output_dir decoder --output_name decoder.axmodel --target_hardware AX620E --npu_mode NPU2 --compiler.check 0",
-    "pulsar_version":"3.2-99f14d0a",
+    "homepage": "https://huggingface.co/myshell-ai/MeloTTS-Chinese",
+    "compile_flage": "pulsar2 build --input decoder.onnx --config config_decoder_u16.json --output_dir decoder --output_name decoder.axmodel --target_hardware AX620E --npu_mode NPU2 --compiler.check 0",
+    "pulsar_version": "3.2-99f14d0a",
     "capabilities": [
         "tts",
         "Chinese"
@@ -21,7 +21,7 @@
         "gbin": "g-zh_mix_en.bin",
         "tokens": "tokens.txt",
         "lexicon": "lexicon.txt",
-        "spacker_speed": 1.0,
+        "spacker_speed": 1.1,
         "mode_rate": 44100,
         "audio_rate": 16000,
         "awake_delay": 1000

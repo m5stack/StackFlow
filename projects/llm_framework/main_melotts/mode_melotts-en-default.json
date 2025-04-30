@@ -21,7 +21,7 @@
         "gbin": "g-en-def.bin",
         "tokens": "tokens-en.txt",
         "lexicon": "lexicon-en.txt",
-        "spacker_speed": 1.0,
+        "spacker_speed": 1.2,
         "mode_rate": 44100,
         "audio_rate": 16000,
         "awake_delay": 1000
