@@ -21,7 +21,7 @@
         "gbin": "g-jp.bin",
         "tokens": "tokens-jp.txt",
         "lexicon": "lexicon-jp.txt",
-        "spacker_speed": 1.0,
+        "spacker_speed": 1.1,
         "mode_rate": 44100,
         "audio_rate": 16000,
         "awake_delay": 1000

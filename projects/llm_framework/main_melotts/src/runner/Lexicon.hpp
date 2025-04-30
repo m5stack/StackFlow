@@ -109,6 +109,90 @@ public:
     {
         return s.size() == 1 && ((s[0] >= 'A' && s[0] <= 'Z') || (s[0] >= 'a' && s[0] <= 'z'));
     }
+
+    bool is_english_token_char(const std::string& s)
+    {
+        if (s.size() != 1) return false;
+        char c = s[0];
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
+    }
+
+    void process_unknown_english(const std::string& word, std::vector<int>& phones, std::vector<int>& tones)
+    {
+        SLOGI("Processing unknown term: %s", word.c_str());
+
+        std::string orig_word = word;
+        std::vector<std::string> parts;
+        std::vector<std::string> phonetic_parts;
+
+        size_t start = 0;
+        while (start < word.size()) {
+            bool matched = false;
+
+            for (size_t len = std::min(word.size() - start, (size_t)10); len > 0 && !matched; --len) {
+                std::string sub_word       = word.substr(start, len);
+                std::string lower_sub_word = sub_word;
+                std::transform(lower_sub_word.begin(), lower_sub_word.end(), lower_sub_word.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
+
+                if (lexicon.find(lower_sub_word) != lexicon.end()) {
+                    // Substring found in lexicon
+                    auto& [sub_phones, sub_tones] = lexicon[lower_sub_word];
+                    phones.insert(phones.end(), sub_phones.begin(), sub_phones.end());
+                    tones.insert(tones.end(), sub_tones.begin(), sub_tones.end());
+
+                    parts.push_back(sub_word);
+                    phonetic_parts.push_back(phonesToString(sub_phones));
+
+                    SLOGI("  Matched: '%s' -> %s", sub_word.c_str(), phonesToString(sub_phones).c_str());
+
+                    start += len;
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (!matched) {
+                std::string single_char = word.substr(start, 1);
+                std::string lower_char  = single_char;
+                std::transform(lower_char.begin(), lower_char.end(), lower_char.begin(),
+                               [](unsigned char c) { return std::tolower(c); });
+
+                if (lexicon.find(lower_char) != lexicon.end()) {
+                    auto& [char_phones, char_tones] = lexicon[lower_char];
+                    phones.insert(phones.end(), char_phones.begin(), char_phones.end());
+                    tones.insert(tones.end(), char_tones.begin(), char_tones.end());
+
+                    parts.push_back(single_char);
+                    phonetic_parts.push_back(phonesToString(char_phones));
+
+                    SLOGI("  Single char: '%s' -> %s", single_char.c_str(), phonesToString(char_phones).c_str());
+                } else {
+                    phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
+                    tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
+
+                    parts.push_back(single_char);
+                    phonetic_parts.push_back("_unknown_");
+
+                    SLOGI("  Unknown: '%s'", single_char.c_str());
+                }
+
+                start++;
+            }
+        }
+
+        std::string parts_str, phonetic_str;
+        for (size_t i = 0; i < parts.size(); i++) {
+            if (i > 0) {
+                parts_str += " ";
+                phonetic_str += " ";
+            }
+            parts_str += parts[i];
+            phonetic_str += phonetic_parts[i];
+        }
+
+        SLOGI("%s\t|\tDecomposed: %s\t|\tPhonetics: %s", orig_word.c_str(), parts_str.c_str(), phonetic_str.c_str());
+    }
     void convert(const std::string& text, std::vector<int>& phones, std::vector<int>& tones)
     {
         SLOGI("\n开始处理文本: \"%s\"", text.c_str());
@@ -139,10 +223,7 @@ public:
                     SLOGI("%s\t|\t%s\t|\t%s", orig_word.c_str(), phonesToString(eng_phones).c_str(),
                           tonesToString(eng_tones).c_str());
                 } else {
-                    phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
-                    tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
-                    SLOGI("%s\t|\t%s (未匹配)\t|\t%s", orig_word.c_str(), phonesToString(unknown_token.first).c_str(),
-                          tonesToString(unknown_token.second).c_str());
+                    process_unknown_english(orig_word, phones, tones);
                 }
                 continue;
             }
