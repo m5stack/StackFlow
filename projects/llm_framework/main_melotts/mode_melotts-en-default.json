@@ -6,7 +6,7 @@
     "pulsar_version": "3.4-983bb35e",
     "capabilities": [
         "tts",
-        "Japanese"
+        "English"
     ],
     "input_type": [
         "tts.utf-8"
@@ -16,9 +16,9 @@
         "sys.play.0_1"
     ],
     "mode_param": {
-        "encoder": "encoder-en-def.ort",
-        "decoder": "decoder-en-def.axmodel",
-        "gbin": "g-en-def.bin",
+        "encoder": "encoder-en-default.ort",
+        "decoder": "decoder-en-default.axmodel",
+        "gbin": "g-en-default.bin",
         "tokens": "tokens-en.txt",
         "lexicon": "lexicon-en.txt",
         "spacker_speed": 1.2,
