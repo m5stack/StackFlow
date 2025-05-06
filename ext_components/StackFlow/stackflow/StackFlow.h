@@ -186,11 +186,34 @@ public:
 };
 
 class stackflow_data {
-    union {
-        std::string *rawobj;
-        std::string *object;
-    };
-    std::string *data;
+public:
+    stackflow_data()
+    {
+    }
+    stackflow_data(const std::string &_data1)
+    {
+        str_data[0] = _data1;
+    }
+    stackflow_data(const std::string &_data1, const std::string &_data2)
+    {
+        str_data[0] = _data1;
+        str_data[1] = _data2;
+    }
+    stackflow_data(const std::string &_data1, int _data2)
+    {
+        str_data[0] = _data1;
+        int_data[0] = _data2;
+    }
+    std::string string(int index = 0)
+    {
+        return str_data[index];
+    }
+    int integer(int index = 0)
+    {
+        return int_data[index];
+    }
+    std::string str_data[2];
+    int int_data[2];
 };
 
 class StackFlow {
@@ -217,7 +240,7 @@ protected:
         EVENT_EXPORT,
     } local_event_t;
 
-    eventpp::EventQueue<int, void(const std::string &, const std::string &)> event_queue_;
+    eventpp::EventQueue<int, void(const std::shared_ptr<void> &)> event_queue_;
     std::unique_ptr<std::thread> even_loop_thread_;
     std::unique_ptr<pzmq> rpc_ctx_;
     std::atomic<int> status_;
@@ -225,7 +248,7 @@ protected:
     std::unordered_map<std::string, std::function<int(void)>> repeat_callback_fun_;
     std::mutex repeat_callback_fun_mutex_;
 
-    void _repeat_loop(const std::string &zmq_url, const std::string &raw);
+    void _repeat_loop(const std::shared_ptr<void> &arg);
 
 public:
     std::string request_id_;
@@ -244,7 +267,7 @@ public:
 
     StackFlow(const std::string &unit_name);
     void even_loop();
-    void _none_event(const std::string &data1, const std::string &data2);
+    void _none_event(const std::shared_ptr<void> &arg);
 
     template <typename T>
     std::shared_ptr<llm_channel_obj> get_channel(T workid)
@@ -261,8 +284,11 @@ public:
     }
 
     std::string _rpc_setup(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data);
-    void _setup(const std::string &zmq_url, const std::string &data)
+    void _setup(const std::shared_ptr<void> &arg)
     {
+        std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
+        std::string zmq_url                         = originalPtr->string(0);
+        std::string data                            = originalPtr->string(1);
         // printf("void _setup run \n");
         request_id_  = sample_json_str_get(data, "request_id");
         out_zmq_url_ = zmq_url;
@@ -272,8 +298,11 @@ public:
     virtual int setup(const std::string &work_id, const std::string &object, const std::string &data);
 
     std::string _rpc_link(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data);
-    void _link(const std::string &zmq_url, const std::string &data)
+    void _link(const std::shared_ptr<void> &arg)
     {
+        std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
+        std::string zmq_url                         = originalPtr->string(0);
+        std::string data                            = originalPtr->string(1);
         // printf("void _link run \n");
         request_id_  = sample_json_str_get(data, "request_id");
         out_zmq_url_ = zmq_url;
@@ -283,8 +312,11 @@ public:
     virtual void link(const std::string &work_id, const std::string &object, const std::string &data);
 
     std::string _rpc_unlink(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data);
-    void _unlink(const std::string &zmq_url, const std::string &data)
+    void _unlink(const std::shared_ptr<void> &arg)
     {
+        std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
+        std::string zmq_url                         = originalPtr->string(0);
+        std::string data                            = originalPtr->string(1);
         // printf("void _unlink run \n");
         request_id_  = sample_json_str_get(data, "request_id");
         out_zmq_url_ = zmq_url;
@@ -294,46 +326,58 @@ public:
     virtual void unlink(const std::string &work_id, const std::string &object, const std::string &data);
 
     std::string _rpc_exit(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data);
-    void _exit(const std::string &zmq_url, const std::string &data)
+    void _exit(const std::shared_ptr<void> &arg)
     {
-        request_id_  = sample_json_str_get(data, "request_id");
-        out_zmq_url_ = zmq_url;
+        std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
+        std::string zmq_url                         = originalPtr->string(0);
+        std::string data                            = originalPtr->string(1);
+        request_id_                                 = sample_json_str_get(data, "request_id");
+        out_zmq_url_                                = zmq_url;
         if (status_.load()) exit(zmq_url, data);
     }
     virtual int exit(const std::string &zmq_url, const std::string &raw);
     virtual int exit(const std::string &work_id, const std::string &object, const std::string &data);
 
     std::string _rpc_work(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data);
-    void _work(const std::string &zmq_url, const std::string &data)
+    void _work(const std::shared_ptr<void> &arg)
     {
-        request_id_  = sample_json_str_get(data, "request_id");
-        out_zmq_url_ = zmq_url;
+        std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
+        std::string zmq_url                         = originalPtr->string(0);
+        std::string data                            = originalPtr->string(1);
+        request_id_                                 = sample_json_str_get(data, "request_id");
+        out_zmq_url_                                = zmq_url;
         if (status_.load()) work(zmq_url, data);
     }
     virtual void work(const std::string &zmq_url, const std::string &raw);
     virtual void work(const std::string &work_id, const std::string &object, const std::string &data);
 
     std::string _rpc_pause(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data);
-    void _pause(const std::string &zmq_url, const std::string &data)
+    void _pause(const std::shared_ptr<void> &arg)
     {
-        request_id_  = sample_json_str_get(data, "request_id");
-        out_zmq_url_ = zmq_url;
+        std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
+        std::string zmq_url                         = originalPtr->string(0);
+        std::string data                            = originalPtr->string(1);
+        request_id_                                 = sample_json_str_get(data, "request_id");
+        out_zmq_url_                                = zmq_url;
         if (status_.load()) pause(zmq_url, data);
     }
     virtual void pause(const std::string &zmq_url, const std::string &raw);
     virtual void pause(const std::string &work_id, const std::string &object, const std::string &data);
 
     std::string _rpc_taskinfo(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data);
-    void _taskinfo(const std::string &zmq_url, const std::string &data)
+    void _taskinfo(const std::shared_ptr<void> &arg)
     {
-        request_id_  = sample_json_str_get(data, "request_id");
-        out_zmq_url_ = zmq_url;
+        std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
+        std::string zmq_url                         = originalPtr->string(0);
+        std::string data                            = originalPtr->string(1);
+        request_id_                                 = sample_json_str_get(data, "request_id");
+        out_zmq_url_                                = zmq_url;
         if (status_.load()) taskinfo(zmq_url, data);
     }
     virtual void taskinfo(const std::string &zmq_url, const std::string &raw);
     virtual void taskinfo(const std::string &work_id, const std::string &object, const std::string &data);
 
-    void _sys_init(const std::string &zmq_url, const std::string &data);
+    void _sys_init(const std::shared_ptr<void> &arg);
 
     void user_output(const std::string &zmq_url, const std::string &request_id, const std::string &data);
     template <typename T, typename U>

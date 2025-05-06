@@ -594,8 +594,8 @@ public:
     {
         auto _rawdata = rawdata->string();
         nlohmann::json req_body;
-        std::string zmq_url    = RPC_PARSE_TO_FIRST(_rawdata);
-        std::string param_json = RPC_PARSE_TO_SECOND(_rawdata);
+        std::string zmq_url    = rawdata->get_param(0);
+        std::string param_json = rawdata->get_param(1);
         std::vector<std::string> devices;
         glob_t glob_result;
         glob("/dev/video*", GLOB_TILDE, NULL, &glob_result);

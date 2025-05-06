@@ -48,14 +48,15 @@ private:
         self->pub_ctx_->send_data((const char *)data, size);
     }
 
-    void hw_queue_play(const std::string &audio_data, const std::string &None)
+    void hw_queue_play(const std::shared_ptr<void> &arg)
     {
         if (audio_clear_flage_) {
             return;
         }
+        std::shared_ptr<pzmq_data> originalPtr = std::static_pointer_cast<pzmq_data>(arg);
         std::lock_guard<std::mutex> guard(ax_play_mtx);
         ax_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
-                play_config.bit, audio_data.c_str(), audio_data.length());
+                play_config.bit, originalPtr->data(), originalPtr->size());
     }
 
     void hw_play(const std::string &audio_data)
@@ -109,8 +110,8 @@ private:
 public:
     llm_audio() : StackFlow("audio")
     {
-        event_queue_.appendListener(
-            EVENT_QUEUE_PLAY, std::bind(&llm_audio::hw_queue_play, this, std::placeholders::_1, std::placeholders::_2));
+        event_queue_.appendListener(EVENT_QUEUE_PLAY,
+                                    std::bind(&llm_audio::hw_queue_play, this, std::placeholders::_1));
         setup("", "audio.play", "{\"None\":\"None\"}");
         setup("", "audio.cap", "{\"None\":\"None\"}");
         self        = this;
@@ -391,9 +392,8 @@ public:
 
     std::string play(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
-        auto _rawdata = rawdata->string();
-        std::string zmq_url    = RPC_PARSE_TO_FIRST(_rawdata);
-        std::string audio_json = RPC_PARSE_TO_SECOND(_rawdata);
+        std::string zmq_url    = rawdata->get_param(0);
+        std::string audio_json = rawdata->get_param(1);
         std::string ret_val =
             parse_data(sample_json_str_get(audio_json, "object"), sample_json_str_get(audio_json, "data"));
         request_id_ = sample_json_str_get(audio_json, "request_id");
@@ -412,7 +412,7 @@ public:
     std::string enqueue_play(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         audio_clear_flage_ = false;
-        event_queue_.enqueue(EVENT_QUEUE_PLAY, rawdata->string(), "");
+        event_queue_.enqueue(EVENT_QUEUE_PLAY, rawdata);
         return LLM_NONE;
     }
 

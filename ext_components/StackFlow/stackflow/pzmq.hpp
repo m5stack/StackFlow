@@ -50,6 +50,33 @@ public:
     {
         return &msg;
     }
+
+    std::string get_param(int index, const std::string &idata = "")
+    {
+        const char *data = NULL;
+        int size         = 0;
+        if (idata.length() > 0) {
+            data = idata.c_str();
+            size = idata.length();
+        } else {
+            data = (const char *)zmq_msg_data(&msg);
+            size = zmq_msg_size(&msg);
+        }
+
+        if ((index % 2) == 0) {
+            return std::string((const char *)(data + 1), data[0]);
+        } else {
+            return std::string((const char *)(data + data[0] + 1), zmq_msg_size(&msg) - data[0] - 1);
+        }
+    }
+
+    static std::string set_param(std::string param0, std::string param1)
+    {
+        std::string data = " " + param0 + param1;
+        data[0]          = param0.length();
+        return data;
+    }
+
     ~pzmq_data()
     {
         zmq_msg_close(&msg);

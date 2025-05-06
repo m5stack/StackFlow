@@ -174,12 +174,8 @@ int c_sys_release_unit(char const *unit)
 std::string rpc_allocate_unit(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw)
 {
     unit_data *unit_info = sys_allocate_unit(raw->string());
-    std::string send_data;
-    std::string send_data1;
-    std::string str_port = std::to_string(unit_info->port_);
-    RPC_PUSH_PARAM(send_data1, unit_info->output_url, unit_info->inference_url);
-    RPC_PUSH_PARAM(send_data, str_port, send_data1);
-    return send_data;
+    return pzmq_data::set_param(std::to_string(unit_info->port_),
+                                pzmq_data::set_param(unit_info->output_url, unit_info->inference_url));
 }
 
 std::string rpc_release_unit(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw)

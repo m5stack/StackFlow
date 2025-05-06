@@ -155,4 +155,32 @@ error::code 为 0 表示执行成功。
 }
 ```
 
+获取本机的摄像头列表。
+
+发送 json：
+
+```json
+{
+  "request_id": "2",
+  "work_id": "camera",
+  "action": "list_camera"
+}
+```
+
+响应 json：
+
+```json
+{
+  "created":1746515639,
+  "data":[],
+  "error":{
+    "code":0,
+    "message":""
+    },
+  "object":"camera.devices",
+  "request_id":"2",
+  "work_id":"camera"
+}
+```
+
 > **注意：work_id 是按照单元的初始化注册顺序增加的，并不是固定的索引值。**  
