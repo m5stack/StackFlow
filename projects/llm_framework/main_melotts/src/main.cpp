@@ -9,6 +9,7 @@
 #include "Lexicon.hpp"
 #include <ax_sys_api.h>
 #include "AudioFile.h"
+#include "SolaProcessor.h"
 #include "Lexicon.hpp"
 
 #include <signal.h>
@@ -263,49 +264,71 @@ public:
             auto encoder_output =
                 encoder_->Run(phones, tones, langids, g_matrix, mode_config_.noise_scale, mode_config_.noise_scale_w,
                               mode_config_.get_length_scale(), mode_config_.sdp_ratio);
-            float *zp_data      = encoder_output.at(0).GetTensorMutableData<float>();
-            int audio_len       = encoder_output.at(2).GetTensorMutableData<int>()[0];
-            auto zp_info        = encoder_output.at(0).GetTensorTypeAndShapeInfo();
-            auto zp_shape       = zp_info.GetShape();
-            int zp_size         = decoder_->GetInputSize(0) / sizeof(float);
-            int dec_len         = zp_size / zp_shape[1];
-            int audio_slice_len = decoder_->GetOutputSize(0) / sizeof(float);
-            std::vector<float> decoder_output(audio_slice_len);
-            int dec_slice_num = int(std::ceil(zp_shape[2] * 1.0 / dec_len));
+            float *zp_data = encoder_output.at(0).GetTensorMutableData<float>();
+            int audio_len  = encoder_output.at(2).GetTensorMutableData<int>()[0];
+            auto zp_info   = encoder_output.at(0).GetTensorTypeAndShapeInfo();
+            auto zp_shape  = zp_info.GetShape();
+
+            // Decoder parameters setup
+            int zp_size                 = decoder_->GetInputSize(0) / sizeof(float);
+            int dec_len                 = zp_size / zp_shape[1];
+            int audio_slice_len         = decoder_->GetOutputSize(0) / sizeof(float);
+            const int pad_frames        = 16;
+            const int samples_per_frame = 512;
+            const int effective_frames  = dec_len - 2 * pad_frames;
+            int dec_slice_num =
+                static_cast<int>(std::ceil(static_cast<double>(zp_shape[2]) / static_cast<double>(effective_frames)));
+            SolaProcessor sola(pad_frames, samples_per_frame);
             std::vector<float> pcmlist;
+
             for (int i = 0; i < dec_slice_num; i++) {
-                std::vector<float> zp(zp_size, 0);
-                int actual_size = (i + 1) * dec_len < zp_shape[2] ? dec_len : zp_shape[2] - i * dec_len;
-                for (int n = 0; n < zp_shape[1]; n++) {
-                    memcpy(zp.data() + n * dec_len, zp_data + n * zp_shape[2] + i * dec_len,
-                           sizeof(float) * actual_size);
+                int input_start = i * effective_frames;
+                if (i > 0) {
+                    input_start -= pad_frames;
                 }
+                input_start    = std::max(0, input_start);
+                int actual_len = std::min(dec_len, static_cast<int>(zp_shape[2] - input_start));
+                std::vector<float> zp(zp_size, 0);
+
+                for (int n = 0; n < zp_shape[1]; n++) {
+                    int copy_size = std::min(actual_len, static_cast<int>(zp_shape[2] - input_start));
+                    if (copy_size > 0) {
+                        memcpy(zp.data() + n * dec_len, zp_data + n * zp_shape[2] + input_start,
+                               sizeof(float) * copy_size);
+                    }
+                }
+                // Run decoder
+                std::vector<float> decoder_output(audio_slice_len);
                 decoder_->SetInput(zp.data(), 0);
                 decoder_->SetInput(g_matrix.data(), 1);
                 if (0 != decoder_->Run()) {
-                    printf("Run decoder model failed!\n");
                     throw std::string("decoder_ RunSync error");
                 }
                 decoder_->GetOutput(decoder_output.data(), 0);
-                actual_size = (i + 1) * audio_slice_len < audio_len ? audio_slice_len : audio_len - i * audio_slice_len;
-                if (decoder_output.size() > actual_size) {
-                    pcmlist.reserve(pcmlist.size() + actual_size);
-                    std::copy(decoder_output.begin(), decoder_output.begin() + actual_size,
-                              std::back_inserter(pcmlist));
-                } else {
-                    pcmlist.reserve(pcmlist.size() + decoder_output.size());
-                    std::copy(decoder_output.begin(), decoder_output.end(), std::back_inserter(pcmlist));
-                }
+                std::vector<float> processed_output = sola.ProcessFrame(decoder_output, i, dec_slice_num, actual_len);
+
+                pcmlist.insert(pcmlist.end(), processed_output.begin(), processed_output.end());
             }
+
             double src_ratio = (mode_config_.audio_rate * 1.0f) / (mode_config_.mode_rate * 1.0f);
             std::vector<float> tmp_pcm((pcmlist.size() * src_ratio + 1));
             int len;
             resample_audio(pcmlist.data(), pcmlist.size(), tmp_pcm.data(), &len, src_ratio);
+
+            // Convert to 16-bit PCM
+            wav_pcm_data.reserve(len);
             std::transform(tmp_pcm.begin(), tmp_pcm.begin() + len, std::back_inserter(wav_pcm_data),
                            [](const auto val) { return (int16_t)(val * INT16_MAX); });
+
+            // Call callback function with output
             if (out_callback_)
                 out_callback_(std::string((char *)wav_pcm_data.data(), wav_pcm_data.size() * sizeof(int16_t)), finish);
+
+        } catch (const std::exception &e) {
+            SLOGI("TTS processing exception: %s", e.what());
+            return true;
         } catch (...) {
+            SLOGI("TTS processing encountered unknown exception");
             return true;
         }
         return false;

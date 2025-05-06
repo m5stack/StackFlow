@@ -32,6 +32,7 @@ private:
 public:
     Lexicon(const std::string& lexicon_filename, const std::string& tokens_filename) : max_phrase_length(0)
     {
+        SLOGI("词典加载: %zu 发音表加载: %zu", tokens_filename, lexicon_filename);
         std::unordered_map<std::string, int> tokens;
         std::ifstream ifs(tokens_filename);
         assert(ifs.is_open());
