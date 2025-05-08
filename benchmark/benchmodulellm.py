@@ -109,7 +109,7 @@ def main(opt):
             
             for model_name in models:
                 logging.info(f"Testing model: {model_name}")
-                input_text = "This is a test input for the LLM."
+                input_text = "Tell me an adventure story."
                 try:
                     result = llm_client.test(model_name, input_text)
                     logging.info(f"Test result for model '{model_name}': {result}")
