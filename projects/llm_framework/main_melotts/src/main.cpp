@@ -9,7 +9,6 @@
 #include "Lexicon.hpp"
 #include <ax_sys_api.h>
 #include "AudioFile.h"
-#include "SolaProcessor.h"
 #include "Lexicon.hpp"
 
 #include <signal.h>
@@ -253,9 +252,9 @@ public:
                 }
                 return false;
             }
-            SLOGI("开始处理文本: %s", msg_str.c_str());
+            SLOGI("Processing text: %s", msg_str.c_str());
 
-            // 文本转音素处理部分保持不变
+            // Convert text to phonemes and tones
             std::vector<int> phones_bef, tones_bef;
             lexicon_->convert(msg_str, phones_bef, tones_bef);
             auto phones   = intersperse(phones_bef, 0);
@@ -263,9 +262,9 @@ public:
             int phone_len = phones.size();
             std::vector<int> langids(phone_len, 3);
 
-            SLOGI("音素转换完成，长度: %d", phone_len);
+            SLOGI("Phoneme conversion completed, length: %d", phone_len);
 
-            // 运行encoder获取latent representation
+            // Run the encoder to generate hidden representations
             auto encoder_output =
                 encoder_->Run(phones, tones, langids, g_matrix, mode_config_.noise_scale, mode_config_.noise_scale_w,
                               mode_config_.get_length_scale(), mode_config_.sdp_ratio);
@@ -274,37 +273,33 @@ public:
             auto zp_info   = encoder_output.at(0).GetTensorTypeAndShapeInfo();
             auto zp_shape  = zp_info.GetShape();
 
-            SLOGI("Encoder输出完成，形状: [%ld, %ld, %ld]，预期音频长度: %d", zp_shape[0], zp_shape[1], zp_shape[2],
-                  audio_len);
+            SLOGI("Encoder output completed, shape: [%ld, %ld, %ld], expected audio length: %d", zp_shape[0],
+                  zp_shape[1], zp_shape[2], audio_len);
 
-            // 解码器参数设置
+            // Calculate decoder parameters
             int zp_size         = decoder_->GetInputSize(0) / sizeof(float);
             int dec_len         = zp_size / zp_shape[1];
             int audio_slice_len = decoder_->GetOutputSize(0) / sizeof(float);
 
-            // 定义pad长度（每侧填充帧数）
-            const int pad_frames = 16;
-            // 每个音频帧的采样点数量
+            const int pad_frames        = 16;
             const int samples_per_frame = 512;
 
-            SLOGI("解码器配置：帧长度=%d, 音频切片长度=%d, pad长度=%d, 每帧采样点=%d", dec_len, audio_slice_len,
-                  pad_frames, samples_per_frame);
+            SLOGI("Decoder configuration: frame length=%d, audio slice length=%d, pad length=%d, samples per frame=%d",
+                  dec_len, audio_slice_len, pad_frames, samples_per_frame);
 
-            // 每次有效处理的帧数量
             const int effective_frames = dec_len - 2 * pad_frames;
 
-            // 计算需要的解码次数 - 确保所有类型一致
             int dec_slice_num =
                 static_cast<int>(std::ceil(static_cast<double>(zp_shape[2]) / static_cast<double>(effective_frames)));
 
-            SLOGI("将进行 %d 次推理，每次有效帧数: %d", dec_slice_num, effective_frames);
+            SLOGI("Will perform %d inferences, each with effective frames: %d", dec_slice_num, effective_frames);
 
-            // === SOLA算法参数设置 ===
-            const int sola_buffer_frame = pad_frames * samples_per_frame;                  // 重叠缓冲区长度
-            const int sola_search_frame = pad_frames * samples_per_frame;                  // 搜索窗口长度
-            const int block_frame       = (dec_len - 2 * pad_frames) * samples_per_frame;  // 有效块长度
+            // SOLA parameters setup
+            const int sola_buffer_frame = pad_frames * samples_per_frame;                  // Overlap buffer length
+            const int sola_search_frame = pad_frames * samples_per_frame;                  // Search window length
+            const int block_frame       = (dec_len - 2 * pad_frames) * samples_per_frame;  // Effective block length
 
-            // 创建淡入淡出窗口
+            // Create fade-in/fade-out windows for smooth transitions
             std::vector<float> fade_in_window(sola_buffer_frame);
             std::vector<float> fade_out_window(sola_buffer_frame);
 
@@ -313,49 +308,50 @@ public:
                 fade_out_window[i] = 1.0f - fade_in_window[i];
             }
 
-            // 初始化SOLA缓冲区
+            // Initialize SOLA buffer
             std::vector<float> sola_buffer(sola_buffer_frame, 0.0f);
             bool first_frame = true;
 
             std::vector<float> pcmlist;
 
+            // Main decoding loop - process each slice
             for (int i = 0; i < dec_slice_num; i++) {
-                // 计算当前批次的输入起始位置
+                // Calculate start position for current batch input
                 int input_start = i * effective_frames;
-                // 考虑前向pad，但确保不为负
+                // Consider forward padding, but ensure non-negative
                 if (i > 0) {
                     input_start -= pad_frames;
                 }
                 input_start = std::max(0, input_start);
 
-                // 实际输入长度
+                // Actual input length
                 int actual_len = std::min(dec_len, static_cast<int>(zp_shape[2] - input_start));
 
-                // 计算输出的有效范围（帧级别）
+                // Calculate effective output range (frame level)
                 int output_start_frame, output_end_frame;
 
                 if (i == 0) {
-                    // 第一帧：跳过前面的pad部分
+                    // First frame: skip padding at beginning
                     output_start_frame = 0;
                     output_end_frame   = effective_frames - 1;
                 } else if (i == dec_slice_num - 1) {
-                    // 最后一帧：从当前段起始计算
+                    // Last frame: calculate from current segment start
                     output_start_frame = i * effective_frames;
-                    // 最后到编码器输出的最大长度
+                    // Last frame extends to encoder's maximum output length
                     output_end_frame = static_cast<int>(zp_shape[2]) - 1;
                 } else {
-                    // 中间帧：标准计算
+                    // Middle frames: standard calculation
                     output_start_frame = i * effective_frames;
                     output_end_frame   = (i + 1) * effective_frames - 1;
                 }
 
-                SLOGI("第 %d 次推理: 输入帧范围=[%d-%d]，实际长度=%d，输出帧范围=[%d-%d]", i + 1, input_start,
-                      input_start + actual_len - 1, actual_len, output_start_frame, output_end_frame);
+                SLOGI("Inference #%d: input frame range=[%d-%d], actual length=%d, output frame range=[%d-%d]", i + 1,
+                      input_start, input_start + actual_len - 1, actual_len, output_start_frame, output_end_frame);
 
-                // 准备decoder输入，全部初始化为0
+                // Prepare decoder input, initialize all to zero
                 std::vector<float> zp(zp_size, 0);
 
-                // 复制数据到decoder输入
+                // Copy data to decoder input
                 for (int n = 0; n < zp_shape[1]; n++) {
                     int copy_size = std::min(actual_len, static_cast<int>(zp_shape[2] - input_start));
                     if (copy_size > 0) {
@@ -364,73 +360,76 @@ public:
                     }
                 }
 
-                // 运行decoder
+                // Run decoder
                 std::vector<float> decoder_output(audio_slice_len);
                 decoder_->SetInput(zp.data(), 0);
                 decoder_->SetInput(g_matrix.data(), 1);
 
-                SLOGI("第 %d 次推理：开始解码...", i + 1);
+                SLOGI("Inference #%d: starting decoding...", i + 1);
 
                 if (0 != decoder_->Run()) {
-                    SLOGI("第 %d 次推理：解码失败", i + 1);
+                    SLOGI("Inference #%d: decoding failed", i + 1);
                     throw std::string("decoder_ RunSync error");
                 }
 
                 decoder_->GetOutput(decoder_output.data(), 0);
 
-                // === SOLA处理流程 ===
+                // === SOLA Processing Logic ===
                 if (first_frame) {
-                    // 首帧特殊处理 - 不应跳过前面的内容
-                    // 首帧直接从解码器输出开始，不跳过任何内容
-                    int audio_start = 0;  // 从头开始，不跳过pad_frames
+                    // Special handling for first frame - should not skip initial content
+                    // First frame starts directly from decoder output without skipping
+                    int audio_start = 0;  // Start from beginning, don't skip pad_frames
 
-                    // 计算首帧应该添加的数据长度
-                    // 首帧应该保留完整解码输出，只留出末尾的sola_buffer_frame用于下一帧衔接
+                    // Calculate data length for first frame
+                    // First frame should preserve complete decoder output, only reserving sola_buffer_frame at the end
+                    // for next frame alignment
                     int audio_len = decoder_output.size() - sola_buffer_frame;
 
-                    // 边界检查
-                    audio_len = std::max(0, audio_len);  // 确保不为负
+                    // Boundary check
+                    audio_len = std::max(0, audio_len);  // Ensure non-negative
 
-                    // 添加首帧数据
+                    // Add first frame data
                     if (audio_len > 0) {
                         pcmlist.insert(pcmlist.end(), decoder_output.begin() + audio_start,
                                        decoder_output.begin() + audio_start + audio_len);
                     }
 
-                    // 保存末尾的sola_buffer_frame长度到SOLA缓冲区，用于下一帧对齐
+                    // Save sola_buffer_frame length from the end to SOLA buffer for next frame alignment
                     int buffer_start = audio_len;
 
-                    // 确保有足够数据可供复制
+                    // Ensure sufficient data is available for copying
                     if (buffer_start + sola_buffer_frame <= decoder_output.size()) {
                         std::copy(decoder_output.begin() + buffer_start,
                                   decoder_output.begin() + buffer_start + sola_buffer_frame, sola_buffer.begin());
                     } else {
-                        // 可能的情况：首帧数据总长度不足sola_buffer_frame
+                        // Possible case: first frame data is shorter than sola_buffer_frame
                         int available = static_cast<int>(decoder_output.size() - buffer_start);
                         if (available > 0) {
                             std::copy(decoder_output.begin() + buffer_start, decoder_output.end(), sola_buffer.begin());
-                            // 填充零
+                            // Fill with zeros
                             std::fill(sola_buffer.begin() + available, sola_buffer.end(), 0.0f);
                         } else {
-                            // 完全没有足够数据，全部填零
+                            // Completely insufficient data, fill all with zeros
                             std::fill(sola_buffer.begin(), sola_buffer.end(), 0.0f);
                         }
                     }
 
                     first_frame = false;
 
-                    SLOGI("第 %d 次推理: 首帧处理，从位置%d开始添加%d采样点到输出，保存%d样本到SOLA缓冲区", i + 1,
-                          audio_start, audio_len, sola_buffer_frame);
+                    SLOGI(
+                        "Inference #%d: First frame processing, added %d samples from position %d to output, saved %d "
+                        "samples to SOLA buffer",
+                        i + 1, audio_len, audio_start, sola_buffer_frame);
                 } else {
-                    // 非首帧：需要执行SOLA对齐
+                    // Non-first frame: SOLA alignment required
                     int audio_start = pad_frames * samples_per_frame;
 
-                    // 1. 准备搜索窗口 - 当前帧的开头部分
+                    // 1. Prepare search window - beginning portion of current frame
                     std::vector<float> search_window(sola_buffer_frame + sola_search_frame);
                     std::copy(decoder_output.begin() + audio_start,
                               decoder_output.begin() + audio_start + search_window.size(), search_window.begin());
 
-                    // 2. 寻找最佳对齐点（计算互相关）
+                    // 2. Find best alignment point (calculate cross-correlation)
                     int best_offset        = 0;
                     float best_correlation = -1.0;
 
@@ -443,7 +442,7 @@ public:
                             energy += search_window[j + offset] * search_window[j + offset];
                         }
 
-                        // 归一化相关性（避免除零）
+                        // Normalize correlation (avoid division by zero)
                         float normalized_correlation = (energy > 1e-8) ? correlation / std::sqrt(energy) : 0.0f;
 
                         if (normalized_correlation > best_correlation) {
@@ -452,30 +451,31 @@ public:
                         }
                     }
 
-                    SLOGI("第 %d 次推理: SOLA找到最佳对齐偏移量 %d，相关系数 %f", i + 1, best_offset, best_correlation);
+                    SLOGI("Inference #%d: SOLA found best alignment offset %d with correlation coefficient %f", i + 1,
+                          best_offset, best_correlation);
 
-                    // 3. 应用对齐偏移
+                    // 3. Apply alignment offset
                     int aligned_start = audio_start + best_offset;
 
-                    // 4. 平滑过渡处理（对齐区域的crossfade）
+                    // 4. Smooth transition processing (crossfade in alignment region)
                     std::vector<float> crossfade_region(sola_buffer_frame);
 
                     for (int j = 0; j < sola_buffer_frame; j++) {
-                        // 应用淡入淡出窗口函数
+                        // Apply fade-in/fade-out window functions
                         crossfade_region[j] =
                             decoder_output[aligned_start + j] * fade_in_window[j] + sola_buffer[j] * fade_out_window[j];
                     }
 
-                    // 5. 添加crossfade区域到输出
+                    // 5. Add crossfade region to output
                     pcmlist.insert(pcmlist.end(), crossfade_region.begin(), crossfade_region.end());
 
-                    // 6. 添加剩余有效音频数据
+                    // 6. Add remaining valid audio data
                     int remaining_start = aligned_start + sola_buffer_frame;
                     int remaining_len   = (i == dec_slice_num - 1)
                                               ? (actual_len - 2 * pad_frames) * samples_per_frame - sola_buffer_frame
                                               : (dec_len - 2 * pad_frames) * samples_per_frame - sola_buffer_frame;
 
-                    // 边界检查
+                    // Boundary check
                     remaining_len = std::min(remaining_len, static_cast<int>(decoder_output.size() - remaining_start));
 
                     if (remaining_len > 0) {
@@ -483,15 +483,15 @@ public:
                                        decoder_output.begin() + remaining_start + remaining_len);
                     }
 
-                    // 7. 更新SOLA缓冲区，为下一帧准备
+                    // 7. Update SOLA buffer for next frame
                     int buffer_start = remaining_start + remaining_len;
 
-                    // 检查是否还有足够的数据用于下一个缓冲区
+                    // Check if there's enough data for the next buffer
                     if (buffer_start + sola_buffer_frame <= decoder_output.size()) {
                         std::copy(decoder_output.begin() + buffer_start,
                                   decoder_output.begin() + buffer_start + sola_buffer_frame, sola_buffer.begin());
                     } else {
-                        // 如果不足，就用零填充
+                        // If insufficient, fill with zeros
                         int avail = static_cast<int>(decoder_output.size() - buffer_start);
                         if (avail > 0) {
                             std::copy(decoder_output.begin() + buffer_start, decoder_output.end(), sola_buffer.begin());
@@ -499,42 +499,46 @@ public:
                         std::fill(sola_buffer.begin() + avail, sola_buffer.end(), 0.0f);
                     }
 
-                    SLOGI("第 %d 次推理: 添加 %d + %d 采样点到输出，累计长度: %zu", i + 1, sola_buffer_frame,
-                          remaining_len, pcmlist.size());
+                    SLOGI("Inference #%d: Added %d + %d samples to output, cumulative length: %zu", i + 1,
+                          sola_buffer_frame, remaining_len, pcmlist.size());
                 }
             }
 
-            SLOGI("所有推理完成，生成PCM长度: %zu", pcmlist.size());
+            SLOGI("All inference completed, generated PCM length: %zu", pcmlist.size());
 
-            // 后续处理：重采样和转换为int16
-            double src_ratio = (mode_config_.audio_rate * 1.0f) / (mode_config_.mode_rate * 1.0f);
+            // Post-processing: resample and convert to int16
+            double src_ratio =
+                static_cast<double>(mode_config_.audio_rate) / static_cast<double>(mode_config_.mode_rate);
             std::vector<float> tmp_pcm((pcmlist.size() * src_ratio + 1));
             int len;
 
-            SLOGI("开始音频重采样，源采样率: %f，目标采样率: %f，比率: %f", mode_config_.mode_rate * 1.0f,
-                  mode_config_.audio_rate * 1.0f, src_ratio);
+            SLOGI("Starting audio resampling, source rate: %f, target rate: %f, ratio: %f",
+                  static_cast<float>(mode_config_.mode_rate), static_cast<float>(mode_config_.audio_rate), src_ratio);
 
             resample_audio(pcmlist.data(), pcmlist.size(), tmp_pcm.data(), &len, src_ratio);
 
-            SLOGI("重采样完成，重采样后长度: %d", len);
+            SLOGI("Resampling completed, length after resampling: %d", len);
 
-            // 转换为16位PCM
+            // Convert to 16-bit PCM
             wav_pcm_data.reserve(len);
             std::transform(tmp_pcm.begin(), tmp_pcm.begin() + len, std::back_inserter(wav_pcm_data),
-                           [](const auto val) { return (int16_t)(val * INT16_MAX); });
+                           [](const auto val) { return static_cast<int16_t>(val * INT16_MAX); });
 
-            SLOGI("最终生成音频长度: %zu 个采样点", wav_pcm_data.size());
+            SLOGI("Final audio length: %zu samples", wav_pcm_data.size());
 
-            // 调用回调函数输出结果
-            if (out_callback_)
-                out_callback_(std::string((char *)wav_pcm_data.data(), wav_pcm_data.size() * sizeof(int16_t)), finish);
+            // Call the output callback function with the result
+            if (out_callback_) {
+                out_callback_(
+                    std::string(reinterpret_cast<char *>(wav_pcm_data.data()), wav_pcm_data.size() * sizeof(int16_t)),
+                    finish);
+            }
 
-            SLOGI("TTS处理完成，输出回调已调用");
+            SLOGI("TTS processing completed, output callback invoked");
         } catch (const std::exception &e) {
-            SLOGI("TTS处理异常: %s", e.what());
+            SLOGI("TTS processing exception: %s", e.what());
             return true;
         } catch (...) {
-            SLOGI("TTS处理发生未知异常");
+            SLOGI("TTS processing encountered an unknown exception");
             return true;
         }
         return false;

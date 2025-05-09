@@ -195,99 +195,16 @@ public:
                   phonetic_str.c_str());
     }
 
-    std::vector<std::string> splitTextByPunctuation(const std::string& text)
+    void convert(const std::string& text, std::vector<int>& phones, std::vector<int>& tones)
     {
-        std::vector<std::string> segments;
-        auto chars = splitEachChar(text);
-        std::string current_segment;
-
-        for (size_t i = 0; i < chars.size(); ++i) {
-            std::string c = chars[i];
-            current_segment += c;
-
-            bool is_segment_punct = false;
-            std::string punct_key = c;
-
-            if (c == "，")
-                punct_key = ",";
-            else if (c == "。")
-                punct_key = ".";
-            else if (c == "！")
-                punct_key = "!";
-            else if (c == "？")
-                punct_key = "?";
-
-            if (lexicon.find(punct_key) != lexicon.end() &&
-                (punct_key == "." || punct_key == "!" || punct_key == "?" || punct_key == "," || punct_key == "…")) {
-                is_segment_punct = true;
-            }
-
-            if (is_segment_punct && i < chars.size() - 1) {
-                segments.push_back(current_segment);
-                current_segment.clear();
-            }
-        }
-
-        if (!current_segment.empty()) {
-            segments.push_back(current_segment);
-        }
-
-        return segments;
-    }
-    std::vector<std::string> mergeShortSegments(const std::vector<std::string>& segments, int min_length = 4)
-    {
-        std::vector<std::string> merged_segments;
-        std::string current_segment;
-
-        for (size_t i = 0; i < segments.size(); ++i) {
-            auto chars       = splitEachChar(segments[i]);
-            int actual_chars = 0;
-            for (const auto& c : chars) {
-                if (c != " " && lexicon.find(c) != lexicon.end()) {
-                    std::string punct_key = c;
-                    if (c == "，")
-                        punct_key = ",";
-                    else if (c == "。")
-                        punct_key = ".";
-                    else if (c == "！")
-                        punct_key = "!";
-                    else if (c == "？")
-                        punct_key = "?";
-
-                    if (punct_key != "," && punct_key != "." && punct_key != "!" && punct_key != "?" &&
-                        punct_key != "…" && punct_key != "'" && punct_key != "-") {
-                        actual_chars++;
-                    }
-                } else if (is_english(c)) {
-                    actual_chars++;
-                }
-            }
-            if (actual_chars < min_length && i < segments.size() - 1) {
-                if (current_segment.empty()) {
-                    current_segment = segments[i];
-                } else {
-                    current_segment += segments[i];
-                }
-            } else {
-                if (!current_segment.empty()) {
-                    current_segment += segments[i];
-                    merged_segments.push_back(current_segment);
-                    current_segment.clear();
-                } else {
-                    merged_segments.push_back(segments[i]);
-                }
-            }
-        }
-
-        if (!current_segment.empty()) {
-            merged_segments.push_back(current_segment);
-        }
-
-        return merged_segments;
-    }
-
-    void processSegment(const std::string& text, std::vector<int>& phones, std::vector<int>& tones)
-    {
+        DEBUG_LOG("\nStarting text processing: \"%s\"", text.c_str());
+        DEBUG_LOG("=======Matching Results=======");
+        DEBUG_LOG("Unit\t|\tPhonemes\t|\tTones");
+        DEBUG_LOG("-----------------------------");
+        phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
+        tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
+        DEBUG_LOG("<BOS>\t|\t%s\t|\t%s", phonesToString(unknown_token.first).c_str(),
+                  tonesToString(unknown_token.second).c_str());
         auto chars = splitEachChar(text);
         int i      = 0;
         while (i < chars.size()) {
@@ -357,39 +274,10 @@ public:
                 }
             }
         }
-    }
-
-    void convert(const std::string& text, std::vector<int>& phones, std::vector<int>& tones)
-    {
-        DEBUG_LOG("\nStarting text processing: \"%s\"", text.c_str());
-
-        std::vector<std::string> segments = splitTextByPunctuation(text);
-
-        std::vector<std::string> merged_segments = mergeShortSegments(segments);
-
-        DEBUG_LOG("Text divided into %zu segments after merging short segments", merged_segments.size());
-        for (size_t i = 0; i < merged_segments.size(); ++i) {
-            DEBUG_LOG("Segment %zu: \"%s\"", i + 1, merged_segments[i].c_str());
-        }
-
-        DEBUG_LOG("=======Matching Results=======");
-        DEBUG_LOG("Unit\t|\tPhonemes\t|\tTones");
-        DEBUG_LOG("-----------------------------");
-
-        phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
-        tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
-        DEBUG_LOG("<BOS>\t|\t%s\t|\t%s", phonesToString(unknown_token.first).c_str(),
-                  tonesToString(unknown_token.second).c_str());
-
-        for (const auto& segment : merged_segments) {
-            processSegment(segment, phones, tones);
-        }
-
         phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
         tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
         DEBUG_LOG("<EOS>\t|\t%s\t|\t%s", phonesToString(unknown_token.first).c_str(),
                   tonesToString(unknown_token.second).c_str());
-
         DEBUG_LOG("\nProcessing Summary:");
         DEBUG_LOG("Original text: %s", text.c_str());
         DEBUG_LOG("Phonemes: %s", phonesToString(phones).c_str());
