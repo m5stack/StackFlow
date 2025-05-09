@@ -396,6 +396,7 @@ if __name__ == "__main__":
         'llm-model-qwen2.5-1.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-p256-ax630c', '0.4', src_folder, revision],
         'llm-model-qwen2.5-1.5B-Int4-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-Int4-ax630c', '0.4', src_folder, revision],
         'llm-model-qwen2.5-coder-0.5B-ax630c':[create_data_deb,'llm-model-qwen2.5-coder-0.5B-ax630c', data_version, src_folder, revision],
+        'llm-model-qwen3-0.6B-ax630c':[create_data_deb,'llm-model-qwen3-0.6B-ax630c', '0.4', src_folder, revision],
         'llm-model-llama3.2-1B-prefill-ax630c':[create_data_deb,'llm-model-llama3.2-1B-prefill-ax630c', data_version, src_folder, revision],
         'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],
         'llm-model-openbuddy-llama3.2-1B-ax630c':[create_data_deb,'llm-model-openbuddy-llama3.2-1B-ax630c', data_version, src_folder, revision],
