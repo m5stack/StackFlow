@@ -252,7 +252,6 @@ public:
                 }
                 return false;
             }
-            SLOGI("Processing text: %s", msg_str.c_str());
 
             // Convert text to phonemes and tones
             std::vector<int> phones_bef, tones_bef;
@@ -261,8 +260,6 @@ public:
             auto tones    = intersperse(tones_bef, 0);
             int phone_len = phones.size();
             std::vector<int> langids(phone_len, 3);
-
-            SLOGI("Phoneme conversion completed, length: %d", phone_len);
 
             // Run the encoder to generate hidden representations
             auto encoder_output =
@@ -273,26 +270,18 @@ public:
             auto zp_info   = encoder_output.at(0).GetTensorTypeAndShapeInfo();
             auto zp_shape  = zp_info.GetShape();
 
-            SLOGI("Encoder output completed, shape: [%ld, %ld, %ld], expected audio length: %d", zp_shape[0],
-                  zp_shape[1], zp_shape[2], audio_len);
-
             // Calculate decoder parameters
             int zp_size         = decoder_->GetInputSize(0) / sizeof(float);
             int dec_len         = zp_size / zp_shape[1];
             int audio_slice_len = decoder_->GetOutputSize(0) / sizeof(float);
 
-            const int pad_frames        = 16;
+            const int pad_frames        = 24;
             const int samples_per_frame = 512;
-
-            SLOGI("Decoder configuration: frame length=%d, audio slice length=%d, pad length=%d, samples per frame=%d",
-                  dec_len, audio_slice_len, pad_frames, samples_per_frame);
 
             const int effective_frames = dec_len - 2 * pad_frames;
 
             int dec_slice_num =
                 static_cast<int>(std::ceil(static_cast<double>(zp_shape[2]) / static_cast<double>(effective_frames)));
-
-            SLOGI("Will perform %d inferences, each with effective frames: %d", dec_slice_num, effective_frames);
 
             // SOLA parameters setup
             const int sola_buffer_frame = pad_frames * samples_per_frame;                  // Overlap buffer length
@@ -344,10 +333,6 @@ public:
                     output_start_frame = i * effective_frames;
                     output_end_frame   = (i + 1) * effective_frames - 1;
                 }
-
-                SLOGI("Inference #%d: input frame range=[%d-%d], actual length=%d, output frame range=[%d-%d]", i + 1,
-                      input_start, input_start + actual_len - 1, actual_len, output_start_frame, output_end_frame);
-
                 // Prepare decoder input, initialize all to zero
                 std::vector<float> zp(zp_size, 0);
 
@@ -364,8 +349,6 @@ public:
                 std::vector<float> decoder_output(audio_slice_len);
                 decoder_->SetInput(zp.data(), 0);
                 decoder_->SetInput(g_matrix.data(), 1);
-
-                SLOGI("Inference #%d: starting decoding...", i + 1);
 
                 if (0 != decoder_->Run()) {
                     SLOGI("Inference #%d: decoding failed", i + 1);
@@ -416,10 +399,6 @@ public:
 
                     first_frame = false;
 
-                    SLOGI(
-                        "Inference #%d: First frame processing, added %d samples from position %d to output, saved %d "
-                        "samples to SOLA buffer",
-                        i + 1, audio_len, audio_start, sola_buffer_frame);
                 } else {
                     // Non-first frame: SOLA alignment required
                     int audio_start = pad_frames * samples_per_frame;
@@ -451,9 +430,6 @@ public:
                         }
                     }
 
-                    SLOGI("Inference #%d: SOLA found best alignment offset %d with correlation coefficient %f", i + 1,
-                          best_offset, best_correlation);
-
                     // 3. Apply alignment offset
                     int aligned_start = audio_start + best_offset;
 
@@ -481,9 +457,6 @@ public:
 
                         int remaining_len =
                             std::min(remaining_needed, static_cast<int>(decoder_output.size() - remaining_start));
-
-                        SLOGI("Inference #%d (final): Expected total=%d, processed=%d, needed=%d, available=%d", i + 1,
-                              total_expected_samples, processed_samples, remaining_needed, remaining_len);
 
                         if (remaining_len > 0) {
                             pcmlist.insert(pcmlist.end(), decoder_output.begin() + remaining_start,
@@ -514,21 +487,13 @@ public:
                             }
                             std::fill(sola_buffer.begin() + avail, sola_buffer.end(), 0.0f);
                         }
-
-                        SLOGI("Inference #%d: Added %d + %d samples to output, cumulative length: %zu", i + 1,
-                              sola_buffer_frame, remaining_len, pcmlist.size());
                     }
                 }
             }
 
-            SLOGI("All inference completed, raw generated PCM length: %zu", pcmlist.size());
-
             if (pcmlist.size() > audio_len) {
-                SLOGI("Truncating output from %zu to %d samples as per encoder prediction", pcmlist.size(), audio_len);
                 pcmlist.resize(audio_len);
             }
-
-            SLOGI("Final PCM length after truncation: %zu", pcmlist.size());
 
             // Post-processing: resample and convert to int16
             double src_ratio =
@@ -536,19 +501,12 @@ public:
             std::vector<float> tmp_pcm((pcmlist.size() * src_ratio + 1));
             int len;
 
-            SLOGI("Starting audio resampling, source rate: %f, target rate: %f, ratio: %f",
-                  static_cast<float>(mode_config_.mode_rate), static_cast<float>(mode_config_.audio_rate), src_ratio);
-
             resample_audio(pcmlist.data(), pcmlist.size(), tmp_pcm.data(), &len, src_ratio);
-
-            SLOGI("Resampling completed, length after resampling: %d", len);
 
             // Convert to 16-bit PCM
             wav_pcm_data.reserve(len);
             std::transform(tmp_pcm.begin(), tmp_pcm.begin() + len, std::back_inserter(wav_pcm_data),
                            [](const auto val) { return static_cast<int16_t>(val * INT16_MAX); });
-
-            SLOGI("Final audio length: %zu samples", wav_pcm_data.size());
 
             // Call the output callback function with the result
             if (out_callback_) {
@@ -557,7 +515,6 @@ public:
                     finish);
             }
 
-            SLOGI("TTS processing completed, output callback invoked");
         } catch (const std::exception &e) {
             SLOGI("TTS processing exception: %s", e.what());
             return true;
