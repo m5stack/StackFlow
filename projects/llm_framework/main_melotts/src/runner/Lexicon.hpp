@@ -9,7 +9,7 @@
 #include <iostream>
 #include "../../../../../SDK/components/utilities/include/sample_log.h"
 // Debug logging switch - set to true to enable debug logs
-static bool DEBUG_LOGGING = false;
+static bool DEBUG_LOGGING = true;
 // Macro for debug logging
 #define DEBUG_LOG(fmt, ...)            \
     do {                               \
