@@ -98,6 +98,7 @@ public:
                     SLOGW("config file :%s miss", file_name.c_str());
                     continue;
                 }
+                SLOGI("config file :%s read", file_name.c_str());
                 config_file >> file_body;
                 config_file.close();
                 break;
@@ -197,11 +198,10 @@ public:
             common::get_input_data_no_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, bgr2rgb);
             cv::Mat img_mat(mode_config_.img_h, mode_config_.img_w, CV_8UC3, image.data());
             depth_anything_->SetInput((void *)image.data(), 0);
-            if (0 != depth_anything_->RunSync()) {
+            if (0 != depth_anything_->Run()) {
                 SLOGE("Run depth_anything model failed!\n");
                 throw std::string("depth_anything_ RunSync error");
             }
-            std::vector<detection::Object> objects;
             std::string depth_anything_output;
             depth_anything_->Post_Process(img_mat, mode_config_.model_type, depth_anything_output);
             if (out_callback_) out_callback_(depth_anything_output, true);
@@ -245,8 +245,18 @@ public:
         _ax_init();
     }
 
+    void start()
+    {
+    }
+
+    void stop()
+    {
+        }
+
     ~llm_task()
     {
+        stop();
+        if (depth_anything_) depth_anything_->Release();
         _ax_deinit();
     }
 };
@@ -409,8 +419,8 @@ public:
                         std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                         std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
                         llm_channel->subscriber(
-                            input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::string &raw) {
-                                this->task_camera_data(_llm_task_obj, _llm_channel, raw);
+                            input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                                this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
                             });
                     }
                 }
@@ -456,8 +466,8 @@ public:
                 std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                 std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
                 llm_channel->subscriber(input_url,
-                                        [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::string &raw) {
-                                            this->task_camera_data(_llm_task_obj, _llm_channel, raw);
+                                        [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                                            this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
                                         });
             }
             llm_task_obj->inputs_.push_back(data);
@@ -536,6 +546,7 @@ public:
             send("None", "None", error_body, work_id);
             return -1;
         }
+        llm_task_[work_id_num]->stop();
         auto llm_channel = get_channel(work_id_num);
         llm_channel->stop_subscriber("");
         llm_task_.erase(work_id_num);
@@ -550,6 +561,7 @@ public:
             if (iteam == llm_task_.end()) {
                 break;
             }
+            iteam->second->stop();
             get_channel(iteam->first)->stop_subscriber("");
             iteam->second.reset();
             llm_task_.erase(iteam->first);

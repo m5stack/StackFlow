@@ -111,6 +111,7 @@ public:
                     SLOGW("config file :%s miss", file_name.c_str());
                     continue;
                 }
+                SLOGI("config file :%s read", file_name.c_str());
                 config_file >> file_body;
                 config_file.close();
                 break;
@@ -227,7 +228,7 @@ public:
             common::get_input_data_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, bgr2rgb);
             cv::Mat img_mat(mode_config_.img_h, mode_config_.img_w, CV_8UC3, image.data());
             yolo_->SetInput((void *)image.data(), 0);
-            if (0 != yolo_->RunSync()) {
+            if (0 != yolo_->Run()) {
                 SLOGE("Run yolo model failed!\n");
                 throw std::string("yolo_ RunSync error");
             }
@@ -339,6 +340,7 @@ public:
     ~llm_task()
     {
         stop();
+        if (yolo_) yolo_->Release();
         _ax_deinit();
     }
 };
@@ -502,8 +504,8 @@ public:
                         std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                         std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
                         llm_channel->subscriber(
-                            input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::string &raw) {
-                                this->task_camera_data(_llm_task_obj, _llm_channel, raw);
+                            input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                                this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
                             });
                     }
                 }
@@ -549,8 +551,8 @@ public:
                 std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                 std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
                 llm_channel->subscriber(input_url,
-                                        [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::string &raw) {
-                                            this->task_camera_data(_llm_task_obj, _llm_channel, raw);
+                                        [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                                            this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
                                         });
             }
             llm_task_obj->inputs_.push_back(data);

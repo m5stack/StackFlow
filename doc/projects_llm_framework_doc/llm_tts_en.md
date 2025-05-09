@@ -16,7 +16,7 @@ Send JSON:
   "action": "setup",
   "object": "tts.setup",
   "data": {
-    "model": "single_speaker_fast",
+    "model": "single-speaker-english-fast",
     "response_format": "sys.pcm",
     "input": "tts.utf-8",
     "enoutput": false
@@ -28,7 +28,7 @@ Send JSON:
 - work_id: For configuring the unit, it is `tts`.
 - action: The method to call is `setup`.
 - object: The type of data being transmitted is `tts.setup`.
-- model: The model used is the `single_speaker_fast` Chinese model.
+- model: The model used is the `single-speaker-english-fast` English model.
 - response_format: The returned result is `sys.pcm`, system audio data, which is directly sent to the llm-audio module
   for playback.
 - input: Input is `tts.utf-8`, representing user input.
@@ -46,12 +46,49 @@ Response JSON:
   },
   "object": "None",
   "request_id": "2",
-  "work_id": "llm.1003"
+  "work_id": "tts.1003"
 }
 ```
 
 - created: Message creation time, in Unix time.
 - work_id: The successfully created work_id unit.
+
+## inference
+
+### streaming input
+
+```json
+{
+    "request_id": "2",
+    "work_id": "tts.1003",
+    "action": "inference",
+    "object": "tts.utf-8.stream",
+    "data": {
+        "delta": "What's ur name?",
+        "index": 0,
+        "finish": true
+    }
+}
+```
+- object: The data type transmitted is tts.utf-8.stream, indicating a streaming input from the user's UTF-8.
+- delta: Segment data of the streaming input.
+- index: Index of the segment in the streaming input.
+- finish: A flag indicating whether the streaming input has completed.
+
+### non-streaming input
+
+```json
+{
+    "request_id": "2",
+    "work_id": "tts.1003",
+    "action": "inference",
+    "object": "tts.utf-8",
+    "data": "What's ur name?"
+}
+```
+
+- object: The data type transmitted is tts.utf-8, indicating a non-streaming input from the user's UTF-8.
+- data: Data for non-streaming input.
 
 ## link
 
@@ -102,7 +139,7 @@ Example:
   "action": "setup",
   "object": "tts.setup",
   "data": {
-    "model": "single_speaker_fast",
+    "model": "single-speaker-fast",
     "response_format": "sys.pcm",
     "input": [
       "tts.utf-8",
@@ -298,7 +335,7 @@ Response JSON:
     "inputs_": [
       "tts.utf-8"
     ],
-    "model": "single_speaker_fast",
+    "model": "single-speaker-fast",
     "response_format": "sys.pcm"
   },
   "error": {

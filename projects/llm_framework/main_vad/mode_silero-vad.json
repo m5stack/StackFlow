@@ -1,5 +1,5 @@
 {
-  "mode": "silero_vad",
+  "mode": "silero-vad",
   "type": "vad",
   "homepage":"https://github.com/snakers4/silero-vad",
   "capabilities": [

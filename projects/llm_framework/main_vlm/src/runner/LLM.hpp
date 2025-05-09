@@ -26,8 +26,6 @@ struct LLMAttrType {
 
     std::string filename_post_axmodel = "tinyllama-int8/tinyllama_post.axmodel";
 
-    bool b_use_topk = false;
-
     std::string filename_vpm_encoder_axmodedl   = "minicpmv/vpm_resampler_version0_fp16.axmodel";
     std::string filename_vpm_resampler_axmodedl = "minicpmv/vpm_resampler_version0_fp16.axmodel";
     int vpm_width                               = 280;
@@ -39,6 +37,7 @@ struct LLMAttrType {
     bool b_bos = true, b_eos = false;
     std::string filename_tokens_embed = "tinyllama.model.embed_tokens.weight.bfloat16.bin";
     int tokens_embed_num              = 32000;
+    int img_token_id                  = 151667;  // InternVL2.5
     int tokens_embed_size             = 2048;
 
     int max_token_len = 127;  // auto calc
@@ -52,6 +51,9 @@ struct LLMAttrType {
     bool b_dynamic_load_axmodel_layer = false;
 
     bool b_use_mmap_load_layer = true;
+
+    bool b_use_topk              = false;
+    std::string post_config_path = "post_config.json";
 
     // bool b_live_print = true;
     LLMRuningCallback runing_callback = nullptr;
@@ -84,36 +86,17 @@ private:
 
     bool b_stop = false;
 
-    int post_process(unsigned short *p, int n, std::vector<int> &history, float *val = 0)
+    LLMPostprocess postprocess;
+    static int post_process(LLMPostprocess &postprocess, unsigned short *p, int n, std::vector<int> &history,
+                            float *val = 0)
     {
         std::vector<float> logits(n);
         for (int i = 0; i < n; i++) {
             unsigned int proc = p[i] << 16;
             logits[i]         = *reinterpret_cast<float *>(&proc);
         }
-        LLMPostprocess postprocess;
-        postprocess.set_temperature(true, _attr.temperature);
-        postprocess.set_repetition_penalty(true, 1.2f);
-        // postprocess.set_top_k_sampling(true, 40);
-        postprocess.set_top_p_sampling(true, _attr.top_p);
 
         return postprocess.apply(logits, history);
-
-        // float max_val = -MAXFLOAT;
-        // int max_index = 0;
-        // for (int i = 0; i < n; i++)
-        // {
-        //     unsigned int proc = p[i] << 16;
-        //     float tmp = *reinterpret_cast<float *>(&proc);
-        //     if (tmp > max_val)
-        //     {
-        //         max_val = tmp;
-        //         max_index = i;
-        //     }
-        // }
-        // if (val)
-        //     *val = max_val;
-        // return max_index;
     }
 
 public:
@@ -308,18 +291,24 @@ public:
             vpm_encoder.inference();
             AX_SYS_MinvalidateCache(vpm_encoder.get_output(0).phyAddr, vpm_encoder.get_output(0).pVirAddr,
                                     vpm_encoder.get_output(0).nSize);
-            memcpy(vpm_resampler.get_input("input").pVirAddr, vpm_encoder.get_output(0).pVirAddr,
+            memcpy(vpm_resampler.get_input(0).pVirAddr, vpm_encoder.get_output(0).pVirAddr,
                    vpm_encoder.get_output(0).nSize);
         } else {
-            void *data = vpm_resampler.get_input("input").pVirAddr;
+            void *data = vpm_resampler.get_input(0).pVirAddr;
             memcpy(data, dst.data, dst.rows * dst.cols * 3);
         }
 
         vpm_resampler.inference();
-        out_embed.resize(vpm_resampler.get_output("output").nSize / sizeof(unsigned short));
-        AX_SYS_MinvalidateCache(vpm_resampler.get_output("output").phyAddr, vpm_resampler.get_output("output").pVirAddr,
-                                vpm_resampler.get_output("output").nSize);
-        memcpy(out_embed.data(), vpm_resampler.get_output("output").pVirAddr, vpm_resampler.get_output("output").nSize);
+        out_embed.resize(vpm_resampler.get_output(0).nSize / sizeof(float));
+        AX_SYS_MinvalidateCache(vpm_resampler.get_output(0).phyAddr, vpm_resampler.get_output(0).pVirAddr,
+                                vpm_resampler.get_output(0).nSize);
+
+        float *output_data = (float *)vpm_resampler.get_output(0).pVirAddr;
+        for (size_t i = 0; i < out_embed.size(); i++) {
+            out_embed[i] = bfloat16(output_data[i]).data;
+        }
+
+        // memcpy(out_embed.data(), vpm_resampler.get_output(0).pVirAddr, vpm_resampler.get_output(0).nSize);
         ALOGI("image encode time : %f ms, size : %d", t.cost(), out_embed.size());
         return 0;
     }
@@ -337,27 +326,49 @@ public:
             embed_selector.getByIndex(input_ids[i], out_embed.data() + i * _attr.tokens_embed_size);
         }
 
-        // memcpy(out_embed.data() + 5 * _attr.tokens_embed_size, vpm_resampler.get_output("output").pVirAddr,
-        // vpm_resampler.get_output("output").nSize);
+        // memcpy(out_embed.data() + 5 * _attr.tokens_embed_size, vpm_resampler.get_output(0).pVirAddr,
+        // vpm_resampler.get_output(0).nSize);
 
         return 0;
     }
 
-    int Encode(std::vector<std::vector<unsigned short>> &img_embeds, std::vector<unsigned short> &out_embed,
-               std::string prompt = "What is in the images?")
+    int Encode(std::vector<unsigned short> &img_embed, std::vector<unsigned short> &out_embed,
+               std::string prompt = "What is in the image?")
     {
         std::vector<int> input_ids = tokenizer->Encode(prompt, true);
 
-        constexpr int IMG_CONTEXT = 151667;  // InternVL2.5
-        std::vector<int> img_positions;
+        // constexpr int img_token_id = 49190;	// smolvlm
+        // constexpr int img_token_id = 151667; // InternVL2.5
+        int offset            = 0;
+        int img_context_count = 0;
 
         for (size_t i = 0; i < input_ids.size(); i++) {
-            if (input_ids[i] == IMG_CONTEXT) {
-                img_positions.push_back(i);
+            if (input_ids[i] == _attr.img_token_id) {
+                img_context_count++;
+                if (img_context_count == 1) {
+                    offset = i;
+                }
             }
         }
 
-        if (img_positions.size() > _attr.prefill_token_num) {
+        if (offset == 0) {
+            ALOGE("offset == 0");
+            return -1;
+        }
+
+        if (img_context_count != img_embed.size() / _attr.tokens_embed_size) {
+            ALOGE("img_context_count(%d) != img_embed.size() / tokens_embed_size(%d)", img_context_count,
+                  img_embed.size() / _attr.tokens_embed_size);
+            return -1;
+        }
+
+        // for (size_t i = 0; i < input_ids.size(); i++)
+        // {
+        //     printf("%d ", input_ids[i]);
+        // }
+        // printf("\n");
+
+        if (input_ids.size() > _attr.prefill_token_num) {
             ALOGE("input_ids(%d) > prefill_token_num(%d)", input_ids.size(), _attr.prefill_token_num);
             return -1;
         }
@@ -366,11 +377,8 @@ public:
         for (size_t i = 0; i < input_ids.size(); i++) {
             embed_selector.getByIndex(input_ids[i], out_embed.data() + i * _attr.tokens_embed_size);
         }
-        for (size_t img_idx = 0; img_idx < img_embeds.size(); img_idx++) {
-            // int pos = img_positions[img_idx];
-            memcpy(out_embed.data() + (14 + img_idx * 64) * _attr.tokens_embed_size, img_embeds[img_idx].data(),
-                   img_embeds[img_idx].size() * sizeof(unsigned short));
-        }
+        memcpy(out_embed.data() + offset * _attr.tokens_embed_size, img_embed.data(),
+               img_embed.size() * sizeof(unsigned short));
 
         return 0;
     }
@@ -504,7 +512,7 @@ public:
                 AX_SYS_MinvalidateCache(output_post.phyAddr, output_post.pVirAddr, output_post.nSize);
                 unsigned short *post_out = (unsigned short *)output_post.pVirAddr;
                 float max_val            = -MAXFLOAT;
-                max_index                = post_process(post_out, _attr.tokens_embed_num, token_ids, &max_val);
+                max_index = post_process(postprocess, post_out, _attr.tokens_embed_num, token_ids, &max_val);
             }
             next_token = max_index;
 
@@ -599,7 +607,7 @@ public:
                     AX_SYS_MinvalidateCache(output_post.phyAddr, output_post.pVirAddr, output_post.nSize);
                     unsigned short *post_out = (unsigned short *)output_post.pVirAddr;
                     float max_val            = -MAXFLOAT;
-                    max_index                = post_process(post_out, _attr.tokens_embed_num, token_ids, &max_val);
+                    max_index = post_process(postprocess, post_out, _attr.tokens_embed_num, token_ids, &max_val);
                 }
                 next_token = max_index;
 

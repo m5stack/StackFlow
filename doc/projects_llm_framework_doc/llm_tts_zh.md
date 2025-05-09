@@ -15,7 +15,7 @@
   "action": "setup",
   "object": "tts.setup",
   "data": {
-    "model": "single_speaker_fast",
+    "model": "single-speaker-fast",
     "response_format": "sys.pcm",
     "input": "tts.utf-8",
     "enoutput": false
@@ -27,7 +27,7 @@
 - work_id：配置单元时，为 `tts`。
 - action：调用的方法为 `setup`。
 - object：传输的数据类型为 `tts.setup`。
-- model：使用的模型为 `single_speaker_fast` 中文模型。
+- model：使用的模型为 `single-speaker-fast` 中文模型。
 - response_format：返回结果为 `sys.pcm`, 系统音频数据，并直接发送到 llm-audio 模块进行播放。
 - input：输入的为 `tts.utf-8`,代表的是从用户输入。
 - enoutput：是否起用用户结果输出。
@@ -44,12 +44,48 @@
   },
   "object": "None",
   "request_id": "2",
-  "work_id": "llm.1003"
+  "work_id": "tts.1003"
 }
 ```
 
 - created：消息创建时间，unix 时间。
 - work_id：返回成功创建的 work_id 单元。
+
+## inference
+
+### 流式输入
+
+```json
+{
+    "request_id": "2",
+    "work_id": "tts.1003",
+    "action": "inference",
+    "object": "tts.utf-8.stream",
+    "data": {
+        "delta": "今天天气真好！",
+        "index": 0,
+        "finish": true
+    }
+}
+```
+- object：传输的数据类型为 `tts.utf-8.stream` 代表的是从用户 utf-8 的流式输入
+- delta：流式输入的分段数据
+- index：流式输入的分段索引
+- finish:流式输入是否完成的标志位
+
+### 非流式输入
+
+```json
+{
+    "request_id": "2",
+    "work_id": "tts.1003",
+    "action": "inference",
+    "object": "tts.utf-8",
+    "data": "今天天气真好！"
+}
+```
+- object：传输的数据类型为 `tts.utf-8` 代表的是从用户 utf-8 的非流式输入
+- data：非流式输入的数据
 
 ## link
 
@@ -98,7 +134,7 @@ error::code 为 0 表示执行成功。
   "action": "setup",
   "object": "tts.setup",
   "data": {
-    "model": "single_speaker_fast",
+    "model": "single-speaker-fast",
     "response_format": "sys.pcm",
     "input": [
       "tts.utf-8",
@@ -294,7 +330,7 @@ error::code 为 0 表示执行成功。
     "inputs_": [
       "tts.utf-8"
     ],
-    "model": "single_speaker_fast",
+    "model": "single-speaker-fast",
     "response_format": "sys.pcm"
   },
   "error": {

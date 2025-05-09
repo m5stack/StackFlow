@@ -1,0 +1,29 @@
+{
+    "mode": "melotts-en-default",
+    "type": "tts",
+    "homepage": "https://github.com/ml-inory/melotts.axera/tree/main/model_convert",
+    "compile_flage": "pulsar2 build --input decoder-en.onnx --config config_decoder_u16.json --output_dir decoder --output_name decoder-en.axmodel --target_hardware AX620E",
+    "pulsar_version": "3.4-983bb35e",
+    "capabilities": [
+        "tts",
+        "English"
+    ],
+    "input_type": [
+        "tts.utf-8"
+    ],
+    "output_type": [
+        "tts.wav",
+        "sys.play.0_1"
+    ],
+    "mode_param": {
+        "encoder": "encoder-en-default.ort",
+        "decoder": "decoder-en-default.axmodel",
+        "gbin": "g-en-default.bin",
+        "tokens": "tokens-en.txt",
+        "lexicon": "lexicon-en.txt",
+        "spacker_speed": 1.2,
+        "mode_rate": 44100,
+        "audio_rate": 16000,
+        "awake_delay": 1000
+    }
+}

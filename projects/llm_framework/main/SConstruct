@@ -24,10 +24,9 @@ STATIC_FILES += [AFile('../static_lib/sherpa/ncnn/libsherpa-ncnn-core.so'),
                  AFile('../static_lib/sherpa/ncnn/libncnn.so'),
                  AFile('../static_lib/libtts.so'),
                  AFile('../static_lib/sherpa/ncnn/libkaldi-native-fbank-core.so'),
-                 AFile('../static_lib/libonnxruntime.so.1.14.0')
                  ]
 
-env['COMPONENTS'].append({'target':'static_file',
+env['COMPONENTS'].append({'target':'static_file-1.0',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

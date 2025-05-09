@@ -47,17 +47,19 @@ public:
 
     int SetInput(void* pInput, int index);
 
-    int RunSync();
-
-    int Post_Process(cv::Mat& mat, int& input_w, int& input_, int& cls_num, int& point_num, float& pron_threshold,
-                     float& nms_threshold, std::vector<detection::Object>& objects, std::string& model_type);
+    int Run();
 
     int GetOutput(void* pOutput, int index);
 
     int GetInputSize(int index);
     int GetOutputSize(int index);
 
+    void* GetOutputPtr(int index);
+
     int Release();
+
+    int Post_Process(cv::Mat& mat, int& input_w, int& input_, int& cls_num, int& point_num, float& pron_threshold,
+                     float& nms_threshold, std::vector<detection::Object>& objects, std::string& model_type);
 
 protected:
     bool m_hasInit;

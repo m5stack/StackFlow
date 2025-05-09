@@ -23,6 +23,9 @@ using namespace StackFlows;
 #include "backward.hpp"
 #include "backward.h"
 #endif
+
+#define MAX_TASK_NUM 2
+
 int main_exit_flage = 0;
 static void __sigint(int iSigNo)
 {
@@ -108,6 +111,7 @@ public:
                     SLOGW("config file :%s miss", file_name.c_str());
                     continue;
                 }
+                SLOGI("config file :%s read", file_name.c_str());
                 config_file >> file_body;
                 config_file.close();
                 break;
@@ -155,6 +159,7 @@ public:
                 if (!tokenizer_server_flage_.load()) {
                     tokenizer_pid_ = fork();
                     if (tokenizer_pid_ == 0) {
+                        setenv("PYTHONPATH", "/opt/m5stack/lib/llm/site-packages", 1);
                         execl("/usr/bin/python3", "python3", tokenizer_file.c_str(), "--host", "localhost", "--port",
                               std::to_string(port_).c_str(), "--model_id", (base_model + "tokenizer").c_str(),
                               "--content", ("'" + prompt_ + "'").c_str(), nullptr);
@@ -287,8 +292,7 @@ public:
 
     bool pause()
     {
-        if(lLaMa_)
-            lLaMa_->Stop();
+        if (lLaMa_) lLaMa_->Stop();
         return true;
     }
 
@@ -331,12 +335,11 @@ public:
         if (inference_run_) {
             std::string par;
             async_list_.put(par);
-            if(lLaMa_)
-                lLaMa_->Stop();
+            if (lLaMa_) lLaMa_->Stop();
             inference_run_->join();
             inference_run_.reset();
         }
-    }    
+    }
 
     ~llm_task()
     {
@@ -357,13 +360,11 @@ std::atomic<unsigned int> llm_task::next_port_{8080};
 
 class llm_llm : public StackFlow {
 private:
-    int task_count_;
     std::unordered_map<int, std::shared_ptr<llm_task>> llm_task_;
 
 public:
     llm_llm() : StackFlow("llm")
     {
-        task_count_ = 2;
     }
 
     void task_output(const std::weak_ptr<llm_task> llm_task_obj_weak,
@@ -499,7 +500,7 @@ public:
     int setup(const std::string &work_id, const std::string &object, const std::string &data) override
     {
         nlohmann::json error_body;
-        if ((llm_task_channel_.size() - 1) == task_count_) {
+        if ((llm_task_channel_.size() - 1) == MAX_TASK_NUM) {
             error_body["code"]    = -21;
             error_body["message"] = "task full";
             send("None", "None", error_body, "llm");

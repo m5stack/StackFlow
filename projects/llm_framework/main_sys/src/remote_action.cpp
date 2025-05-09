@@ -20,12 +20,10 @@ int remote_call(int com_id, const std::string &json_str)
     std::string work_unit = work_id.substr(0, work_id.find("."));
     std::string action    = sample_json_str_get(json_str, "action");
     char com_url[256];
-    int length = snprintf(com_url, 255, zmq_c_format.c_str(), com_id);
-    std::string send_data;
-    std::string com_urls(com_url);
-    RPC_PUSH_PARAM(send_data, com_urls, json_str);
+    snprintf(com_url, 255, zmq_c_format.c_str(), com_id);
     pzmq clent(work_unit);
-    return clent.call_rpc_action(action, send_data, [](pzmq *_pzmq, const std::string &val) {});
+    return clent.call_rpc_action(action, pzmq_data::set_param(com_url, json_str),
+                                 [](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &val) {});
 }
 
 void remote_action_work()

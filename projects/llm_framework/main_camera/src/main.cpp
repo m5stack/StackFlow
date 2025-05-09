@@ -16,9 +16,44 @@
 #include "axera_camera.h"
 #include <glob.h>
 #include <opencv2/opencv.hpp>
+#include "hv/TcpServer.h"
+#include <sys/time.h>
+#include <time.h>
 
+#include <regex>
+// #include <jpeglib.h>
+
+#ifdef ENABLE_BACKWARD
+#define BACKWARD_HAS_DW 1
+#include "backward.hpp"
+#include "backward.h"
+#endif
+
+#define MAX_TASK_NUM 1
 using namespace StackFlows;
 int main_exit_flage = 0;
+
+const char *http_response =
+    "HTTP/1.0 200 OK\n"
+    "Server: BaseHTTP/0.6 Python/3.10.12\n"
+    "Date: %s\n"
+    "Cache-Control: no-store, no-cache, must-revalidate, pre-check=0, post-check=0, max-age=0\n"
+    "Connection: close\n"
+    "Content-Type: multipart/x-mixed-replace;boundary=--boundarydonotcross\n"
+    "Expires: Mon, 1 Jan 2130 00:00:00 GMT\n"
+    "Pragma: no-cache\n"
+    "Access-Control-Allow-Origin: *\n";
+const char *http_jpeg_response =
+    "\n"
+    "--boundarydonotcross\n"
+    "X-Timestamp: %lf\n"
+    "Content-Length: %d\n"
+    "Content-Type: image/jpeg\n"
+    "\n";
+
+char http_response_buff[1024];
+char http_response_buff1[1024];
+
 static void __sigint(int iSigNo)
 {
     main_exit_flage = 1;
@@ -26,26 +61,29 @@ static void __sigint(int iSigNo)
 
 typedef std::function<void(const void *, int)> task_callback_t;
 
-typedef camera_t* (*hal_camera_open_fun)(const char* pdev_name, int width, int height, int fps);
-typedef int (*hal_camera_close_fun)(camera_t* camera);
+typedef camera_t *(*hal_camera_open_fun)(const char *pdev_name, int width, int height, int fps);
+typedef int (*hal_camera_close_fun)(camera_t *camera);
 
-
-#define CONFIG_AUTO_SET(obj, key)             \
-    if (config_body.contains(#key))           \
-        mode_config_.key = config_body[#key]; \
-    else if (obj.contains(#key))              \
-        mode_config_.key = obj[#key];
+#define CONFIG_AUTO_SET(obj, key)              \
+    if (config_body.contains(#key))            \
+        stVencChnAttr.key = config_body[#key]; \
+    else if (obj.contains(#key))               \
+        stVencChnAttr.key = obj[#key];
 
 class llm_task {
 private:
     camera_t *cam;
     hal_camera_open_fun hal_camera_open;
     hal_camera_close_fun hal_camera_close;
+
 public:
     std::string response_format_;
     task_callback_t out_callback_;
     bool enoutput_;
     bool enstream_;
+    bool enjpegout_;
+    std::string rtsp_config_;
+    bool enable_webstream_;
     std::atomic_int cap_status_;
     std::unique_ptr<std::thread> camera_cap_thread_;
     std::atomic_bool camera_clear_flage_;
@@ -54,6 +92,8 @@ public:
     int frame_width_;
     int frame_height_;
     cv::Mat yuv_dist_;
+
+    std::unique_ptr<hv::TcpServer> hv_tcpserver_;
 
     static void on_cap_fream(void *pData, uint32_t width, uint32_t height, uint32_t Length, void *ctx)
     {
@@ -127,21 +167,360 @@ public:
             devname_         = config_body.at("input");
             frame_width_     = config_body.at("frame_width");
             frame_height_    = config_body.at("frame_height");
+            if (config_body.contains("rtsp")) {
+                rtsp_config_ = config_body.at("rtsp");
+            }
+            if (config_body.contains("enable_webstream")) {
+                enable_webstream_ = config_body.at("enable_webstream");
+            } else {
+                enable_webstream_ = false;
+            }
 
         } catch (...) {
             return true;
         }
-        enstream_ = (response_format_.find("stream") != std::string::npos);
-        yuv_dist_ = cv::Mat(frame_height_, frame_width_, CV_8UC2, cv::Scalar(0, 128));
-        if(devname_.find("/dev/video") != std::string::npos){
-            hal_camera_open = camera_open;
+        enstream_  = (response_format_.find("stream") != std::string::npos);
+        enjpegout_ = (response_format_.find("jpeg") != std::string::npos);
+        yuv_dist_  = cv::Mat(frame_height_, frame_width_, CV_8UC2, cv::Scalar(0, 128));
+        if (devname_.find("/dev/video") != std::string::npos) {
+            hal_camera_open  = camera_open;
             hal_camera_close = camera_close;
-        }else if(devname_.find("axera_") != std::string::npos){
-            hal_camera_open = axera_camera_open;
+        } else if (devname_.find("axera_") != std::string::npos) {
+            hal_camera_open  = axera_camera_open;
             hal_camera_close = axera_camera_close;
-        }else {
+            if (!rtsp_config_.empty()) {
+                nlohmann::json error_body;
+                nlohmann::json file_body;
+                std::string base_model_path;
+                std::string base_model_config_path;
+                std::list<std::string> config_file_paths =
+                    get_config_file_paths(base_model_path, base_model_config_path, "camera");
+                try {
+                    for (auto file_name : config_file_paths) {
+                        std::ifstream config_file(file_name);
+                        if (!config_file.is_open()) {
+                            SLOGW("config file :%s miss", file_name.c_str());
+                            continue;
+                        }
+                        SLOGI("config file :%s read", file_name.c_str());
+                        config_file >> file_body;
+                        config_file.close();
+                        break;
+                    }
+                    if (file_body.empty()) {
+                        SLOGE("all config file miss");
+                        return true;
+                    }
+                    AX_VENC_CHN_ATTR_T stVencChnAttr;
+                    memset(&stVencChnAttr, 0, sizeof(AX_VENC_CHN_ATTR_T));
+                    if (rtsp_config_.find("h264") != std::string::npos) {
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.enType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.u32MaxPicWidth);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.u32MaxPicHeight);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.enMemSource);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.u32BufSize);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.enProfile);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.enLevel);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.enTier);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.u32PicWidthSrc);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.u32PicHeightSrc);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.stCropCfg.bEnable);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.stCropCfg.stRect.s32X);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.stCropCfg.stRect.s32Y);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.stCropCfg.stRect.u32Width);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.stCropCfg.stRect.u32Height);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.enRotation);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.enLinkMode);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.bDeBreathEffect);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.bRefRingbuf);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.s32StopWaitTime);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.u8InFifoDepth);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.u8OutFifoDepth);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.u32SliceNum);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stVencAttr.stAttrH265e.bRcnRefShareBuf);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.enRcMode);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.s32FirstFrameStartQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stFrameRate.fSrcFrameRate);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stFrameRate.fDstFrameRate);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32BitRate);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32MinQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32MaxQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32MinIQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32MaxIQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32MaxIprop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32MinIprop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.s32IntraQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.s32DeBreathQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.u32IdrQpDeltaRange);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Cbr.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264Cbr.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264Cbr.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.u32MaxBitRate);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.enVQ);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.u32MaxQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.u32MinQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.u32MaxIQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.u32MinIQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.s32IntraQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.s32DeBreathQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.u32IdrQpDeltaRange);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264Vbr.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264Vbr.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264Vbr.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.u32MaxBitRate);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.u32MaxQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.u32MinQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.u32MaxIQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.u32MinIQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.s32IntraQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.s32DeBreathQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.u32IdrQpDeltaRange);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264AVbr.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264AVbr.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264AVbr.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264QVbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264QVbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264QVbr.u32TargetBitRate);
+
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32MaxQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32MinQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32MaxIQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32MinIQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32MinQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32MaxQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.s32DeBreathQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32IdrQpDeltaRange);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32MaxIprop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32MinIprop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32MaxBitRate);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32ShortTermStatTime);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32LongTermStatTime);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32LongTermMaxBitrate);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32LongTermMinBitrate);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32ExtraBitPercent);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.u32LongTermStatTimeUnit);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.s32IntraQpDelta);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264CVbr.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264CVbr.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264CVbr.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264FixQp.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264FixQp.u32IQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264FixQp.u32PQp);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264FixQp.u32BQp);
+
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264QpMap.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264QpMap.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264QpMap.u32TargetBitRate);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264QpMap.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stRcAttr.stH264QpMap.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264QpMap.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stRcAttr.stH264QpMap.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stGopAttr.enGopMode);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stGopAttr.stNormalP.stPicConfig.s32QpOffset);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stGopAttr.stNormalP.stPicConfig.f32QpFactor);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stGopAttr.stOneLTR.stPicConfig.s32QpOffset);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stGopAttr.stOneLTR.stPicConfig.f32QpFactor);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stGopAttr.stOneLTR.stPicSpecialConfig.s32QpOffset);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stGopAttr.stOneLTR.stPicSpecialConfig.f32QpFactor);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"],
+                                        stGopAttr.stOneLTR.stPicSpecialConfig.s32Interval);
+                        CONFIG_AUTO_SET(file_body["h264_config_param"], stGopAttr.stSvcT.u32GopSize);
+                    } else if (rtsp_config_.find("h265") != std::string::npos) {
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.enType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.u32MaxPicWidth);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.u32MaxPicHeight);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.enMemSource);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.u32BufSize);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.enProfile);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.enLevel);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.enTier);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.u32PicWidthSrc);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.u32PicHeightSrc);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.stCropCfg.bEnable);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.stCropCfg.stRect.s32X);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.stCropCfg.stRect.s32Y);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.stCropCfg.stRect.u32Width);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.stCropCfg.stRect.u32Height);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.enRotation);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.enLinkMode);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.bDeBreathEffect);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.bRefRingbuf);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.s32StopWaitTime);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.u8InFifoDepth);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.u8OutFifoDepth);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.u32SliceNum);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stVencAttr.stAttrH265e.bRcnRefShareBuf);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.enRcMode);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.s32FirstFrameStartQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stFrameRate.fSrcFrameRate);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stFrameRate.fDstFrameRate);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32BitRate);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32MinQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32MaxQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32MinIQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32MaxIQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32MaxIprop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32MinIprop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.s32IntraQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.s32DeBreathQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.u32IdrQpDeltaRange);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Cbr.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265Cbr.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265Cbr.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.u32MaxBitRate);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.enVQ);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.u32MaxQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.u32MinQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.u32MaxIQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.u32MinIQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.s32IntraQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.s32DeBreathQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.u32IdrQpDeltaRange);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265Vbr.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265Vbr.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265Vbr.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.u32MaxBitRate);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.u32MaxQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.u32MinQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.u32MaxIQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.u32MinIQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.s32IntraQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.s32DeBreathQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.u32IdrQpDeltaRange);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265AVbr.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265AVbr.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265AVbr.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265QVbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265QVbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265QVbr.u32TargetBitRate);
+
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32MaxQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32MinQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32MaxIQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32MinIQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32MinQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32MaxQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.s32DeBreathQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32IdrQpDeltaRange);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32MaxIprop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32MinIprop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32MaxBitRate);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32ShortTermStatTime);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32LongTermStatTime);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32LongTermMaxBitrate);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32LongTermMinBitrate);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32ExtraBitPercent);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.u32LongTermStatTimeUnit);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.s32IntraQpDelta);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265CVbr.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265CVbr.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265CVbr.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265FixQp.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265FixQp.u32IQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265FixQp.u32PQp);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265FixQp.u32BQp);
+
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265QpMap.u32Gop);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265QpMap.u32StatTime);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265QpMap.u32TargetBitRate);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265QpMap.stQpmapInfo.enCtbRcMode);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stRcAttr.stH265QpMap.stQpmapInfo.enQpmapQpType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265QpMap.stQpmapInfo.enQpmapBlockType);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stRcAttr.stH265QpMap.stQpmapInfo.enQpmapBlockUnit);
+
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stGopAttr.enGopMode);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stGopAttr.stNormalP.stPicConfig.s32QpOffset);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stGopAttr.stNormalP.stPicConfig.f32QpFactor);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stGopAttr.stOneLTR.stPicConfig.s32QpOffset);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stGopAttr.stOneLTR.stPicConfig.f32QpFactor);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stGopAttr.stOneLTR.stPicSpecialConfig.s32QpOffset);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stGopAttr.stOneLTR.stPicSpecialConfig.f32QpFactor);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"],
+                                        stGopAttr.stOneLTR.stPicSpecialConfig.s32Interval);
+                        CONFIG_AUTO_SET(file_body["h265_config_param"], stGopAttr.stSvcT.u32GopSize);
+                    }
+                    try {
+                        std::regex pattern(R"(rtsp\.(\d+)[xX-](\d+)\.h(264|265))");
+                        std::smatch matches;
+                        if (std::regex_search(rtsp_config_, matches, pattern)) {
+                            if (matches.size() >= 3) {
+                                stVencChnAttr.stVencAttr.u32PicWidthSrc  = std::stoi(matches[1].str());
+                                stVencChnAttr.stVencAttr.u32PicHeightSrc = std::stoi(matches[2].str());
+                            }
+                        }
+                    } catch (...) {
+                        return true;
+                    }
+                    if ((stVencChnAttr.stVencAttr.u32PicWidthSrc < frame_width_) ||
+                        (stVencChnAttr.stVencAttr.u32PicHeightSrc < frame_height_)) {
+                        return true;
+                    }
+                    init_rtsp(&stVencChnAttr);
+                } catch (...) {
+                    return true;
+                }
+            }
+        } else {
             return true;
         }
+
         return false;
     }
 
@@ -177,13 +556,26 @@ public:
         cam = NULL;
     }
 
-    ~llm_task()
+    void start()
+    {
+    }
+
+    void stop()
     {
         if (cam) {
             cam->camera_capture_stop(cam);
             hal_camera_close(cam);
             cam = NULL;
         }
+        if (hv_tcpserver_) {
+            hv_tcpserver_->stop();
+            hv_tcpserver_.reset();
+        }
+    }
+
+    ~llm_task()
+    {
+        stop();
     }
 };
 
@@ -198,11 +590,12 @@ public:
             "list_camera", std::bind(&llm_camera::list_camera, this, std::placeholders::_1, std::placeholders::_2));
     }
 
-    std::string list_camera(pzmq *_pzmq, const std::string &rawdata)
+    std::string list_camera(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
+        auto _rawdata = rawdata->string();
         nlohmann::json req_body;
-        std::string zmq_url    = RPC_PARSE_TO_FIRST(rawdata);
-        std::string param_json = RPC_PARSE_TO_SECOND(rawdata);
+        std::string zmq_url    = rawdata->get_param(0);
+        std::string param_json = rawdata->get_param(1);
         std::vector<std::string> devices;
         glob_t glob_result;
         glob("/dev/video*", GLOB_TILDE, NULL, &glob_result);
@@ -222,27 +615,92 @@ public:
         if (!(llm_task_obj && llm_channel)) {
             return;
         }
+        std::vector<uchar> jpeg_image;
+        // StackFlow output
         std::string out_data((char *)data, size);
         llm_channel->send_raw_to_pub(out_data);
+        // user output
         if (llm_task_obj->enoutput_) {
             std::string base64_data;
-            int ret = StackFlows::encode_base64(out_data, base64_data);
+            if (llm_task_obj->enjpegout_) {
+                cv::Mat yuv_image(llm_task_obj->frame_height_, llm_task_obj->frame_width_, CV_8UC2, (void *)data);
+                cv::Mat bgr_image;
+                cv::cvtColor(yuv_image, bgr_image, cv::COLOR_YUV2BGR_YUYV);
+                cv::imencode(".jpg", bgr_image, jpeg_image);
+                std::string in_data((char *)jpeg_image.data(), jpeg_image.size());
+                StackFlows::encode_base64(in_data, base64_data);
+            } else {
+                StackFlows::encode_base64(out_data, base64_data);
+            }
             std::string out_json_str;
-            out_json_str.reserve(llm_channel->request_id_.size() + llm_channel->work_id_.size() + base64_data.size() + 108);
+            out_json_str.reserve(llm_channel->request_id_.size() + llm_channel->work_id_.size() + base64_data.size() +
+                                 128);
             out_json_str += R"({"request_id":")";
             out_json_str += llm_channel->request_id_;
             out_json_str += R"(","work_id":")";
             out_json_str += llm_channel->work_id_;
-            out_json_str += R"(","object":"image.yuvraw.base64","error":{"code":0, "message":""},"data":")";
+            out_json_str += R"(","object":")";
+            out_json_str += llm_task_obj->response_format_;
+            out_json_str += R"(","error":{"code":0, "message":""},"data":")";
             out_json_str += base64_data;
             out_json_str += "\"}\n";
             llm_channel->send_raw_to_usr(out_json_str);
+        }
+        // webstream output
+        if (llm_task_obj->enable_webstream_) {
+            if (!llm_task_obj->hv_tcpserver_) {
+                llm_task_obj->hv_tcpserver_ = std::make_unique<hv::TcpServer>();
+                int listenfd                = llm_task_obj->hv_tcpserver_->createsocket(8989);
+                if (listenfd < 0) {
+                    llm_task_obj->hv_tcpserver_.reset();
+                    return;
+                }
+                llm_task_obj->hv_tcpserver_->onConnection = [](const hv::SocketChannelPtr &channel) {
+                    std::string peeraddr = channel->peeraddr();
+                    if (channel->isConnected()) {
+                        memset(http_response_buff, 0, 1024);
+                        time_t current_time;
+                        struct tm *time_info;
+                        time(&current_time);
+                        time_info = gmtime(&current_time);
+                        char time_str[30];
+                        strftime(time_str, sizeof(time_str), "%a, %d %b %Y %H:%M:%S GMT", time_info);
+                        sprintf(http_response_buff, http_response, time_str);
+                        channel->write(http_response_buff);
+                    }
+                };
+                llm_task_obj->hv_tcpserver_->onMessage = [](const hv::SocketChannelPtr &channel, hv::Buffer *buf) {};
+                llm_task_obj->hv_tcpserver_->setThreadNum(1);
+                llm_task_obj->hv_tcpserver_->start();
+            }
+            llm_task_obj->hv_tcpserver_->foreachChannel([&](const hv::SocketChannelPtr &channel) {
+                if (jpeg_image.empty()) {
+                    cv::Mat yuv_image(llm_task_obj->frame_height_, llm_task_obj->frame_width_, CV_8UC2, (void *)data);
+                    cv::Mat bgr_image;
+                    cv::cvtColor(yuv_image, bgr_image, cv::COLOR_YUV2BGR_YUYV);
+                    cv::imencode(".jpg", bgr_image, jpeg_image);
+                }
+                char tmpsdas[256];
+                struct timeval tv;
+                gettimeofday(&tv, NULL);
+                double timestamp = (double)tv.tv_sec + (double)tv.tv_usec / 1000000.0;
+                memset(http_response_buff1, 0, 1024);
+                sprintf(http_response_buff1, http_jpeg_response, timestamp, jpeg_image.size());
+                channel->write(http_response_buff1);
+                channel->write(jpeg_image.data(), jpeg_image.size());
+            });
         }
     }
 
     int setup(const std::string &work_id, const std::string &object, const std::string &data) override
     {
         nlohmann::json error_body;
+        if ((llm_task_channel_.size() - 1) == MAX_TASK_NUM) {
+            error_body["code"]    = -21;
+            error_body["message"] = "task full";
+            send("None", "None", error_body, "llm");
+            return -1;
+        }
         int work_id_num   = sample_get_work_id_num(work_id);
         auto llm_channel  = get_channel(work_id);
         auto llm_task_obj = std::make_shared<llm_task>(work_id);
@@ -310,6 +768,7 @@ public:
             send("None", "None", error_body, work_id);
             return -1;
         }
+        llm_task_[work_id_num]->stop();
         auto llm_channel = get_channel(work_id_num);
         llm_channel->stop_subscriber("");
         llm_task_.erase(work_id_num);
@@ -324,6 +783,7 @@ public:
             if (iteam == llm_task_.end()) {
                 break;
             }
+            iteam->second->stop();
             get_channel(iteam->first)->stop_subscriber("");
             iteam->second.reset();
             llm_task_.erase(iteam->first);

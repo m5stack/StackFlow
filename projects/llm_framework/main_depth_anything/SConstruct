@@ -16,7 +16,7 @@ LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
-DEFINITIONS += ['-std=c++17']
+DEFINITIONS += ['-O3', '-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 REQUIREMENTS += ['ax_engine', 'ax_interpreter', 'ax_sys']
@@ -30,7 +30,7 @@ STATIC_LIB += static_file * 2
 STATIC_FILES += Glob('mode_*.json')
 
 
-env['COMPONENTS'].append({'target':'llm_depth_anything',
+env['COMPONENTS'].append({'target':'llm_depth_anything-1.6',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

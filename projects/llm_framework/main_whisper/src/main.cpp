@@ -192,6 +192,34 @@ public:
         return tv.tv_sec * 1000.0 + tv.tv_usec / 1000.0;
     }
 
+    bool is_valid_utf8(const std::string &str)
+    {
+        int bytes = 0;
+        for (unsigned char c : str) {
+            if (bytes == 0) {
+                if ((c >> 5) == 0b110)
+                    bytes = 1;
+                else if ((c >> 4) == 0b1110)
+                    bytes = 2;
+                else if ((c >> 3) == 0b11110)
+                    bytes = 3;
+                else if ((c >> 7))
+                    return false;
+            } else {
+                if ((c >> 6) != 0b10) return false;
+                bytes--;
+            }
+        }
+        return bytes == 0;
+    }
+
+    void fix_utf8_string(std::string &s)
+    {
+        while (!s.empty() && !is_valid_utf8(s)) {
+            s.pop_back();
+        }
+    }
+
     int load_model(const nlohmann::json &config_body)
     {
         if (parse_config(config_body)) {
@@ -212,6 +240,7 @@ public:
                     SLOGW("config file :%s miss", file_name.c_str());
                     continue;
                 }
+                SLOGI("config file :%s read", file_name.c_str());
                 config_file >> file_body;
                 config_file.close();
                 break;
@@ -259,7 +288,7 @@ public:
             positional_embedding.resize(mode_config_.whisper_n_text_ctx * WHISPER_N_TEXT_STATE);
             FILE *fp = fopen(mode_config_.positional_embedding.c_str(), "rb");
             if (!fp) {
-                printf("Open %s failed!\n", mode_config_.positional_embedding.c_str());
+                SLOGE("Open %s failed!\n", mode_config_.positional_embedding.c_str());
                 return -3;
             }
             fread(positional_embedding.data(), sizeof(float), mode_config_.whisper_n_text_ctx * WHISPER_N_TEXT_STATE,
@@ -281,15 +310,15 @@ public:
             decoder_main_ = std::make_unique<DecoderMain>();
             decoder_loop_ = std::make_unique<DecoderLoop>();
             if (0 != encoder_->Init(mode_config_.encoder.c_str())) {
-                printf("encoder init failed!\n");
+                SLOGE("encoder init failed!\n");
                 return -4;
             }
             if (0 != decoder_main_->Init(mode_config_.decoder_main.c_str())) {
-                printf("Init decoder_main model failed!\n");
+                SLOGE("Init decoder_main model failed!\n");
                 return -5;
             }
             if (0 != decoder_loop_->Init(mode_config_.decoder_loop.c_str())) {
-                printf("Init decoder_main model failed!\n");
+                SLOGE("Init decoder_main model failed!\n");
                 return -6;
             }
         } catch (...) {
@@ -315,6 +344,7 @@ public:
             if (endpoint_flage_) return;
         }
         endpoint_flage_ = true;
+        if (delay_audio_frame_ == 0) buffer_resize(pcmdata, 0);
         buffer_write_char(pcmdata, raw.c_str(), raw.length());
         buffer_position_set(pcmdata, 0);
         count = 0;
@@ -390,7 +420,7 @@ public:
             return;
         }
         end = get_current_time();
-        printf("Encoder run take %.2f ms\n", (end - start));
+        SLOGI("Encoder run take %.2f ms\n", (end - start));
 
         // detect language
         SOT_SEQUENCE[1] = detect_language(language_);
@@ -416,7 +446,7 @@ public:
         supress_tokens(logits, true);
 
         max_token_id = argmax(logits);
-        printf("First token: %d \t take %.2fms\n", max_token_id, (end - start));
+        SLOGI("First token: %d \t take %.2fms\n", max_token_id, (end - start));
         mode_config_.neg_inf = -std::numeric_limits<float>::infinity();
         std::vector<float> mask(mode_config_.whisper_n_text_ctx);
         for (int n = 0; n < mode_config_.whisper_n_text_ctx - offset - 1; n++) {
@@ -445,7 +475,7 @@ public:
 
             ret = decoder_loop_->Run();
             if (ret) {
-                printf("decoder_loop run failed!\n");
+                SLOGE("decoder_loop run failed!\n");
                 return;
             }
 
@@ -460,11 +490,11 @@ public:
             max_token_id = argmax(logits);
             end          = get_current_time();
 
-            printf("Next Token: %d \t take %.2fms\n", max_token_id, (end - start));
+            SLOGI("Next Token: %d \t take %.2fms\n", max_token_id, (end - start));
         }
 
         end_all = get_current_time();
-        printf("All take %.2f ms\n", (end_all - start_all));
+        SLOGI("All take %.2f ms\n", (end_all - start_all));
 
         std::string s;
         for (const auto i : results) {
@@ -473,14 +503,12 @@ public:
                           (uint32)mode_config_.token_tables[i].size(), str);
             s += str;
         }
-
+        fix_utf8_string(s);
         if (mode_config_.language == "en" || mode_config_.language == "ja") {
-            printf("Result: %s\n", s.c_str());
             if (out_callback_) out_callback_(s, true);
         } else {
             const opencc::SimpleConverter converter(mode_config_.t2s.c_str());
             std::string simple_str = converter.Convert(s);
-            printf("Result: %s\n", simple_str.c_str());
             if ((!simple_str.empty()) && out_callback_) {
                 out_callback_(simple_str, true);
             }
@@ -533,8 +561,20 @@ public:
         _ax_init();
     }
 
+    void start()
+    {
+    }
+
+    void stop()
+    {
+    }
+
     ~llm_task()
     {
+        stop();
+        if (encoder_) encoder_->Release();
+        if (decoder_main_) decoder_main_->Release();
+        if (decoder_loop_) decoder_loop_->Release();
         _ax_deinit();
         buffer_destroy(pcmdata);
     }
@@ -555,8 +595,8 @@ public:
     llm_whisper() : StackFlow("whisper")
     {
         task_count_ = 1;
-        event_queue_.appendListener(
-            EVENT_TASK_PAUSE, std::bind(&llm_whisper::_task_pause, this, std::placeholders::_1, std::placeholders::_2));
+        event_queue_.appendListener(EVENT_TASK_PAUSE,
+                                    std::bind(&llm_whisper::_task_pause, this, std::placeholders::_1));
     }
 
     void task_output(const std::weak_ptr<llm_task> llm_task_obj_weak,
@@ -673,9 +713,10 @@ public:
         llm_task_obj->sys_pcm_on_data((*next_data));
     }
 
-    void _task_pause(const std::string &work_id, const std::string &data)
+    void _task_pause(const std::shared_ptr<void> &arg)
     {
-        int work_id_num = sample_get_work_id_num(work_id);
+        std::shared_ptr<std::string> work_id = std::static_pointer_cast<std::string>(arg);
+        int work_id_num                      = sample_get_work_id_num(*work_id);
         if (llm_task_.find(work_id_num) == llm_task_.end()) {
             return;
         }
@@ -689,7 +730,7 @@ public:
 
     void task_pause(const std::string &work_id, const std::string &data)
     {
-        event_queue_.enqueue(EVENT_TASK_PAUSE, work_id, "");
+        event_queue_.enqueue(EVENT_TASK_PAUSE, std::make_shared<std::string>(work_id));
     }
 
     void task_work(const std::weak_ptr<llm_task> llm_task_obj_weak,
@@ -703,8 +744,8 @@ public:
         llm_task_obj->kws_awake();
         if ((!audio_url_.empty()) && (llm_task_obj->audio_flage_ == false)) {
             std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
-            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::string &raw) {
-                _llm_task_obj.lock()->sys_pcm_on_data(raw);
+            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
             });
             llm_task_obj->audio_flage_ = true;
         }
@@ -806,11 +847,13 @@ public:
                 if (input.find("sys") != std::string::npos) {
                     audio_url_                            = unit_call("audio", "cap", input);
                     std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
-                    llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::string &raw) {
-                        _llm_task_obj.lock()->sys_pcm_on_data(raw);
-                    });
+                    llm_channel->subscriber(audio_url_,
+                                            [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                                                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
+                                            });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("whisper") != std::string::npos) {
+                    if (input.find("stream.base64") != std::string::npos) llm_task_obj->delay_audio_frame_ = 0;
                     llm_channel->subscriber_work_id(
                         "", std::bind(&llm_whisper::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                                       std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
@@ -861,8 +904,8 @@ public:
         if (data.find("sys") != std::string::npos) {
             if (audio_url_.empty()) audio_url_ = unit_call("audio", "cap", data);
             std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
-            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::string &raw) {
-                _llm_task_obj.lock()->sys_pcm_on_data(raw);
+            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
             });
             llm_task_obj->audio_flage_ = true;
             llm_task_obj->inputs_.push_back(data);
@@ -957,6 +1000,7 @@ public:
             send("None", "None", error_body, work_id);
             return -1;
         }
+        llm_task_[work_id_num]->stop();
         auto llm_channel = get_channel(work_id_num);
         llm_channel->stop_subscriber("");
         if (llm_task_[work_id_num]->audio_flage_) {
@@ -974,6 +1018,7 @@ public:
             if (iteam == llm_task_.end()) {
                 break;
             }
+            iteam->second->stop();
             if (iteam->second->audio_flage_) {
                 unit_call("audio", "cap_stop", "None");
             }

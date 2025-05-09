@@ -17,7 +17,9 @@ LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
+python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-vlm-python-venv_v1.6.tar.gz", 'm5stack_llm-vlm-python-venv_v1.6.tar.gz')
 
+DEFINITIONS += ['-O2']
 DEFINITIONS += ['-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
 REQUIREMENTS += ['ax_engine', 'ax_interpreter', 'ax_sys']
@@ -49,10 +51,29 @@ static_file += [AFile('../static_lib/libopencv-4.6-aarch64-none/lib/libtegra_hal
 static_file += [AFile('../static_lib/libopencv-4.6-aarch64-none/lib/libzlib.a')]
 STATIC_LIB += static_file * 4
 
+STATIC_FILES += [os.path.join(python_venv, 'vlm')]
 STATIC_FILES += Glob('scripts/tokenizer_*.py')
 STATIC_FILES += Glob('models/mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_vlm',
+IGNORE_FILES = []
+IGNORE_FILES += ['vlm']
+
+import json
+if not os.path.exists('../dist'):
+    os.makedirs('../dist')
+ignore = {'ignore':[]}
+try:
+    with open('../dist/fileignore', 'a+') as f:
+        f.seek(0)
+        ignore = json.load(f)
+except:
+    pass
+ignore['ignore'] += IGNORE_FILES
+ignore['ignore'] = list(set(ignore['ignore']))
+with open('../dist/fileignore', 'w') as f:
+    json.dump(ignore, f, indent=4)
+
+env['COMPONENTS'].append({'target':'llm_vlm-1.7',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

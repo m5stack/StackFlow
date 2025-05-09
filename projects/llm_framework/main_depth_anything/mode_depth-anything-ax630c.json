@@ -1,7 +1,9 @@
 {
-    "mode":"depth_anything",
+    "mode":"depth-anything-ax630c",
     "type":"cv",
     "homepage":"https://github.com/DepthAnything/Depth-Anything-V2",
+    "compile_flage":"pulsar2 build --input depth_anything.onnx --config config.json --output_dir output --output_name depth_anything.axmodel --target_hardware AX620E",
+    "pulsar_version":"2.5-2d5d0fa3",
     "capabilities":[
         "Segmentation"
     ],

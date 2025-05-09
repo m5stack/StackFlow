@@ -358,8 +358,15 @@ std::string StackFlows::unit_call(const std::string &unit_name, const std::strin
 {
     std::string value;
     pzmq _call(unit_name);
-    _call.call_rpc_action(unit_action, data, [&value](pzmq *_pzmq, const std::string &raw) { value = raw; });
+    _call.call_rpc_action(unit_action, data, [&value](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) { value = raw->string(); });
     return value;
+}
+
+void StackFlows::unit_call(const std::string &unit_name, const std::string &unit_action, const std::string &data, std::function<void(const std::shared_ptr<StackFlows::pzmq_data> &)> callback)
+{
+    std::string value;
+    StackFlows::pzmq _call(unit_name);
+    _call.call_rpc_action(unit_action, data, [callback](StackFlows::pzmq *_pzmq, const std::shared_ptr<StackFlows::pzmq_data> &raw) { callback(raw); });
 }
 
 std::list<std::string> StackFlows::get_config_file_paths(std::string &base_model_path,

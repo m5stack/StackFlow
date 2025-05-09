@@ -16,11 +16,12 @@ Send JSON:
   "action": "setup",
   "object": "kws.setup",
   "data": {
-    "model": "sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01",
+    "model": "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01",
     "response_format": "kws.bool",
     "input": "sys.pcm",
     "enoutput": true,
-    "kws": "你好你好"
+    "kws": "HELLO",
+    "enwake_audio": true
   }
 }
 ```
@@ -29,11 +30,12 @@ Send JSON:
 - work_id: When configuring the unit, it is `kws`.
 - action: The method called is `setup`.
 - object: The type of data being transmitted is `kws.setup`.
-- model: The model used is the Chinese model `sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01`.
+- model: The model used is the Chinese model `sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01`.
 - response_format: The result returned is in `kws.bool` format.
 - input: The input is `sys.pcm`, representing system audio.
 - enoutput: Whether to enable user result output.
 - kws: The Chinese wake-up word is `"你好你好"`.
+- enwake_audio: Whether to enable wake-up audio output. Default is true.
 
 Response JSON:
 
@@ -204,7 +206,7 @@ Response JSON:
     "inputs_": [
       "sys.pcm"
     ],
-    "model": "sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01",
+    "model": "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01",
     "response_format": "kws.bool"
   },
   "error": {

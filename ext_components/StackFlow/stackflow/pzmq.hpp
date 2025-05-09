@@ -18,10 +18,75 @@
 #define ZMQ_RPC_CALL (ZMQ_REQ | 0x80)
 
 namespace StackFlows {
+
+class pzmq_data {
+private:
+    zmq_msg_t msg;
+
+public:
+    pzmq_data(/* args */)
+    {
+        zmq_msg_init(&msg);
+    }
+    std::shared_ptr<std::string> get_string()
+    {
+        auto len = zmq_msg_size(&msg);
+        return std::make_shared<std::string>((const char *)zmq_msg_data(&msg), zmq_msg_size(&msg));
+    }
+    std::string string()
+    {
+        auto len = zmq_msg_size(&msg);
+        return std::string((const char *)zmq_msg_data(&msg), zmq_msg_size(&msg));
+    }
+    void *data()
+    {
+        return zmq_msg_data(&msg);
+    }
+    size_t size()
+    {
+        return zmq_msg_size(&msg);
+    }
+    zmq_msg_t *get()
+    {
+        return &msg;
+    }
+
+    std::string get_param(int index, const std::string &idata = "")
+    {
+        const char *data = NULL;
+        int size         = 0;
+        if (idata.length() > 0) {
+            data = idata.c_str();
+            size = idata.length();
+        } else {
+            data = (const char *)zmq_msg_data(&msg);
+            size = zmq_msg_size(&msg);
+        }
+
+        if ((index % 2) == 0) {
+            return std::string((const char *)(data + 1), data[0]);
+        } else {
+            return std::string((const char *)(data + data[0] + 1), zmq_msg_size(&msg) - data[0] - 1);
+        }
+    }
+
+    static std::string set_param(std::string param0, std::string param1)
+    {
+        std::string data = " " + param0 + param1;
+        data[0]          = param0.length();
+        return data;
+    }
+
+    ~pzmq_data()
+    {
+        zmq_msg_close(&msg);
+    }
+};
+
 class pzmq {
 public:
-    typedef std::function<std::string(pzmq *, const std::string &)> rpc_callback_fun;
-    typedef std::function<void(pzmq *, const std::string &)> msg_callback_fun;
+    typedef std::function<std::string(pzmq *, const std::shared_ptr<pzmq_data> &)> rpc_callback_fun;
+    typedef std::function<void(pzmq *, const std::shared_ptr<pzmq_data> &)> msg_callback_fun;
 
 private:
     const int rpc_url_head_length = 6;
@@ -85,7 +150,7 @@ public:
         }
         return zmq_url_;
     }
-    std::string _rpc_list_action(pzmq *self, const std::string &_None)
+    std::string _rpc_list_action(pzmq *self, const std::shared_ptr<pzmq_data> &_None)
     {
         std::string action_list;
         action_list.reserve(128);
@@ -131,8 +196,7 @@ public:
     int call_rpc_action(const std::string &action, const std::string &data, const msg_callback_fun &raw_call)
     {
         int ret;
-        zmq_msg_t msg;
-        zmq_msg_init(&msg);
+        std::shared_ptr<pzmq_data> msg_ptr = std::make_shared<pzmq_data>();
         try {
             if (NULL == zmq_socket_) {
                 if (rpc_server_.empty()) return -1;
@@ -150,13 +214,13 @@ public:
             }
             // action
             {
-                zmq_msg_recv(&msg, zmq_socket_, 0);
+                zmq_msg_recv(msg_ptr->get(), zmq_socket_, 0);
             }
-            raw_call(this, std::string((const char *)zmq_msg_data(&msg), zmq_msg_size(&msg)));
+            raw_call(this, msg_ptr);
         } catch (int e) {
             ret = e;
         }
-        zmq_msg_close(&msg);
+        msg_ptr.reset();
         close_zmq();
         return ret;
     }
@@ -293,8 +357,7 @@ public:
             items[0].revents = 0;
         };
         while (!flage_.load()) {
-            zmq_msg_t msg;
-            zmq_msg_init(&msg);
+            std::shared_ptr<pzmq_data> msg_ptr = std::make_shared<pzmq_data>();
             if (mode_ == ZMQ_PULL) {
                 ret = zmq_poll(items, 1, -1);
                 if (ret == -1) {
@@ -305,30 +368,28 @@ public:
                     continue;
                 }
             }
-            ret = zmq_msg_recv(&msg, zmq_socket_, 0);
+            ret = zmq_msg_recv(msg_ptr->get(), zmq_socket_, 0);
             if (ret <= 0) {
-                zmq_msg_close(&msg);
+                msg_ptr.reset();
                 continue;
             }
-            std::string raw_data((const char *)zmq_msg_data(&msg), zmq_msg_size(&msg));
+
             if (mode_ == ZMQ_RPC_FUN) {
-                zmq_msg_t msg1;
-                zmq_msg_init(&msg1);
-                zmq_msg_recv(&msg1, zmq_socket_, 0);
-                std::string _raw_data((const char *)zmq_msg_data(&msg1), zmq_msg_size(&msg1));
+                std::shared_ptr<pzmq_data> msg1_ptr = std::make_shared<pzmq_data>();
+                zmq_msg_recv(msg1_ptr->get(), zmq_socket_, 0);
                 std::string retval;
                 try {
                     std::unique_lock<std::mutex> lock(zmq_fun_mtx_);
-                    retval = zmq_fun_.at(raw_data)(this, _raw_data);
+                    retval = zmq_fun_.at(msg_ptr->string())(this, msg1_ptr);
                 } catch (...) {
                     retval = "NotAction";
                 }
                 zmq_send(zmq_socket_, retval.c_str(), retval.length(), 0);
-                zmq_msg_close(&msg1);
+                msg1_ptr.reset();
             } else {
-                raw_call(this, raw_data);
+                raw_call(this, msg_ptr);
             }
-            zmq_msg_close(&msg);
+            msg_ptr.reset();
         }
     }
     void close_zmq()

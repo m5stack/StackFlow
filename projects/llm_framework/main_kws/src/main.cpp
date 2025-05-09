@@ -107,6 +107,7 @@ public:
                     SLOGW("config file :%s miss", file_name.c_str());
                     continue;
                 }
+                SLOGI("config file :%s read", file_name.c_str());
                 config_file >> file_body;
                 config_file.close();
                 break;
@@ -176,9 +177,11 @@ public:
             temp_awake_key.close();
             std::ostringstream awake_key_compile_cmd;
             if (file_exists("/opt/m5stack/scripts/text2token.py"))
-                awake_key_compile_cmd << "/usr/bin/python3 /opt/m5stack/scripts/text2token.py ";
+                awake_key_compile_cmd << "PYTHONPATH=/opt/m5stack/lib/sherpa-onnx/site-packages /usr/bin/python3 "
+                                         "/opt/m5stack/scripts/text2token.py ";
             else if (file_exists("/opt/m5stack/scripts/llm-kws_text2token.py"))
-                awake_key_compile_cmd << "/usr/bin/python3 /opt/m5stack/scripts/llm-kws_text2token.py ";
+                awake_key_compile_cmd << "PYTHONPATH=/opt/m5stack/lib/sherpa-onnx/site-packages /usr/bin/python3 "
+                                         "/opt/m5stack/scripts/llm-kws_text2token.py ";
             else {
                 SLOGE("text2token.py or llm-kws_text2token.py not found!");
             }
@@ -255,11 +258,17 @@ public:
         pcmdata = buffer_create();
     }
 
+    void start()
+    {
+    }
+
+    void stop()
+    {
+    }
+
     ~llm_task()
     {
-        if (spotter_stream_) {
-            spotter_stream_.reset();
-        }
+        stop();
         buffer_destroy(pcmdata);
     }
 };
@@ -327,8 +336,8 @@ public:
         }
         if ((!audio_url_.empty()) && (llm_task_obj->audio_flage_ == false)) {
             std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
-            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::string &raw) {
-                _llm_task_obj.lock()->sys_pcm_on_data(raw);
+            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
             });
             llm_task_obj->audio_flage_ = true;
         }
@@ -447,8 +456,8 @@ public:
                 if (input.find("sys") != std::string::npos) {
                     audio_url_                            = unit_call("audio", "cap", "None");
                     std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
-                    llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::string &raw) {
-                        _llm_task_obj.lock()->sys_pcm_on_data(raw);
+                    llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                        _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
                     });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("kws") != std::string::npos) {
@@ -509,6 +518,7 @@ public:
             send("None", "None", error_body, work_id);
             return -1;
         }
+        llm_task_[work_id_num]->stop();
         auto llm_channel = get_channel(work_id_num);
         llm_channel->stop_subscriber("");
         if (llm_task_[work_id_num]->audio_flage_) {
@@ -526,6 +536,7 @@ public:
             if (iteam == llm_task_.end()) {
                 break;
             }
+            iteam->second->stop();
             if (iteam->second->audio_flage_) {
                 unit_call("audio", "cap_stop", "None");
             }
