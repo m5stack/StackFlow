@@ -469,42 +469,66 @@ public:
                     // 5. Add crossfade region to output
                     pcmlist.insert(pcmlist.end(), crossfade_region.begin(), crossfade_region.end());
 
-                    // 6. Add remaining valid audio data
                     int remaining_start = aligned_start + sola_buffer_frame;
-                    int remaining_len   = (i == dec_slice_num - 1)
-                                              ? (actual_len - 2 * pad_frames) * samples_per_frame - sola_buffer_frame
-                                              : (dec_len - 2 * pad_frames) * samples_per_frame - sola_buffer_frame;
 
-                    // Boundary check
-                    remaining_len = std::min(remaining_len, static_cast<int>(decoder_output.size() - remaining_start));
+                    if (i == dec_slice_num - 1) {
+                        int total_expected_samples = audio_len * samples_per_frame / 512;
 
-                    if (remaining_len > 0) {
-                        pcmlist.insert(pcmlist.end(), decoder_output.begin() + remaining_start,
-                                       decoder_output.begin() + remaining_start + remaining_len);
-                    }
+                        int processed_samples = static_cast<int>(pcmlist.size());
 
-                    // 7. Update SOLA buffer for next frame
-                    int buffer_start = remaining_start + remaining_len;
+                        int remaining_needed = total_expected_samples - processed_samples;
+                        remaining_needed     = std::max(0, remaining_needed);
 
-                    // Check if there's enough data for the next buffer
-                    if (buffer_start + sola_buffer_frame <= decoder_output.size()) {
-                        std::copy(decoder_output.begin() + buffer_start,
-                                  decoder_output.begin() + buffer_start + sola_buffer_frame, sola_buffer.begin());
-                    } else {
-                        // If insufficient, fill with zeros
-                        int avail = static_cast<int>(decoder_output.size() - buffer_start);
-                        if (avail > 0) {
-                            std::copy(decoder_output.begin() + buffer_start, decoder_output.end(), sola_buffer.begin());
+                        int remaining_len =
+                            std::min(remaining_needed, static_cast<int>(decoder_output.size() - remaining_start));
+
+                        SLOGI("Inference #%d (final): Expected total=%d, processed=%d, needed=%d, available=%d", i + 1,
+                              total_expected_samples, processed_samples, remaining_needed, remaining_len);
+
+                        if (remaining_len > 0) {
+                            pcmlist.insert(pcmlist.end(), decoder_output.begin() + remaining_start,
+                                           decoder_output.begin() + remaining_start + remaining_len);
                         }
-                        std::fill(sola_buffer.begin() + avail, sola_buffer.end(), 0.0f);
-                    }
 
-                    SLOGI("Inference #%d: Added %d + %d samples to output, cumulative length: %zu", i + 1,
-                          sola_buffer_frame, remaining_len, pcmlist.size());
+                    } else {
+                        int remaining_len = (dec_len - 2 * pad_frames) * samples_per_frame - sola_buffer_frame;
+
+                        remaining_len =
+                            std::min(remaining_len, static_cast<int>(decoder_output.size() - remaining_start));
+
+                        if (remaining_len > 0) {
+                            pcmlist.insert(pcmlist.end(), decoder_output.begin() + remaining_start,
+                                           decoder_output.begin() + remaining_start + remaining_len);
+                        }
+
+                        int buffer_start = remaining_start + remaining_len;
+
+                        if (buffer_start + sola_buffer_frame <= decoder_output.size()) {
+                            std::copy(decoder_output.begin() + buffer_start,
+                                      decoder_output.begin() + buffer_start + sola_buffer_frame, sola_buffer.begin());
+                        } else {
+                            int avail = static_cast<int>(decoder_output.size() - buffer_start);
+                            if (avail > 0) {
+                                std::copy(decoder_output.begin() + buffer_start, decoder_output.end(),
+                                          sola_buffer.begin());
+                            }
+                            std::fill(sola_buffer.begin() + avail, sola_buffer.end(), 0.0f);
+                        }
+
+                        SLOGI("Inference #%d: Added %d + %d samples to output, cumulative length: %zu", i + 1,
+                              sola_buffer_frame, remaining_len, pcmlist.size());
+                    }
                 }
             }
 
-            SLOGI("All inference completed, generated PCM length: %zu", pcmlist.size());
+            SLOGI("All inference completed, raw generated PCM length: %zu", pcmlist.size());
+
+            if (pcmlist.size() > audio_len) {
+                SLOGI("Truncating output from %zu to %d samples as per encoder prediction", pcmlist.size(), audio_len);
+                pcmlist.resize(audio_len);
+            }
+
+            SLOGI("Final PCM length after truncation: %zu", pcmlist.size());
 
             // Post-processing: resample and convert to int16
             double src_ratio =
