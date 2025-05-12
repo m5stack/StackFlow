@@ -14,6 +14,7 @@
 
 * [特性](#特性)
 * [Demo](#demo)
+* [模型列表](#模型列表)
 * [环境要求](#环境要求)
 * [编译](#编译)
 * [安装](#安装)
@@ -53,6 +54,11 @@ StackFlow 语音助手的主要工作模式：
 - [StackFlow TTS 语音合成播放](./projects/llm_framework/README.md)
 - [StackFlow yolo 视觉检测](https://github.com/Abandon-ht/ModuleLLM_Development_Guide/tree/dev/ESP32/cpp)
 - [StackFlow VLM 图片描述](https://github.com/Abandon-ht/ModuleLLM_Development_Guide/tree/dev/ESP32/cpp)
+
+## 模型列表
+| 模型名 | 模型类型 | 模型大小 | 模型能力 | 模型配置文件 | 计算单元 |
+| :----: | :----: | :----: | :----: | :----: | :----: |
+| [sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01](https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2) | KWS | 6.4M | 关键词识别 | [mode_sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.json](projects/llm_framework/main_kws/mode_sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.json) | CPU |
 
 ## 环境要求 ##
 当前 StackFlow 的 AI 单元是建立在 AXERA 加速平台之上的，主要的芯片平台为 ax630c、ax650n。系统要求为 ubuntu。
