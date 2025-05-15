@@ -590,11 +590,12 @@ public:
             "list_camera", std::bind(&llm_camera::list_camera, this, std::placeholders::_1, std::placeholders::_2));
     }
 
-    std::string list_camera(pzmq *_pzmq, const std::string &rawdata)
+    std::string list_camera(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
+        auto _rawdata = rawdata->string();
         nlohmann::json req_body;
-        std::string zmq_url    = RPC_PARSE_TO_FIRST(rawdata);
-        std::string param_json = RPC_PARSE_TO_SECOND(rawdata);
+        std::string zmq_url    = rawdata->get_param(0);
+        std::string param_json = rawdata->get_param(1);
         std::vector<std::string> devices;
         glob_t glob_result;
         glob("/dev/video*", GLOB_TILDE, NULL, &glob_result);

@@ -3,7 +3,7 @@ import json
 import time
 import logging
 import uuid
-from .token_calc import calculate_token_length
+# from .token_calc import calculate_token_length
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -24,6 +24,7 @@ class LLMClient:
         response = b""
         parsed_responses = []
         output_text = ""
+        token_count = 0
 
         start_time = time.time()
         first_packet_time = None
@@ -42,13 +43,14 @@ class LLMClient:
                         if first_packet_time is None:
                             first_packet_time = time.time()
                         output_text += parsed_response["data"]["delta"]
+                        token_count += 3
 
                     if "data" in parsed_response and parsed_response["data"].get("finish", False):
                         end_time = time.time()
                         total_time = end_time - start_time
                         first_packet_latency = first_packet_time - start_time if first_packet_time else None
 
-                        token_count = calculate_token_length(output_text)
+                        # token_count = calculate_token_length(output_text)
                         token_speed = token_count / total_time if total_time > 0 else 0
 
                         logging.info("Stream reception completed.")

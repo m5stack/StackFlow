@@ -14,7 +14,8 @@ std::string llm_channel_obj::uart_push_url;
 #define RPC_PARSE_TO_PARAM_OLD(obj) \
     sample_json_str_get(obj, "zmq_com"), sample_unescapeString(sample_json_str_get(obj, "raw_data"))
 
-#define RPC_PARSE_TO_PARAM(obj) RPC_PARSE_TO_FIRST(obj), RPC_PARSE_TO_SECOND(obj)
+#define RPC_PARSE_TO_PARAM(obj)     RPC_PARSE_TO_FIRST(obj), RPC_PARSE_TO_SECOND(obj)
+#define PTR_RPC_PARSE_TO_PARAM(obj) PTR_RPC_PARSE_TO_FIRST(obj), PTR_RPC_PARSE_TO_SECOND(obj)
 
 llm_channel_obj::llm_channel_obj(const std::string &_publisher_url, const std::string &inference_url,
                                  const std::string &unit_name)
@@ -30,23 +31,24 @@ llm_channel_obj::~llm_channel_obj()
 }
 
 void llm_channel_obj::subscriber_event_call(const std::function<void(const std::string &, const std::string &)> &call,
-                                            pzmq *_pzmq, const std::string &raw)
+                                            pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw)
 {
+    auto _raw                            = raw->string();
     const char *user_inference_flage_str = "\"action\"";
-    std::size_t pos                      = raw.find(user_inference_flage_str);
+    std::size_t pos                      = _raw.find(user_inference_flage_str);
     while (true) {
         if (pos == std::string::npos) {
             break;
-        } else if ((pos > 0) && (raw[pos - 1] != '\\')) {
-            std::string zmq_com = sample_json_str_get(raw, "zmq_com");
+        } else if ((pos > 0) && (_raw[pos - 1] != '\\')) {
+            std::string zmq_com = sample_json_str_get(_raw, "zmq_com");
             if (!zmq_com.empty()) set_push_url(zmq_com);
-            request_id_ = sample_json_str_get(raw, "request_id");
-            work_id_    = sample_json_str_get(raw, "work_id");
+            request_id_ = sample_json_str_get(_raw, "request_id");
+            work_id_    = sample_json_str_get(_raw, "work_id");
             break;
         }
-        pos = raw.find(user_inference_flage_str, pos + sizeof(user_inference_flage_str));
+        pos = _raw.find(user_inference_flage_str, pos + sizeof(user_inference_flage_str));
     }
-    call(sample_json_str_get(raw, "object"), sample_json_str_get(raw, "data"));
+    call(sample_json_str_get(_raw, "object"), sample_json_str_get(_raw, "data"));
 }
 
 int llm_channel_obj::subscriber_work_id(const std::string &work_id,
@@ -151,26 +153,16 @@ int llm_channel_obj::output_to_uart(const std::string &data)
 StackFlow::StackFlow::StackFlow(const std::string &unit_name)
     : work_id_num_cout_(1000), unit_name_(unit_name), rpc_ctx_(std::make_unique<pzmq>(unit_name))
 {
-    event_queue_.appendListener(EVENT_NONE,
-                                std::bind(&StackFlow::_none_event, this, std::placeholders::_1, std::placeholders::_2));
-    event_queue_.appendListener(EVENT_PAUSE,
-                                std::bind(&StackFlow::_pause, this, std::placeholders::_1, std::placeholders::_2));
-    event_queue_.appendListener(EVENT_WORK,
-                                std::bind(&StackFlow::_work, this, std::placeholders::_1, std::placeholders::_2));
-    event_queue_.appendListener(EVENT_EXIT,
-                                std::bind(&StackFlow::_exit, this, std::placeholders::_1, std::placeholders::_2));
-    event_queue_.appendListener(EVENT_SETUP,
-                                std::bind(&StackFlow::_setup, this, std::placeholders::_1, std::placeholders::_2));
-    event_queue_.appendListener(EVENT_LINK,
-                                std::bind(&StackFlow::_link, this, std::placeholders::_1, std::placeholders::_2));
-    event_queue_.appendListener(EVENT_UNLINK,
-                                std::bind(&StackFlow::_unlink, this, std::placeholders::_1, std::placeholders::_2));
-    event_queue_.appendListener(EVENT_TASKINFO,
-                                std::bind(&StackFlow::_taskinfo, this, std::placeholders::_1, std::placeholders::_2));
-    event_queue_.appendListener(EVENT_SYS_INIT,
-                                std::bind(&StackFlow::_sys_init, this, std::placeholders::_1, std::placeholders::_2));
-    event_queue_.appendListener(
-        EVENT_REPEAT_EVENT, std::bind(&StackFlow::_repeat_loop, this, std::placeholders::_1, std::placeholders::_2));
+    event_queue_.appendListener(EVENT_NONE, std::bind(&StackFlow::_none_event, this, std::placeholders::_1));
+    event_queue_.appendListener(EVENT_PAUSE, std::bind(&StackFlow::_pause, this, std::placeholders::_1));
+    event_queue_.appendListener(EVENT_WORK, std::bind(&StackFlow::_work, this, std::placeholders::_1));
+    event_queue_.appendListener(EVENT_EXIT, std::bind(&StackFlow::_exit, this, std::placeholders::_1));
+    event_queue_.appendListener(EVENT_SETUP, std::bind(&StackFlow::_setup, this, std::placeholders::_1));
+    event_queue_.appendListener(EVENT_LINK, std::bind(&StackFlow::_link, this, std::placeholders::_1));
+    event_queue_.appendListener(EVENT_UNLINK, std::bind(&StackFlow::_unlink, this, std::placeholders::_1));
+    event_queue_.appendListener(EVENT_TASKINFO, std::bind(&StackFlow::_taskinfo, this, std::placeholders::_1));
+    event_queue_.appendListener(EVENT_SYS_INIT, std::bind(&StackFlow::_sys_init, this, std::placeholders::_1));
+    event_queue_.appendListener(EVENT_REPEAT_EVENT, std::bind(&StackFlow::_repeat_loop, this, std::placeholders::_1));
     rpc_ctx_->register_rpc_action(
         "setup", std::bind(&StackFlow::_rpc_setup, this, std::placeholders::_1, std::placeholders::_2));
     rpc_ctx_->register_rpc_action(
@@ -215,7 +207,7 @@ StackFlow::~StackFlow()
         llm_task_channel_.erase(iteam->first);
     }
     exit_flage_.store(true);
-    event_queue_.enqueue(EVENT_NONE, "", "");
+    event_queue_.enqueue(EVENT_NONE, nullptr);
     even_loop_thread_->join();
 }
 
@@ -227,18 +219,19 @@ void StackFlow::even_loop()
     }
 }
 
-void StackFlow::_none_event(const std::string &data1, const std::string &data2)
+void StackFlow::_none_event(const std::shared_ptr<void> &arg)
 {
+    // std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
 }
 
-void StackFlow::_sys_init(const std::string &zmq_url, const std::string &data)
+void StackFlow::_sys_init(const std::shared_ptr<void> &arg)
 {
     // todo:...
 }
 
-std::string StackFlow::_rpc_setup(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_setup(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_SETUP, RPC_PARSE_TO_PARAM(data));
+    event_queue_.enqueue(EVENT_SETUP, std::make_shared<stackflow_data>(data->get_param(0), data->get_param(1)));
     return std::string("None");
 }
 
@@ -270,9 +263,9 @@ int StackFlow::setup(const std::string &work_id, const std::string &object, cons
     return -1;
 }
 
-std::string StackFlow::_rpc_link(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_link(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_LINK, RPC_PARSE_TO_PARAM(data));
+    event_queue_.enqueue(EVENT_LINK, std::make_shared<stackflow_data>(data->get_param(0), data->get_param(1)));
     return std::string("None");
 }
 
@@ -301,9 +294,9 @@ void StackFlow::link(const std::string &work_id, const std::string &object, cons
     send("None", "None", error_body, work_id);
 }
 
-std::string StackFlow::_rpc_unlink(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_unlink(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_UNLINK, RPC_PARSE_TO_PARAM(data));
+    event_queue_.enqueue(EVENT_UNLINK, std::make_shared<stackflow_data>(data->get_param(0), data->get_param(1)));
     return std::string("None");
 }
 
@@ -332,9 +325,9 @@ void StackFlow::unlink(const std::string &work_id, const std::string &object, co
     send("None", "None", error_body, work_id);
 }
 
-std::string StackFlow::_rpc_work(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_work(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_WORK, RPC_PARSE_TO_PARAM(data));
+    event_queue_.enqueue(EVENT_WORK, std::make_shared<stackflow_data>(data->get_param(0), data->get_param(1)));
     return std::string("None");
 }
 
@@ -363,9 +356,9 @@ void StackFlow::work(const std::string &work_id, const std::string &object, cons
     send("None", "None", error_body, work_id);
 }
 
-std::string StackFlow::_rpc_exit(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_exit(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_EXIT, RPC_PARSE_TO_PARAM(data));
+    event_queue_.enqueue(EVENT_EXIT, std::make_shared<stackflow_data>(data->get_param(0), data->get_param(1)));
     return std::string("None");
 }
 
@@ -397,9 +390,9 @@ int StackFlow::exit(const std::string &work_id, const std::string &object, const
     return 0;
 }
 
-std::string StackFlow::_rpc_pause(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_pause(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_PAUSE, RPC_PARSE_TO_PARAM(data));
+    event_queue_.enqueue(EVENT_PAUSE, std::make_shared<stackflow_data>(data->get_param(0), data->get_param(1)));
     return std::string("None");
 }
 
@@ -428,15 +421,15 @@ void StackFlow::pause(const std::string &work_id, const std::string &object, con
     send("None", "None", error_body, work_id);
 }
 
-std::string StackFlow::_rpc_taskinfo(pzmq *_pzmq, const std::string &data)
+std::string StackFlow::_rpc_taskinfo(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data)
 {
-    event_queue_.enqueue(EVENT_TASKINFO, RPC_PARSE_TO_PARAM(data));
+    event_queue_.enqueue(EVENT_TASKINFO, std::make_shared<stackflow_data>(data->get_param(0), data->get_param(1)));
     return std::string("None");
 }
 
 void StackFlow::taskinfo(const std::string &zmq_url, const std::string &raw)
 {
-    SLOGI("StackFlow::taskinfo raw");
+    // SLOGI("StackFlow::taskinfo raw");
     std::string work_id = sample_json_str_get(raw, "work_id");
     try {
         auto task_channel = get_channel(sample_get_work_id_num(work_id));
@@ -448,7 +441,7 @@ void StackFlow::taskinfo(const std::string &zmq_url, const std::string &raw)
 
 void StackFlow::taskinfo(const std::string &work_id, const std::string &object, const std::string &data)
 {
-    SLOGI("StackFlow::taskinfo");
+    // SLOGI("StackFlow::taskinfo");
     if (_taskinfo_) {
         _taskinfo_(work_id, object, data);
         return;
@@ -462,13 +455,17 @@ void StackFlow::taskinfo(const std::string &work_id, const std::string &object, 
 int StackFlow::sys_register_unit(const std::string &unit_name)
 {
     int work_id_number;
-    std::string component_msg  = unit_call("sys", "register_unit", unit_name);
-    std::string str_port       = RPC_PARSE_TO_FIRST(component_msg);
-    work_id_number             = std::stoi(str_port);
-    std::string tmp_buf        = RPC_PARSE_TO_SECOND(component_msg);
-    std::string out_port       = RPC_PARSE_TO_FIRST(tmp_buf);
-    std::string inference_port = RPC_PARSE_TO_SECOND(tmp_buf);
+    std::string str_port;
+    std::string out_port;
+    std::string inference_port;
 
+    unit_call("sys", "register_unit", unit_name, [&](const std::shared_ptr<StackFlows::pzmq_data> &pzmg_msg) {
+        str_port       = pzmg_msg->get_param(1);
+        out_port       = pzmg_msg->get_param(0, str_port);
+        inference_port = pzmg_msg->get_param(1, str_port);
+        str_port       = pzmg_msg->get_param(0);
+    });
+    work_id_number = std::stoi(str_port);
     SLOGI("work_id_number:%d, out_port:%s, inference_port:%s ", work_id_number, out_port.c_str(),
           inference_port.c_str());
     llm_task_channel_[work_id_number] = std::make_shared<llm_channel_obj>(out_port, inference_port, unit_name_);
@@ -511,20 +508,23 @@ void StackFlow::sys_sql_unset(const std::string &key)
     unit_call("sys", "sql_unset", key);
 }
 
-void StackFlow::_repeat_loop(const std::string &action, const std::string &ms)
+void StackFlow::_repeat_loop(const std::shared_ptr<void> &arg)
 {
+    std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
+    std::string action                          = originalPtr->string(0);
+    int ms                                      = originalPtr->integer(0);
     repeat_callback_fun_mutex_.lock();
     const auto call_fun = repeat_callback_fun_[action];
     repeat_callback_fun_mutex_.unlock();
     if (call_fun()) {
-        int delayms = std::stoi(ms);
+        int delayms = ms;
         if (delayms)
             std::thread([this, action, delayms, ms]() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(delayms));
-                this->event_queue_.enqueue(EVENT_REPEAT_EVENT, action, ms);
+                this->event_queue_.enqueue(EVENT_REPEAT_EVENT, std::make_shared<stackflow_data>(action, ms));
             }).detach();
         else {
-            event_queue_.enqueue(EVENT_REPEAT_EVENT, action, ms);
+            event_queue_.enqueue(EVENT_REPEAT_EVENT, std::make_shared<stackflow_data>(action, ms));
         }
     } else {
         repeat_callback_fun_mutex_.lock();
@@ -542,9 +542,9 @@ void StackFlow::repeat_event(int ms, std::function<int(void)> repeat_fun, bool n
     if (!now)
         std::thread([this, action, ms]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(ms));
-            this->event_queue_.enqueue(EVENT_REPEAT_EVENT, action, std::to_string(ms));
+            this->event_queue_.enqueue(EVENT_REPEAT_EVENT, std::make_shared<stackflow_data>(action, ms));
         }).detach();
     else {
-        event_queue_.enqueue(EVENT_REPEAT_EVENT, action, std::to_string(ms));
+        event_queue_.enqueue(EVENT_REPEAT_EVENT, std::make_shared<stackflow_data>(action, ms));
     }
 }

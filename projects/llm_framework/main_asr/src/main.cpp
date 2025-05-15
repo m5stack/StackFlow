@@ -278,8 +278,7 @@ public:
     llm_asr() : StackFlow("asr")
     {
         task_count_ = 1;
-        event_queue_.appendListener(
-            EVENT_TASK_PAUSE, std::bind(&llm_asr::_task_pause, this, std::placeholders::_1, std::placeholders::_2));
+        event_queue_.appendListener(EVENT_TASK_PAUSE, std::bind(&llm_asr::_task_pause, this, std::placeholders::_1));
     }
 
     void task_output(const std::weak_ptr<llm_task> llm_task_obj_weak,
@@ -396,9 +395,10 @@ public:
         llm_task_obj->sys_pcm_on_data((*next_data));
     }
 
-    void _task_pause(const std::string &work_id, const std::string &data)
+    void _task_pause(const std::shared_ptr<void> &arg)
     {
-        int work_id_num = sample_get_work_id_num(work_id);
+        std::shared_ptr<std::string> work_id = std::static_pointer_cast<std::string>(arg);
+        int work_id_num                      = sample_get_work_id_num(*work_id);
         if (llm_task_.find(work_id_num) == llm_task_.end()) {
             return;
         }
@@ -412,7 +412,7 @@ public:
 
     void task_pause(const std::string &work_id, const std::string &data)
     {
-        event_queue_.enqueue(EVENT_TASK_PAUSE, work_id, "");
+        event_queue_.enqueue(EVENT_TASK_PAUSE, std::make_shared<std::string>(work_id));
     }
 
     void task_work(const std::weak_ptr<llm_task> llm_task_obj_weak,
@@ -426,8 +426,8 @@ public:
         llm_task_obj->kws_awake();
         if ((!audio_url_.empty()) && (llm_task_obj->audio_flage_ == false)) {
             std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
-            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::string &raw) {
-                _llm_task_obj.lock()->sys_pcm_on_data(raw);
+            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
             });
             llm_task_obj->audio_flage_ = true;
         }
@@ -515,9 +515,10 @@ public:
                 if (input.find("sys") != std::string::npos) {
                     audio_url_                            = unit_call("audio", "cap", input);
                     std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
-                    llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::string &raw) {
-                        _llm_task_obj.lock()->sys_pcm_on_data(raw);
-                    });
+                    llm_channel->subscriber(audio_url_,
+                                            [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                                                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
+                                            });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("asr") != std::string::npos) {
                     llm_channel->subscriber_work_id(
@@ -563,8 +564,8 @@ public:
         if (data.find("sys") != std::string::npos) {
             if (audio_url_.empty()) audio_url_ = unit_call("audio", "cap", data);
             std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
-            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::string &raw) {
-                _llm_task_obj.lock()->sys_pcm_on_data(raw);
+            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
             });
             llm_task_obj->audio_flage_ = true;
             llm_task_obj->inputs_.push_back(data);

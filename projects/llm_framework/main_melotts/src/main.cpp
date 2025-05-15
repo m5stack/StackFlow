@@ -364,6 +364,7 @@ public:
                     }
 
                     first_frame = false;
+
                 } else {
                     int audio_start = pad_frames * samples_per_frame;
 
@@ -390,6 +391,7 @@ public:
                             best_offset      = offset;
                         }
                     }
+
 
                     int aligned_start = audio_start + best_offset;
 
@@ -449,12 +451,14 @@ public:
                 pcmlist.resize(audio_len);
             }
 
+
             double src_ratio =
                 static_cast<double>(mode_config_.audio_rate) / static_cast<double>(mode_config_.mode_rate);
             std::vector<float> tmp_pcm((pcmlist.size() * src_ratio + 1));
             int len;
 
             resample_audio(pcmlist.data(), pcmlist.size(), tmp_pcm.data(), &len, src_ratio);
+
 
             wav_pcm_data.reserve(len);
             std::transform(tmp_pcm.begin(), tmp_pcm.begin() + len, std::back_inserter(wav_pcm_data),
@@ -465,6 +469,7 @@ public:
                     std::string(reinterpret_cast<char *>(wav_pcm_data.data()), wav_pcm_data.size() * sizeof(int16_t)),
                     finish);
             }
+
         } catch (const std::exception &e) {
             return true;
         } catch (...) {

@@ -42,7 +42,7 @@ void zmq_bus_com::work(const std::string &zmq_url_format, int port)
     _zmq_url = std::string((char *)buff.data());
     SAFE_SETTING("serial_zmq_url", _zmq_url);
     user_chennal_           = std::make_unique<pzmq>(_zmq_url, ZMQ_PULL,
-                                                     [this](pzmq *_pzmq, const std::string &data) { this->send_data(data); });
+                                                     [this](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &data) { this->send_data(data->string()); });
     reace_data_event_thread = std::make_unique<std::thread>(std::bind(&zmq_bus_com::reace_data_event, this));
 }
 
