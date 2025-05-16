@@ -25,9 +25,12 @@ REQUIREMENTS += ['samplerate']
 
 INCLUDE += [ADir('../include')]
 INCLUDE += [ADir('src/runner'), ADir('../include/onnxruntime/core/session')]
-
+LINK_SEARCH_PATH += [ADir('../static_lib/wetext')]
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
-LDFLAGS += ['-l:libcargs.a', '-l:libonnxruntime.a']
+LDFLAGS += ['-l:libcargs.a', '-l:libonnxruntime.a','-l:libglog.so','-l:libfst.so']
+
+
+LDFLAGS += []
 
 STATIC_FILES += Glob('mode_*.json')
 

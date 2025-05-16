@@ -8,8 +8,10 @@
 #include <cassert>
 #include <iostream>
 #include "../../../../../SDK/components/utilities/include/sample_log.h"
+#include "processor/wetext_processor.h"
+
 // Debug logging switch - set to true to enable debug logs
-static bool DEBUG_LOGGING = true;
+static bool DEBUG_LOGGING = false;
 // Macro for debug logging
 #define DEBUG_LOG(fmt, ...)            \
     do {                               \
@@ -36,16 +38,23 @@ private:
     std::pair<std::vector<int>, std::vector<int>> unknown_token;
     std::unordered_map<int, std::string> reverse_tokens;
 
+    wetext::Processor* m_processor;
+
 public:
     // Setter for debug logging
     static void setDebugLogging(bool enable)
     {
         DEBUG_LOGGING = enable;
     }
-    Lexicon(const std::string& lexicon_filename, const std::string& tokens_filename) : max_phrase_length(0)
+    Lexicon(const std::string& lexicon_filename, const std::string& tokens_filename, const std::string& tagger_filename,
+            const std::string& verbalizer_filename)
+        : max_phrase_length(0)
     {
-        DEBUG_LOG("Dictionary loading: %s Pronunciation table loading: %s", tokens_filename.c_str(),
-                  lexicon_filename.c_str());
+        DEBUG_LOG("Dictionary loading: %s Pronunciation table loading: %s tagger_filename: %s verbalizer_filename: %s",
+                  tokens_filename.c_str(), lexicon_filename.c_str(), tagger_filename.c_str(),
+                  verbalizer_filename.c_str());
+
+        m_processor = new wetext::Processor(tagger_filename, verbalizer_filename);
 
         std::unordered_map<std::string, int> tokens;
         std::ifstream ifs(tokens_filename);
@@ -198,6 +207,12 @@ public:
     void convert(const std::string& text, std::vector<int>& phones, std::vector<int>& tones)
     {
         DEBUG_LOG("\nStarting text processing: \"%s\"", text.c_str());
+
+        std::string taggedText = m_processor->Tag(text);
+        DEBUG_LOG("\taggedText processing: \"%s\"", taggedText.c_str());
+        std::string normalizedText = m_processor->Verbalize(taggedText);
+        DEBUG_LOG("\normalizedText processing: \"%s\"", normalizedText.c_str());
+
         DEBUG_LOG("=======Matching Results=======");
         DEBUG_LOG("Unit\t|\tPhonemes\t|\tTones");
         DEBUG_LOG("-----------------------------");
@@ -205,7 +220,7 @@ public:
         tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
         DEBUG_LOG("<BOS>\t|\t%s\t|\t%s", phonesToString(unknown_token.first).c_str(),
                   tonesToString(unknown_token.second).c_str());
-        auto chars = splitEachChar(text);
+        auto chars = splitEachChar(normalizedText);
         int i      = 0;
         while (i < chars.size()) {
             if (is_english(chars[i])) {
