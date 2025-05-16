@@ -9,7 +9,6 @@
 #include "Lexicon.hpp"
 #include <ax_sys_api.h>
 #include "AudioFile.h"
-#include "Lexicon.hpp"
 
 #include <signal.h>
 #include <sys/stat.h>
@@ -44,6 +43,8 @@ typedef struct {
     std::string tokens;
     std::string gbin;
     std::string sentence;
+    std::string tagger;
+    std::string verbalizer;
     float spacker_speed = 1.0;
     int mode_rate       = 44100;
     int audio_rate      = 16000;
@@ -169,17 +170,22 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], length_scale);
             CONFIG_AUTO_SET(file_body["mode_param"], noise_scale_w);
             CONFIG_AUTO_SET(file_body["mode_param"], sdp_ratio);
-            mode_config_.tokens  = base_model + mode_config_.tokens;
-            mode_config_.gbin    = base_model + mode_config_.gbin;
-            mode_config_.encoder = base_model + mode_config_.encoder;
-            mode_config_.decoder = base_model + mode_config_.decoder;
-            mode_config_.lexicon = base_model + mode_config_.lexicon;
+            CONFIG_AUTO_SET(file_body["mode_param"], tagger);
+            CONFIG_AUTO_SET(file_body["mode_param"], verbalizer);
+            mode_config_.tokens     = base_model + mode_config_.tokens;
+            mode_config_.gbin       = base_model + mode_config_.gbin;
+            mode_config_.encoder    = base_model + mode_config_.encoder;
+            mode_config_.decoder    = base_model + mode_config_.decoder;
+            mode_config_.lexicon    = base_model + mode_config_.lexicon;
+            mode_config_.tagger     = base_model + mode_config_.tagger;
+            mode_config_.verbalizer = base_model + mode_config_.verbalizer;
             if (config_body.contains("awake_delay"))
                 awake_delay_ = config_body["awake_delay"].get<int>();
             else if (file_body["mode_param"].contains("awake_delay"))
                 awake_delay_ = file_body["mode_param"]["awake_delay"];
             // Load lexicon
-            lexicon_ = std::make_unique<Lexicon>(mode_config_.lexicon, mode_config_.tokens);
+            lexicon_ = std::make_unique<Lexicon>(mode_config_.lexicon, mode_config_.tokens, mode_config_.tagger,
+                                                 mode_config_.verbalizer);
             // Read g.bin
             g_matrix.resize(256, 0);
             FILE *fp = fopen(mode_config_.gbin.c_str(), "rb");

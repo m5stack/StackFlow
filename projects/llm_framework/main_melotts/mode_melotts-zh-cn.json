@@ -21,6 +21,8 @@
         "gbin": "g-zh_mix_en.bin",
         "tokens": "tokens.txt",
         "lexicon": "lexicon.txt",
+        "tagger": "zh_tn_tagger.fst",
+        "verbalizer": "zh_tn_verbalizer.fst",
         "spacker_speed": 1.1,
         "mode_rate": 44100,
         "audio_rate": 16000,
