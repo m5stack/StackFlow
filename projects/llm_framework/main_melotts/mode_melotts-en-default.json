@@ -21,6 +21,8 @@
         "gbin": "g-en-default.bin",
         "tokens": "tokens-en.txt",
         "lexicon": "lexicon-en.txt",
+        "tagger": "en_tn_tagger.fst",
+        "verbalizer": "en_tn_verbalizer.fst",
         "spacker_speed": 1.2,
         "mode_rate": 44100,
         "audio_rate": 16000,
