@@ -29,9 +29,11 @@ INCLUDE += [ADir('../include/sherpa'),
             ]
 
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
-LDFLAGS += ['-l:libcargs.a', '-l:libonnxruntime.a',
+LDFLAGS += ['-l:libcargs.a',
             '-l:libsherpa-onnx-core.a', '-l:libkaldi-native-fbank-core.a',
             '-l:libkaldi-decoder-core.a', '-l:libssentencepiece_core.a']
+
+REQUIREMENTS += ['onnxruntime']
 
 STATIC_FILES += [os.path.join(python_venv, 'sherpa-onnx')]
 STATIC_FILES += Glob('llm-kws_text2token.py')
@@ -55,7 +57,7 @@ ignore['ignore'] = list(set(ignore['ignore']))
 with open('../dist/fileignore', 'w') as f:
     json.dump(ignore, f, indent=4)
 
-env['COMPONENTS'].append({'target':'llm_kws-1.7',
+env['COMPONENTS'].append({'target':'llm_kws-1.8',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

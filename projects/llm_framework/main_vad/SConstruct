@@ -23,12 +23,13 @@ LINK_SEARCH_PATH += [ADir('../static_lib')]
 INCLUDE += [ADir('../include/sherpa')]
 
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
-LDFLAGS += ['-l:libsherpa-onnx-core.a',
-            '-l:libonnxruntime.a']
+LDFLAGS += ['-l:libsherpa-onnx-core.a']
+
+REQUIREMENTS += ['onnxruntime']
 
 STATIC_FILES += Glob('mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_vad-1.6',
+env['COMPONENTS'].append({'target':'llm_vad-1.7',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
