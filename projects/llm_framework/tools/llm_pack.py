@@ -225,7 +225,7 @@ def create_data_deb(package_name, version, src_folder, revision = 'm5stack1', de
     shutil.rmtree(deb_folder)
     return package_name + " creat success!"
 
-def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.7)'):
+def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.8)'):
     bin_files = glob.glob(os.path.join(src_folder, package_name.replace("-", "_") + "-*"))
     version_info = 0.0
     print(os.path.join(src_folder, package_name + "-*"))
@@ -352,7 +352,7 @@ if __name__ == "__main__":
         cpu_count = cpu_count - 2
     # cpu_count = 50
     Tasks = {
-        'lib-llm':[create_lib_deb,'lib-llm', '1.7', src_folder, revision],
+        'lib-llm':[create_lib_deb,'lib-llm', '1.8', src_folder, revision],
         'llm-sys':[create_bin_deb,'llm-sys', '1.6', src_folder, revision],
         'llm-audio':[create_bin_deb,'llm-audio', '1.6', src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', '1.7', src_folder, revision],
@@ -376,10 +376,10 @@ if __name__ == "__main__":
         'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
-        'llm-model-melotts-zh-cn':[create_data_deb,'llm-model-melotts-zh-cn', '0.5', src_folder, revision],
+        'llm-model-melotts-zh-cn':[create_data_deb,'llm-model-melotts-zh-cn', '0.6', src_folder, revision],
         'llm-model-melotts-en-us':[create_data_deb,'llm-model-melotts-en-us', '0.5', src_folder, revision],
-        'llm-model-melotts-en-default':[create_data_deb,'llm-model-melotts-en-default', '0.5', src_folder, revision],
-        'llm-model-melotts-ja-jp':[create_data_deb,'llm-model-melotts-ja-jp', '0.5', src_folder, revision],
+        'llm-model-melotts-en-default':[create_data_deb,'llm-model-melotts-en-default', '0.6', src_folder, revision],
+        'llm-model-melotts-ja-jp':[create_data_deb,'llm-model-melotts-ja-jp', '0.6', src_folder, revision],
         'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
         'llm-model-yolo11n-pose':[create_data_deb,'llm-model-yolo11n-pose', '0.3', src_folder, revision],
         'llm-model-yolo11n-hand-pose':[create_data_deb,'llm-model-yolo11n-hand-pose', '0.3', src_folder, revision],

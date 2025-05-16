@@ -24,6 +24,8 @@ STATIC_FILES += [AFile('../static_lib/sherpa/ncnn/libsherpa-ncnn-core.so'),
                  AFile('../static_lib/sherpa/ncnn/libncnn.so'),
                  AFile('../static_lib/libtts.so'),
                  AFile('../static_lib/sherpa/ncnn/libkaldi-native-fbank-core.so'),
+                 AFile('../static_lib/wetext/libglog.so.0'),
+                 AFile('../static_lib/wetext/libfst.so.16'),
                  ]
 
 env['COMPONENTS'].append({'target':'static_file-1.0',
