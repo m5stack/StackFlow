@@ -183,10 +183,14 @@ public:
                 awake_delay_ = config_body["awake_delay"].get<int>();
             else if (file_body["mode_param"].contains("awake_delay"))
                 awake_delay_ = file_body["mode_param"]["awake_delay"];
-            // Load lexicon
-            lexicon_ = std::make_unique<Lexicon>(mode_config_.lexicon, mode_config_.tokens, mode_config_.tagger,
-                                                 mode_config_.verbalizer);
-            // Read g.bin
+
+            if (!std::filesystem::exists(mode_config_.tagger) || !std::filesystem::exists(mode_config_.verbalizer)) {
+                SLOGW("Either tagger or verbalizer file does not exist, using alternative lexicon.");
+                lexicon_ = std::make_unique<Lexicon>(mode_config_.lexicon, mode_config_.tokens);
+            } else {
+                lexicon_ = std::make_unique<Lexicon>(mode_config_.lexicon, mode_config_.tokens, mode_config_.tagger,
+                                                     mode_config_.verbalizer);
+            }
             g_matrix.resize(256, 0);
             FILE *fp = fopen(mode_config_.gbin.c_str(), "rb");
             if (!fp) {

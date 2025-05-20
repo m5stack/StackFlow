@@ -30,7 +30,7 @@ private:
     std::pair<std::vector<int>, std::vector<int>> unknown_token;
     std::unordered_map<int, std::string> reverse_tokens;
 
-    wetext::Processor* m_processor;
+    wetext::Processor* m_processor = nullptr;
 
 public:
     Lexicon(const std::string& lexicon_filename, const std::string& tokens_filename, const std::string& tagger_filename,
@@ -41,6 +41,65 @@ public:
               tokens_filename.c_str(), lexicon_filename.c_str(), tagger_filename.c_str(), verbalizer_filename.c_str());
 
         m_processor = new wetext::Processor(tagger_filename, verbalizer_filename);
+
+        std::unordered_map<std::string, int> tokens;
+        std::ifstream ifs(tokens_filename);
+        assert(ifs.is_open());
+        std::string line;
+        while (std::getline(ifs, line)) {
+            auto splitted_line = split(line, ' ');
+            if (splitted_line.size() >= 2) {
+                int token_id = std::stoi(splitted_line[1]);
+                tokens.insert({splitted_line[0], token_id});
+                reverse_tokens[token_id] = splitted_line[0];
+            }
+        }
+        ifs.close();
+        ifs.open(lexicon_filename);
+        assert(ifs.is_open());
+        while (std::getline(ifs, line)) {
+            auto splitted_line = split(line, ' ');
+            if (splitted_line.empty()) continue;
+            std::string word_or_phrase = splitted_line[0];
+            auto chars                 = splitEachChar(word_or_phrase);
+            max_phrase_length          = std::max(max_phrase_length, chars.size());
+            size_t phone_tone_len      = splitted_line.size() - 1;
+            size_t half_len            = phone_tone_len / 2;
+            std::vector<int> phones, tones;
+            for (size_t i = 0; i < phone_tone_len; i++) {
+                auto phone_or_tone = splitted_line[i + 1];
+                if (i < half_len) {
+                    if (tokens.find(phone_or_tone) != tokens.end()) {
+                        phones.push_back(tokens[phone_or_tone]);
+                    }
+                } else {
+                    tones.push_back(std::stoi(phone_or_tone));
+                }
+            }
+            lexicon[word_or_phrase] = std::make_pair(phones, tones);
+        }
+        const std::vector<std::string> punctuation{"!", "?", "…", ",", ".", "'", "-"};
+        for (const auto& p : punctuation) {
+            if (tokens.find(p) != tokens.end()) {
+                int i      = tokens[p];
+                lexicon[p] = std::make_pair(std::vector<int>{i}, std::vector<int>{0});
+            }
+        }
+        assert(tokens.find("_") != tokens.end());
+        unknown_token = std::make_pair(std::vector<int>{tokens["_"]}, std::vector<int>{0});
+        lexicon[" "]  = unknown_token;
+        lexicon["，"] = lexicon[","];
+        lexicon["。"] = lexicon["."];
+        lexicon["！"] = lexicon["!"];
+        lexicon["？"] = lexicon["?"];
+        SLOGD("Dictionary loading complete, containing %zu entries, longest phrase length: %zu", lexicon.size(),
+              max_phrase_length);
+    }
+
+    Lexicon(const std::string& lexicon_filename, const std::string& tokens_filename) : max_phrase_length(0)
+    {
+        SLOGD("Dictionary loading: %s Pronunciation table loading: %s", tokens_filename.c_str(),
+              lexicon_filename.c_str());
 
         std::unordered_map<std::string, int> tokens;
         std::ifstream ifs(tokens_filename);
@@ -195,14 +254,17 @@ public:
     {
         SLOGD("\nStarting text processing: \"%s\"", text.c_str());
 
-        std::string taggedText = m_processor->Tag(text);
-        SLOGD("\taggedText processing: \"%s\"", taggedText.c_str());
-        std::string normalizedText = m_processor->Verbalize(taggedText);
-        SLOGD("\normalizedText processing: \"%s\"", normalizedText.c_str());
+        std::string normalizedText;
+        if (m_processor) {
+            std::string taggedText = m_processor->Tag(text);
+            SLOGD("\taggedText processing: \"%s\"", taggedText.c_str());
+            normalizedText = m_processor->Verbalize(taggedText);
+            SLOGD("\tnormalizedText processing: \"%s\"", normalizedText.c_str());
+        } else {
+            SLOGD("m_processor is not initialized, skipping tag and verbalize steps.");
+            normalizedText = text;
+        }
 
-        SLOGD("=======Matching Results=======");
-        SLOGD("Unit\t|\tPhonemes\t|\tTones");
-        SLOGD("-----------------------------");
         phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
         tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
         SLOGD("<BOS>\t|\t%s\t|\t%s", phonesToString(unknown_token.first).c_str(),
