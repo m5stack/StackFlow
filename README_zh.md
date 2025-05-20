@@ -58,7 +58,44 @@ StackFlow 语音助手的主要工作模式：
 ## 模型列表
 | 模型名 | 模型类型 | 模型大小 | 模型能力 | 模型配置文件 | 计算单元 |
 | :----: | :----: | :----: | :----: | :----: | :----: |
+| [silero-vad](https://github.com/snakers4/silero-vad) | VAD | 3.3M | 语音活动检测 | [mode_silero-vad.json](projects/llm_framework/main_vad/mode_silero-vad.json) | CPU |
 | [sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01](https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2) | KWS | 6.4M | 关键词识别 | [mode_sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.json](projects/llm_framework/main_kws/mode_sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.json) | CPU |
+| [sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01](https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.tar.bz2) | KWS | 5.7M | 关键词识别 | [mode_sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.json](projects/llm_framework/main_kws/mode_sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01.json) | CPU |
+| [sherpa-ncnn-streaming-zipformer-20M-2023-02-17](https://huggingface.co/desh2608/icefall-asr-librispeech-pruned-transducer-stateless7-streaming-small) | ASR | 40M | 语音识别 | [mode_sherpa-ncnn-streaming-zipformer-20M-2023-02-17.json](projects/llm_framework/main_asr/mode_sherpa-ncnn-streaming-zipformer-20M-2023-02-17.json) | CPU |
+| [sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23](https://github.com/k2-fsa/icefall/tree/master/egs/librispeech/ASR/pruned_transducer_stateless7_streaming) | ASR | 24M | 语音识别 | [mode_sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23.json](projects/llm_framework/main_asr/mode_sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23.json) | CPU |
+| [whisper-tiny](https://huggingface.co/openai/whisper-tiny) | ASR | 201M | 语音识别 | [mode_whisper-tiny.json](projects/llm_framework/main_whisper/mode_whisper-tiny.json) | NPU |
+| [whisper-base](https://huggingface.co/openai/whisper-base) | ASR | 309M | 语音识别 | [mode_whisper-base.json](projects/llm_framework/main_whisper/mode_whisper-base.json) | NPU |
+| [whisper-small](https://huggingface.co/openai/whisper-small) | ASR | 725M | 语音识别 | [mode_whisper-small.json](projects/llm_framework/main_whisper/mode_whisper-small.json) | NPU |
+| [single-speaker-fast](https://github.com/huakunyang/SummerTTS) | TTS | 77M | 语音生成 | [mode_whisper-tiny.json](projects/llm_framework/main_tts/mode_single-speaker-fast.json) | CPU |
+| [single-speaker-english-fast](https://github.com/huakunyang/SummerTTS) | TTS | 60M | 语音生成 | [mode_whisper-tiny.json](projects/llm_framework/main_tts/mode_single-speaker-english-fast.json) | CPU |
+| [melotts-en-au](https://huggingface.co/myshell-ai/MeloTTS-English) | TTS | 102M | 语音生成 | [mode_melotts-en-au.json](projects/llm_framework/main_melotts/mode_melotts-en-au.json) | NPU |
+| [melotts-en-br](https://huggingface.co/myshell-ai/MeloTTS-English) | TTS | 102M | 语音生成 | [mode_melotts-en-au.json](projects/llm_framework/main_melotts/mode_melotts-en-br.json) | NPU |
+| [melotts-en-default](https://huggingface.co/myshell-ai/MeloTTS-English) | TTS | 102M | 语音生成 | [mode_melotts-en-india.json](projects/llm_framework/main_melotts/mode_melotts-en-default.json) | NPU |
+| [melotts-en-us](https://huggingface.co/myshell-ai/MeloTTS-English) | TTS | 102M | 语音生成 | [mode_melotts-en-au.json](projects/llm_framework/main_melotts/mode_melotts-en-us.json) | NPU |
+| [melotts-es-es](https://huggingface.co/myshell-ai/MeloTTS-Spanish) | TTS | 83M | 语音生成 | [mode_melotts-es-es.json](projects/llm_framework/main_melotts/mode_melotts-es-es.json) | NPU |
+| [melotts-ja-jp](https://huggingface.co/myshell-ai/MeloTTS-Japanese) | TTS | 83M | 语音生成 | [mode_melotts-ja-jp.json](projects/llm_framework/main_melotts/mode_melotts-ja-jp.json) | NPU |
+| [melotts-zh-cn](https://huggingface.co/myshell-ai/MeloTTS-Chinese) | TTS | 86M | 语音生成 | [mode_melotts-zh-cn.json](projects/llm_framework/main_melotts/mode_melotts-zh-cn.json) | NPU |
+| [deepseek-r1-1.5B-ax630c](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B) | LLM | 2.0G | 文本生成 | [mode_deepseek-r1-1.5B-ax630c.json](projects/llm_framework/main_llm/models/mode_deepseek-r1-1.5B-ax630c.json) | NPU |
+| [deepseek-r1-1.5B-p256-ax630c](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B) | LLM | 2.0G | 文本生成 | [mode_deepseek-r1-1.5B-p256-ax630c.json](projects/llm_framework/main_llm/models/mode_deepseek-r1-1.5B-p256-ax630c.json) | NPU |
+| [llama3.2-1B-p256-ax630c](https://huggingface.co/meta-llama/Llama-3.2-1B) | LLM | 1.7G | 文本生成 | [mode_llama3.2-1B-p256-ax630c.json](projects/llm_framework/main_llm/models/mode_llama3.2-1B-p256-ax630c.json) | NPU |
+| [llama3.2-1B-prefill-ax630c](https://huggingface.co/meta-llama/Llama-3.2-1B) | LLM | 1.7G | 文本生成 | [mode_llama3.2-1B-prefill-ax630c.json](projects/llm_framework/main_llm/models/mode_llama3.2-1B-prefill-ax630c.json) | NPU |
+| [openbuddy-llama3.2-1B-ax630c](https://huggingface.co/OpenBuddy/openbuddy-llama3.2-1b-v23.1-131k) | LLM | 1.7G | 文本生成 | [mode_openbuddy-llama3.2-1B-ax630c.json](projects/llm_framework/main_llm/models/mode_openbuddy-llama3.2-1B-ax630c.json) | NPU |
+| [qwen2.5-0.5B-Int4-ax630c](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GPTQ-Int4) | LLM | 626M | 文本生成 | [mode_qwen2.5-0.5B-Int4-ax630c.json](projects/llm_framework/main_llm/models/mode_qwen2.5-0.5B-Int4-ax630c.json) | NPU |
+| [qwen2.5-0.5B-p256-ax630c](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) | LLM | 760M | 文本生成 | [mode_qwen2.5-0.5B-p256-ax630c.json](projects/llm_framework/main_llm/models/mode_qwen2.5-0.5B-p256-ax630c.json) | NPU |
+| [qwen2.5-0.5B-prefill-20e](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) | LLM | 758M | 文本生成 | [mode_qwen2.5-0.5B-prefill-20e.json](projects/llm_framework/main_llm/models/mode_qwen2.5-0.5B-prefill-20e.json) | NPU |
+| [qwen2.5-1.5B-Int4-ax630c](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GPTQ-Int4) | LLM | 1.5G | 文本生成 | [mode_qwen2.5-1.5B-Int4-ax630c.json](projects/llm_framework/main_llm/models/mode_qwen2.5-1.5B-Int4-ax630c.json) | NPU |
+| [qwen2.5-1.5B-p256-ax630c](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) | LLM | 2.0G | 文本生成 | [mode_qwen2.5-1.5B-p256-ax630c.json](projects/llm_framework/main_llm/models/mode_qwen2.5-1.5B-p256-ax630c.json) | NPU |
+| [qwen2.5-1.5B-ax630c](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) | LLM | 2.0G | 文本生成 | [mode_qwen2.5-1.5B-ax630c.json](projects/llm_framework/main_llm/models/mode_qwen2.5-1.5B-ax630c.json) | NPU |
+| [qwen2.5-coder-0.5B-ax630c](https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct) | LLM | 756M | 文本生成 | [mode_qwen2.5-coder-0.5B-ax630c.json](projects/llm_framework/main_llm/models/mode_qwen2.5-coder-0.5B-ax630c.json) | NPU |
+| [qwen3-0.6B-ax630c](https://huggingface.co/AXERA-TECH/InternVL2_5-1B) | LLM | 917M | 文本生成 | [mode_qwen3-0.6B-ax630c.json](projects/llm_framework/main_llm/models/mode_qwen3-0.6B-ax630c.json) | NPU |
+| [mode_internvl2.5-1B-364-ax630c](https://huggingface.co/Qwen/Qwen3-0.6B) | VLM | 1.2G | 多模态文本生成 | [mode_internvl2.5-1B-364-ax630c.json](projects/llm_framework/main_vlm/models/mode_internvl2.5-1B-364-ax630c.json) | NPU |
+| [smolvlm-256M-ax630c](https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct) | VLM | 330M | 多模态文本生成 | [mode_smolvlm-256M-ax630c.json](projects/llm_framework/main_vlm/models/mode_smolvlm-256M-ax630c.json) | NPU |
+| [smolvlm-500M-ax630c](https://huggingface.co/HuggingFaceTB/SmolVLM-500M-Instruct) | VLM | 605M | 多模态文本生成 | [mode_smolvlm-256M-ax630c.json](projects/llm_framework/main_vlm/models/mode_smolvlm-500M-ax630c.json) | NPU |
+| [yolo11n](https://github.com/ultralytics/ultralytics) | CV | 2.8M | 目标检测 | [mode_yolo11n.json](projects/llm_framework/main_yolo/mode_yolo11n.json) | NPU |
+| [yolo11n-seg](https://github.com/ultralytics/ultralytics) | CV | 3.0M | 实例分割 | [mode_yolo11n-seg.json](projects/llm_framework/main_yolo/mode_yolo11n-seg.json) | NPU |
+| [yolo11n-pose](https://github.com/ultralytics/ultralytics) | CV | 3.1M | 姿态检测 | [mode_yolo11n-pose.json](projects/llm_framework/main_yolo/mode_yolo11n-pose.json) | NPU |
+| [yolo11n-hand-pose](https://github.com/ultralytics/ultralytics) | CV | 3.2M | 姿态检测 | [mode_yolo11n-hand-pose.json](projects/llm_framework/main_yolo/mode_yolo11n-hand-pose.json) | NPU |
+| [depth-anything-ax630c](https://github.com/DepthAnything/Depth-Anything-V2) | CV | 29M | 单目深度估计 | [mode_depth-anything-ax630c.json](projects/llm_framework/main_depth_anything/mode_depth-anything-ax630c.json) | NPU |
 
 ## 环境要求 ##
 当前 StackFlow 的 AI 单元是建立在 AXERA 加速平台之上的，主要的芯片平台为 ax630c、ax650n。系统要求为 ubuntu。
