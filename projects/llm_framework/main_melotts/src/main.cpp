@@ -190,7 +190,7 @@ public:
             g_matrix.resize(256, 0);
             FILE *fp = fopen(mode_config_.gbin.c_str(), "rb");
             if (!fp) {
-                printf("Open %s failed!\n", mode_config_.gbin.c_str());
+                SLOGE("Open %s failed!", mode_config_.gbin.c_str());
                 return -3;
             }
             fread(g_matrix.data(), sizeof(float), g_matrix.size(), fp);
@@ -198,11 +198,11 @@ public:
             encoder_ = std::make_unique<OnnxWrapper>();
             decoder_ = std::make_unique<EngineWrapper>();
             if (0 != encoder_->Init(mode_config_.encoder)) {
-                printf("encoder init failed!\n");
+                SLOGE("encoder init failed!");
                 return -4;
             }
             if (0 != decoder_->Init(mode_config_.decoder.c_str())) {
-                printf("Init decoder model failed!\n");
+                SLOGE("Init decoder model failed!");
                 return -5;
             }
         } catch (...) {
@@ -398,7 +398,6 @@ public:
                         }
                     }
 
-
                     int aligned_start = audio_start + best_offset;
 
                     std::vector<float> crossfade_region(sola_buffer_frame);
@@ -457,14 +456,12 @@ public:
                 pcmlist.resize(audio_len);
             }
 
-
             double src_ratio =
                 static_cast<double>(mode_config_.audio_rate) / static_cast<double>(mode_config_.mode_rate);
             std::vector<float> tmp_pcm((pcmlist.size() * src_ratio + 1));
             int len;
 
             resample_audio(pcmlist.data(), pcmlist.size(), tmp_pcm.data(), &len, src_ratio);
-
 
             wav_pcm_data.reserve(len);
             std::transform(tmp_pcm.begin(), tmp_pcm.begin() + len, std::back_inserter(wav_pcm_data),

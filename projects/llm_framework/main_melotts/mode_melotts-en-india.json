@@ -1,8 +1,8 @@
 {
-    "mode": "melotts-en-us",
+    "mode": "melotts-en-india",
     "type": "tts",
-    "homepage": "https://huggingface.co/myshell-ai/MeloTTS-English",
-    "compile_flage": "pulsar2 build --input decoder-en.onnx --config config_decoder_u16.json --output_dir decoder_en-us --output_name decoder-en-us.axmodel --target_hardware AX620E --npu_mode NPU2 --compiler.check 0",
+    "homepage": "https://github.com/ml-inory/melotts.axera/tree/main/model_convert",
+    "compile_flage": "pulsar2 build --input decoder-en.onnx --config config_decoder_u16.json --output_dir decoder_en-india --output_name decoder-en-india.axmodel --target_hardware AX620E",
     "pulsar_version": "4.0-64a0e58f",
     "capabilities": [
         "tts",
@@ -16,9 +16,9 @@
         "sys.play.0_1"
     ],
     "mode_param": {
-        "encoder": "encoder-en-us.ort",
-        "decoder": "decoder-en-us.axmodel",
-        "gbin": "g-en-us.bin",
+        "encoder": "encoder-en-india.ort",
+        "decoder": "decoder-en-india.axmodel",
+        "gbin": "g-en-india.bin",
         "tokens": "tokens-en.txt",
         "lexicon": "lexicon-en.txt",
         "tagger": "en_tn_tagger.fst",

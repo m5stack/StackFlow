@@ -10,15 +10,6 @@
 #include "../../../../../SDK/components/utilities/include/sample_log.h"
 #include "processor/wetext_processor.h"
 
-// Debug logging switch - set to true to enable debug logs
-static bool DEBUG_LOGGING = false;
-// Macro for debug logging
-#define DEBUG_LOG(fmt, ...)            \
-    do {                               \
-        if (DEBUG_LOGGING) {           \
-            SLOGI(fmt, ##__VA_ARGS__); \
-        }                              \
-    } while (0)
 std::vector<std::string> split(const std::string& s, char delim)
 {
     std::vector<std::string> result;
@@ -31,6 +22,7 @@ std::vector<std::string> split(const std::string& s, char delim)
     }
     return result;
 }
+
 class Lexicon {
 private:
     std::unordered_map<std::string, std::pair<std::vector<int>, std::vector<int>>> lexicon;
@@ -41,18 +33,12 @@ private:
     wetext::Processor* m_processor;
 
 public:
-    // Setter for debug logging
-    static void setDebugLogging(bool enable)
-    {
-        DEBUG_LOGGING = enable;
-    }
     Lexicon(const std::string& lexicon_filename, const std::string& tokens_filename, const std::string& tagger_filename,
             const std::string& verbalizer_filename)
         : max_phrase_length(0)
     {
-        DEBUG_LOG("Dictionary loading: %s Pronunciation table loading: %s tagger_filename: %s verbalizer_filename: %s",
-                  tokens_filename.c_str(), lexicon_filename.c_str(), tagger_filename.c_str(),
-                  verbalizer_filename.c_str());
+        SLOGD("Dictionary loading: %s Pronunciation table loading: %s tagger_filename: %s verbalizer_filename: %s",
+              tokens_filename.c_str(), lexicon_filename.c_str(), tagger_filename.c_str(), verbalizer_filename.c_str());
 
         m_processor = new wetext::Processor(tagger_filename, verbalizer_filename);
 
@@ -106,8 +92,8 @@ public:
         lexicon["。"] = lexicon["."];
         lexicon["！"] = lexicon["!"];
         lexicon["？"] = lexicon["?"];
-        DEBUG_LOG("Dictionary loading complete, containing %zu entries, longest phrase length: %zu", lexicon.size(),
-                  max_phrase_length);
+        SLOGD("Dictionary loading complete, containing %zu entries, longest phrase length: %zu", lexicon.size(),
+              max_phrase_length);
     }
 
     std::vector<std::string> splitEachChar(const std::string& text)
@@ -136,15 +122,17 @@ public:
     {
         return s.size() == 1 && ((s[0] >= 'A' && s[0] <= 'Z') || (s[0] >= 'a' && s[0] <= 'z'));
     }
+
     bool is_english_token_char(const std::string& s)
     {
         if (s.size() != 1) return false;
         char c = s[0];
         return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
     }
+
     void process_unknown_english(const std::string& word, std::vector<int>& phones, std::vector<int>& tones)
     {
-        DEBUG_LOG("Processing unknown term: %s", word.c_str());
+        SLOGD("Processing unknown term: %s", word.c_str());
         std::string orig_word = word;
         std::vector<std::string> parts;
         std::vector<std::string> phonetic_parts;
@@ -163,7 +151,7 @@ public:
                     tones.insert(tones.end(), sub_tones.begin(), sub_tones.end());
                     parts.push_back(sub_word);
                     phonetic_parts.push_back(phonesToString(sub_phones));
-                    DEBUG_LOG("  Matched: '%s' -> %s", sub_word.c_str(), phonesToString(sub_phones).c_str());
+                    SLOGD("  Matched: '%s' -> %s", sub_word.c_str(), phonesToString(sub_phones).c_str());
                     start += len;
                     matched = true;
                     break;
@@ -180,13 +168,13 @@ public:
                     tones.insert(tones.end(), char_tones.begin(), char_tones.end());
                     parts.push_back(single_char);
                     phonetic_parts.push_back(phonesToString(char_phones));
-                    DEBUG_LOG("  Single char: '%s' -> %s", single_char.c_str(), phonesToString(char_phones).c_str());
+                    SLOGD("  Single char: '%s' -> %s", single_char.c_str(), phonesToString(char_phones).c_str());
                 } else {
                     phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
                     tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
                     parts.push_back(single_char);
                     phonetic_parts.push_back("_unknown_");
-                    DEBUG_LOG("  Unknown: '%s'", single_char.c_str());
+                    SLOGD("  Unknown: '%s'", single_char.c_str());
                 }
                 start++;
             }
@@ -200,26 +188,25 @@ public:
             parts_str += parts[i];
             phonetic_str += phonetic_parts[i];
         }
-        DEBUG_LOG("%s\t|\tDecomposed: %s\t|\tPhonetics: %s", orig_word.c_str(), parts_str.c_str(),
-                  phonetic_str.c_str());
+        SLOGD("%s\t|\tDecomposed: %s\t|\tPhonetics: %s", orig_word.c_str(), parts_str.c_str(), phonetic_str.c_str());
     }
 
     void convert(const std::string& text, std::vector<int>& phones, std::vector<int>& tones)
     {
-        DEBUG_LOG("\nStarting text processing: \"%s\"", text.c_str());
+        SLOGD("\nStarting text processing: \"%s\"", text.c_str());
 
         std::string taggedText = m_processor->Tag(text);
-        DEBUG_LOG("\taggedText processing: \"%s\"", taggedText.c_str());
+        SLOGD("\taggedText processing: \"%s\"", taggedText.c_str());
         std::string normalizedText = m_processor->Verbalize(taggedText);
-        DEBUG_LOG("\normalizedText processing: \"%s\"", normalizedText.c_str());
+        SLOGD("\normalizedText processing: \"%s\"", normalizedText.c_str());
 
-        DEBUG_LOG("=======Matching Results=======");
-        DEBUG_LOG("Unit\t|\tPhonemes\t|\tTones");
-        DEBUG_LOG("-----------------------------");
+        SLOGD("=======Matching Results=======");
+        SLOGD("Unit\t|\tPhonemes\t|\tTones");
+        SLOGD("-----------------------------");
         phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
         tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
-        DEBUG_LOG("<BOS>\t|\t%s\t|\t%s", phonesToString(unknown_token.first).c_str(),
-                  tonesToString(unknown_token.second).c_str());
+        SLOGD("<BOS>\t|\t%s\t|\t%s", phonesToString(unknown_token.first).c_str(),
+              tonesToString(unknown_token.second).c_str());
         auto chars = splitEachChar(normalizedText);
         int i      = 0;
         while (i < chars.size()) {
@@ -236,8 +223,8 @@ public:
                     auto& [eng_phones, eng_tones] = lexicon[eng_word];
                     phones.insert(phones.end(), eng_phones.begin(), eng_phones.end());
                     tones.insert(tones.end(), eng_tones.begin(), eng_tones.end());
-                    DEBUG_LOG("%s\t|\t%s\t|\t%s", orig_word.c_str(), phonesToString(eng_phones).c_str(),
-                              tonesToString(eng_tones).c_str());
+                    SLOGD("%s\t|\t%s\t|\t%s", orig_word.c_str(), phonesToString(eng_phones).c_str(),
+                          tonesToString(eng_tones).c_str());
                 } else {
                     process_unknown_english(orig_word, phones, tones);
                 }
@@ -256,8 +243,8 @@ public:
                     auto& [phrase_phones, phrase_tones] = lexicon[phrase];
                     phones.insert(phones.end(), phrase_phones.begin(), phrase_phones.end());
                     tones.insert(tones.end(), phrase_tones.begin(), phrase_tones.end());
-                    DEBUG_LOG("%s\t|\t%s\t|\t%s", phrase.c_str(), phonesToString(phrase_phones).c_str(),
-                              tonesToString(phrase_tones).c_str());
+                    SLOGD("%s\t|\t%s\t|\t%s", phrase.c_str(), phonesToString(phrase_phones).c_str(),
+                          tonesToString(phrase_tones).c_str());
                     i += len;
                     matched = true;
                     break;
@@ -279,25 +266,25 @@ public:
                     auto& [char_phones, char_tones] = lexicon[s];
                     phones.insert(phones.end(), char_phones.begin(), char_phones.end());
                     tones.insert(tones.end(), char_tones.begin(), char_tones.end());
-                    DEBUG_LOG("%s\t|\t%s\t|\t%s", orig_char.c_str(), phonesToString(char_phones).c_str(),
-                              tonesToString(char_tones).c_str());
+                    SLOGD("%s\t|\t%s\t|\t%s", orig_char.c_str(), phonesToString(char_phones).c_str(),
+                          tonesToString(char_tones).c_str());
                 } else {
                     phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
                     tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
-                    DEBUG_LOG("%s\t|\t%s (Not matched)\t|\t%s", orig_char.c_str(),
-                              phonesToString(unknown_token.first).c_str(), tonesToString(unknown_token.second).c_str());
+                    SLOGD("%s\t|\t%s (Not matched)\t|\t%s", orig_char.c_str(),
+                          phonesToString(unknown_token.first).c_str(), tonesToString(unknown_token.second).c_str());
                 }
             }
         }
         phones.insert(phones.end(), unknown_token.first.begin(), unknown_token.first.end());
         tones.insert(tones.end(), unknown_token.second.begin(), unknown_token.second.end());
-        DEBUG_LOG("<EOS>\t|\t%s\t|\t%s", phonesToString(unknown_token.first).c_str(),
-                  tonesToString(unknown_token.second).c_str());
-        DEBUG_LOG("\nProcessing Summary:");
-        DEBUG_LOG("Original text: %s", text.c_str());
-        DEBUG_LOG("Phonemes: %s", phonesToString(phones).c_str());
-        DEBUG_LOG("Tones: %s", tonesToString(tones).c_str());
-        DEBUG_LOG("====================");
+        SLOGD("<EOS>\t|\t%s\t|\t%s", phonesToString(unknown_token.first).c_str(),
+              tonesToString(unknown_token.second).c_str());
+        SLOGD("\nProcessing Summary:");
+        SLOGD("Original text: %s", text.c_str());
+        SLOGD("Phonemes: %s", phonesToString(phones).c_str());
+        SLOGD("Tones: %s", tonesToString(tones).c_str());
+        SLOGD("====================");
     }
 
 private:
@@ -316,6 +303,7 @@ private:
         phones.insert(phones.end(), phones_and_tones.first.begin(), phones_and_tones.first.end());
         tones.insert(tones.end(), phones_and_tones.second.begin(), phones_and_tones.second.end());
     }
+
     std::string phonesToString(const std::vector<int>& phones)
     {
         std::string result;
@@ -329,6 +317,7 @@ private:
         }
         return result;
     }
+
     std::string tonesToString(const std::vector<int>& tones)
     {
         std::string result;
