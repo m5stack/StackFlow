@@ -383,6 +383,7 @@ if __name__ == "__main__":
         'llm-model-melotts-en-india':[create_data_deb,'llm-model-melotts-en-india', '0.6', src_folder, revision],
         'llm-model-melotts-en-us':[create_data_deb,'llm-model-melotts-en-us', '0.6', src_folder, revision],
         'llm-model-melotts-ja-jp':[create_data_deb,'llm-model-melotts-ja-jp', '0.6', src_folder, revision],
+        'llm-model-melotts-es-es':[create_data_deb,'llm-model-melotts-es-es', '0.5', src_folder, revision],
         'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
         'llm-model-yolo11n-pose':[create_data_deb,'llm-model-yolo11n-pose', '0.3', src_folder, revision],
         'llm-model-yolo11n-hand-pose':[create_data_deb,'llm-model-yolo11n-hand-pose', '0.3', src_folder, revision],
