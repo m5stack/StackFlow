@@ -283,6 +283,7 @@ public:
 
 class llm_kws : public StackFlow {
 private:
+    enum { EVENT_TRIGGER = EVENT_EXPORT + 1 };
     int task_count_;
     std::string audio_url_;
     std::unordered_map<int, std::shared_ptr<llm_task>> llm_task_;
@@ -291,9 +292,13 @@ public:
     llm_kws() : StackFlow("kws")
     {
         task_count_ = 1;
-        rpc_ctx_->register_rpc_action("trigger",
-                       std::bind(&llm_kws::trigger, this, std::placeholders::_1, std::placeholders::_2));
-
+        event_queue_.appendListener(EVENT_TRIGGER, std::bind(&llm_kws::trigger, this, std::placeholders::_1));
+        rpc_ctx_->register_rpc_action(
+            "trigger", [this](pzmq *_pzmq, const std::shared_ptr<StackFlows::pzmq_data> &data) -> std::string {
+                this->event_queue_.enqueue(EVENT_TRIGGER,
+                                           std::make_shared<stackflow_data>(data->get_param(0), data->get_param(1)));
+                return LLM_NONE;
+            });
     }
 
     void play_awake_wav(const std::string &wav_file)
@@ -440,9 +445,11 @@ public:
             return -1;
         }
 
-        int work_id_num   = sample_get_work_id_num(work_id);
-        auto llm_channel  = get_channel(work_id);
-        auto llm_task_obj = std::make_shared<llm_task>(work_id);
+        int work_id_num                             = sample_get_work_id_num(work_id);
+        auto llm_channel                            = get_channel(work_id);
+        auto llm_task_obj                           = std::make_shared<llm_task>(work_id);
+        std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
+        std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
         nlohmann::json config_body;
         try {
             config_body = nlohmann::json::parse(data);
@@ -458,17 +465,22 @@ public:
             llm_channel->set_output(llm_task_obj->enoutput_);
             llm_channel->set_stream(llm_task_obj->enstream_);
             llm_task_obj->play_awake_wav = std::bind(&llm_kws::play_awake_wav, this, std::placeholders::_1);
-            llm_task_obj->set_output([llm_task_obj, llm_channel](const std::string &data) {
-                llm_channel->send(llm_task_obj->response_format_, true, LLM_NO_ERROR);
+            llm_task_obj->set_output([_llm_task_obj, _llm_channel](const std::string &data) {
+                auto llm_task_obj = _llm_task_obj.lock();
+                auto llm_channel  = _llm_channel.lock();
+                if (llm_task_obj && llm_channel) {
+                    llm_channel->send(llm_task_obj->response_format_, true, LLM_NO_ERROR);
+                }
             });
 
             for (const auto input : llm_task_obj->inputs_) {
                 if (input.find("sys") != std::string::npos) {
-                    audio_url_                            = unit_call("audio", "cap", "None");
-                    std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
-                    llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                        _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
-                    });
+                    audio_url_ = unit_call("audio", "cap", "None");
+                    llm_channel->subscriber(audio_url_,
+                                            [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                                                auto llm_task_obj = _llm_task_obj.lock();
+                                                if (llm_task_obj) llm_task_obj->sys_pcm_on_data(raw->string());
+                                            });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("kws") != std::string::npos) {
                     llm_channel->subscriber_work_id(
@@ -539,37 +551,47 @@ public:
         return 0;
     }
 
-    std::string  trigger(pzmq *_pzmq, const std::shared_ptr<StackFlows::pzmq_data>& rawdata0)
+    std::string trigger(const std::shared_ptr<void> &arg)
     {
-        const std::string rawdata = rawdata0->string();
-        int pos = rawdata.find("{");
-//        SLOGI("llm_kws::trigger:json:%s", rawdata.substr(pos).c_str());
-
-        nlohmann::json error_body;
-        nlohmann::json data;
-        try {
-            data = nlohmann::json::parse(rawdata.substr(pos));
-        } catch (...) {
-            SLOGE("setup json format error.");
-            error_body["code"]    = -2;
-            error_body["message"] = "json format error.";
-            send("None", "None", error_body, "kws");
+        std::shared_ptr<stackflow_data> originalPtr = std::static_pointer_cast<stackflow_data>(arg);
+        std::string zmq_url                         = originalPtr->string(0);
+        std::string data                            = originalPtr->string(1);
+        std::string work_id                         = sample_json_str_get(data, "work_id");
+        if (work_id.length() == 0) {
+            nlohmann::json out_body;
+            out_body["request_id"]       = sample_json_str_get(data, "request_id");
+            out_body["work_id"]          = "kws";
+            out_body["created"]          = time(NULL);
+            out_body["object"]           = "";
+            out_body["data"]             = "";
+            out_body["error"]["code"]    = -2;
+            out_body["error"]["message"] = "json format error.";
+            pzmq _zmq(zmq_url, ZMQ_PUSH);
+            std::string out = out_body.dump();
+            out += "\n";
+            _zmq.send_data(out);
             return LLM_NONE;
         }
-        auto work_id = data["work_id"].get<std::string>();
 
         int work_id_num = sample_get_work_id_num(work_id);
         if (llm_task_.find(work_id_num) == llm_task_.end()) {
-            error_body["code"]    = -6;
-            error_body["message"] = "Unit Does Not Exist";
-            send("None", "None", error_body, work_id);
+            nlohmann::json out_body;
+            out_body["request_id"]       = sample_json_str_get(data, "request_id");
+            out_body["work_id"]          = "kws";
+            out_body["created"]          = time(NULL);
+            out_body["object"]           = "";
+            out_body["data"]             = "";
+            out_body["error"]["code"]    = -6;
+            out_body["error"]["message"] = "Unit Does Not Exist";
+            pzmq _zmq(zmq_url, ZMQ_PUSH);
+            std::string out = out_body.dump();
+            out += "\n";
+            _zmq.send_data(out);
             return LLM_NONE;
         }
-
         llm_task_[work_id_num]->trigger();
         return LLM_NONE;
     }
-
 
     ~llm_kws()
     {
