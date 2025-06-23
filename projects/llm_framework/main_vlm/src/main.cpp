@@ -15,18 +15,24 @@
 #include <fstream>
 #include <stdexcept>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
+#include "thread_safe_list.h"
 
 using namespace StackFlows;
 
 int main_exit_flage = 0;
 static void __sigint(int iSigNo)
 {
-    SLOGW("llm_sys will be exit!");
+    SLOGW("llm_vlm will be exit!");
     main_exit_flage = 1;
 }
 
 static std::string base_model_path_;
 static std::string base_model_config_path_;
+
+typedef struct {
+    cv::Mat inference_src;
+    bool inference_bgr2rgb;
+} inference_async_par;
 
 typedef std::function<void(const std::string &data, bool finish)> task_callback_t;
 
@@ -56,6 +62,8 @@ public:
     task_callback_t out_callback_;
     bool enoutput_;
     bool enstream_;
+    bool encamera_;
+    thread_safe::list<inference_async_par> async_list_;
 
     void set_output(task_callback_t out_callback)
     {
@@ -222,10 +230,46 @@ public:
         return oss_prompt.str();
     }
 
+    int inference_async(cv::Mat &src, bool bgr2rgb = true)
+    {
+        if (async_list_.size() < 1) {
+            inference_async_par par;
+            par.inference_src     = src.clone();
+            par.inference_bgr2rgb = bgr2rgb;
+            async_list_.put(par);
+        }
+        return async_list_.size();
+    }
+
+    bool inference_raw_yuv(const std::string &msg)
+    {
+        if (msg.size() != 320 * 320 * 2) {
+            throw std::string("img size error");
+        }
+        cv::Mat camera_data(320, 320, CV_8UC2, (void *)msg.data());
+        cv::Mat rgb;
+        cv::cvtColor(camera_data, rgb, cv::COLOR_YUV2RGB_YUYV);
+        return inference_async(rgb, true) ? false : true;
+    }
+
     void inference(const std::string &msg)
     {
         try {
-            if (image_data_.empty()) {
+            if (encamera_) {
+                inference_async_par par;
+                async_list_.get();  // discard buffered frames
+                par = async_list_.get();
+                if (par.inference_src.empty()) return;
+                if (par.inference_bgr2rgb) {
+                    cv::Mat rgb;
+                    cv::cvtColor(par.inference_src, rgb, cv::COLOR_BGR2RGB);
+                    par.inference_src = rgb;
+                }
+                lLaMa_->Encode(par.inference_src, img_embed);
+                lLaMa_->Encode(img_embed, prompt_data_, prompt_complete(msg));
+                std::string out = lLaMa_->Run(prompt_data_);
+                if (out_callback_) out_callback_(out, true);
+            } else if (image_data_.empty()) {
                 lLaMa_->Encode(prompt_data_, prompt_complete(msg));
                 std::string out = lLaMa_->Run(prompt_data_);
                 if (out_callback_) out_callback_(out, true);
@@ -302,13 +346,13 @@ std::atomic<unsigned int> llm_task::next_port_{8090};
 
 #undef CONFIG_AUTO_SET
 
-class llm_llm : public StackFlow {
+class llm_vlm : public StackFlow {
 private:
     int task_count_;
     std::unordered_map<int, std::shared_ptr<llm_task>> llm_task_;
 
 public:
-    llm_llm() : StackFlow("vlm")
+    llm_vlm() : StackFlow("vlm")
     {
         task_count_ = 2;
     }
@@ -447,6 +491,23 @@ public:
         llm_task_obj->lLaMa_->Stop();
     }
 
+    void task_camera_data(const std::weak_ptr<llm_task> llm_task_obj_weak,
+                          const std::weak_ptr<llm_channel_obj> llm_channel_weak, const std::string &data)
+    {
+        nlohmann::json error_body;
+        auto llm_task_obj = llm_task_obj_weak.lock();
+        auto llm_channel  = llm_channel_weak.lock();
+        if (!(llm_task_obj && llm_channel)) {
+            SLOGE("Model run failed.");
+            return;
+        }
+        try {
+            llm_task_obj->inference_raw_yuv(data);
+        } catch (...) {
+            SLOGE("data format error");
+        }
+    }
+
     int setup(const std::string &work_id, const std::string &object, const std::string &data) override
     {
         nlohmann::json error_body;
@@ -476,26 +537,38 @@ public:
             llm_channel->set_output(llm_task_obj->enoutput_);
             llm_channel->set_stream(llm_task_obj->enstream_);
 
-            llm_task_obj->set_output(std::bind(&llm_llm::task_output, this, std::weak_ptr<llm_task>(llm_task_obj),
+            llm_task_obj->set_output(std::bind(&llm_vlm::task_output, this, std::weak_ptr<llm_task>(llm_task_obj),
                                                std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
                                                std::placeholders::_2));
 
             for (const auto input : llm_task_obj->inputs_) {
                 if (input.find("vlm") != std::string::npos) {
                     llm_channel->subscriber_work_id(
-                        "", std::bind(&llm_llm::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
+                        "", std::bind(&llm_vlm::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                                       std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
                                       std::placeholders::_2));
                 } else if (input.find("asr") != std::string::npos) {
                     llm_channel->subscriber_work_id(
-                        input, std::bind(&llm_llm::task_asr_data, this, std::weak_ptr<llm_task>(llm_task_obj),
+                        input, std::bind(&llm_vlm::task_asr_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                                          std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
                                          std::placeholders::_2));
                 } else if (input.find("kws") != std::string::npos) {
                     llm_channel->subscriber_work_id(
-                        input, std::bind(&llm_llm::kws_awake, this, std::weak_ptr<llm_task>(llm_task_obj),
+                        input, std::bind(&llm_vlm::kws_awake, this, std::weak_ptr<llm_task>(llm_task_obj),
                                          std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
                                          std::placeholders::_2));
+                } else if (input.find("camera") != std::string::npos) {
+                    llm_task_obj->encamera_    = true;
+                    std::string input_url_name = input + ".out_port";
+                    std::string input_url      = unit_call("sys", "sql_select", input_url_name);
+                    if (!input_url.empty()) {
+                        std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
+                        std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
+                        llm_channel->subscriber(input_url, [this, _llm_task_obj, _llm_channel](
+                                                               pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                            this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
+                        });
+                    }
                 }
             }
             llm_task_[work_id_num] = llm_task_obj;
@@ -513,7 +586,7 @@ public:
 
     void link(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_llm::link:%s", data.c_str());
+        SLOGI("llm_vlm::link:%s", data.c_str());
         int ret = 1;
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
@@ -528,14 +601,27 @@ public:
         if (data.find("asr") != std::string::npos) {
             ret = llm_channel->subscriber_work_id(
                 data,
-                std::bind(&llm_llm::task_asr_data, this, std::weak_ptr<llm_task>(llm_task_obj),
+                std::bind(&llm_vlm::task_asr_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                           std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
             llm_task_obj->inputs_.push_back(data);
         } else if (data.find("kws") != std::string::npos) {
             ret = llm_channel->subscriber_work_id(
                 data,
-                std::bind(&llm_llm::kws_awake, this, std::weak_ptr<llm_task>(llm_task_obj),
+                std::bind(&llm_vlm::kws_awake, this, std::weak_ptr<llm_task>(llm_task_obj),
                           std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
+            llm_task_obj->inputs_.push_back(data);
+        } else if (data.find("camera") != std::string::npos) {
+            llm_task_obj->encamera_    = true;
+            std::string input_url_name = data + ".out_port";
+            std::string input_url      = unit_call("sys", "sql_select", input_url_name);
+            if (!input_url.empty()) {
+                std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
+                std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
+                llm_channel->subscriber(
+                    input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                        this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
+                    });
+            }
             llm_task_obj->inputs_.push_back(data);
         }
         if (ret) {
@@ -550,7 +636,7 @@ public:
 
     void unlink(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_llm::unlink:%s", data.c_str());
+        SLOGI("llm_vlm::unlink:%s", data.c_str());
         int ret = 0;
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
@@ -575,7 +661,7 @@ public:
 
     void taskinfo(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_llm::taskinfo:%s", data.c_str());
+        SLOGI("llm_vlm::taskinfo:%s", data.c_str());
         nlohmann::json req_body;
         int work_id_num = sample_get_work_id_num(work_id);
         if (WORK_ID_NONE == work_id_num) {
@@ -602,7 +688,7 @@ public:
 
     int exit(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_llm::exit:%s", data.c_str());
+        SLOGI("llm_vlm::exit:%s", data.c_str());
 
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
@@ -621,7 +707,7 @@ public:
         return 0;
     }
 
-    ~llm_llm()
+    ~llm_vlm()
     {
         while (1) {
             auto iteam = llm_task_.begin();
@@ -641,7 +727,7 @@ int main(int argc, char *argv[])
     signal(SIGTERM, __sigint);
     signal(SIGINT, __sigint);
     mkdir("/tmp/llm", 0777);
-    llm_llm llm;
+    llm_vlm llm;
     while (!main_exit_flage) {
         sleep(1);
     }

@@ -45,7 +45,7 @@ def create_melotts_setup_data(request_id="melotts_setup"):
         "action": "setup",
         "object": "melotts.setup",
         "data": {
-            "model": "melotts_zh-cn",
+            "model": "melotts-zh-cn",
             "response_format": "sys.pcm",
             "input": "tts.utf-8",
             "enoutput": False
