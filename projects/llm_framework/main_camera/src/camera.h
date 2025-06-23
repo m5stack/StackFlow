@@ -36,6 +36,7 @@ typedef struct camera_t {
                             3 Error */
     pthread_t capture_thread_id_;
     void* ctx_;
+    void* custom_config_;
     /**
      * Set capture frame callback
      * Return value: 0 for success, -1 for failure
@@ -59,7 +60,7 @@ typedef struct camera_t {
  * @pdev_name Device node
  * Return value: NULL for failure
  */
-camera_t* camera_open(const char* pdev_name, int width, int height, int fps);
+camera_t* camera_open(const char* pdev_name, int width, int height, int fps, void* config);
 
 /**
  * Open the camera from config
