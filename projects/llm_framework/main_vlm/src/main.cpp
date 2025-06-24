@@ -621,6 +621,7 @@ public:
                     input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
                         this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
                     });
+                ret = 0;
             }
             llm_task_obj->inputs_.push_back(data);
         }

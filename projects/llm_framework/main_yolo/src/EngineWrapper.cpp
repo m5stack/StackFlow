@@ -179,9 +179,18 @@ static AX_S32 CheckModelVNpu(const std::string& strModel, const AX_ENGINE_MODEL_
 }
 #endif
 
-int EngineWrapper::Init(const char* strModelPath, uint32_t nNpuType)
+int EngineWrapper::Init(const char* strModelPath, uint32_t nNpuType, uint32_t npuMode)
 {
     AX_S32 ret = 0;
+
+    // 0. Init AX_ENGINE
+    AX_ENGINE_NPU_ATTR_T npu_attr;
+    memset(&npu_attr, 0, sizeof(npu_attr));
+    npu_attr.eHardMode = static_cast<AX_ENGINE_NPU_MODE_T>(npuMode);
+    ret                = AX_ENGINE_Init(&npu_attr);
+    if (0 != ret) {
+        fprintf(stderr, "Init ax-engine failed{0x%8x}.\n", ret);
+    }
 
     // 1. load model
     AX_BOOL bLoadModelUseCmm     = AX_TRUE;

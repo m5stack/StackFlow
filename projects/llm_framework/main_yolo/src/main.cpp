@@ -40,6 +40,7 @@ typedef struct {
     int point_num        = 17;
     float pron_threshold = 0.45f;
     float nms_threshold  = 0.45;
+    uint32_t npu_type    = 0;
 } yolo_config;
 
 typedef struct {
@@ -131,9 +132,10 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], cls_num);
             CONFIG_AUTO_SET(file_body["mode_param"], point_num);
             CONFIG_AUTO_SET(file_body["mode_param"], model_type);
+            CONFIG_AUTO_SET(file_body["mode_param"], npu_type);
             mode_config_.yolo_model = base_model + mode_config_.yolo_model;
             yolo_                   = std::make_unique<EngineWrapper>();
-            if (0 != yolo_->Init(mode_config_.yolo_model.c_str())) {
+            if (0 != yolo_->Init(mode_config_.yolo_model.c_str(), 0, mode_config_.npu_type)) {
                 SLOGE("Init yolo_model model failed!\n");
                 return -5;
             }
@@ -293,12 +295,6 @@ public:
             if (0 != ret) {
                 fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
             }
-            AX_ENGINE_NPU_ATTR_T npu_attr;
-            memset(&npu_attr, 0, sizeof(npu_attr));
-            ret = AX_ENGINE_Init(&npu_attr);
-            if (0 != ret) {
-                fprintf(stderr, "Init ax-engine failed{0x%8x}.\n", ret);
-            }
         }
         ax_init_flage_++;
     }
@@ -308,7 +304,6 @@ public:
         if (ax_init_flage_ > 0) {
             --ax_init_flage_;
             if (!ax_init_flage_) {
-                AX_ENGINE_Deinit();
                 AX_SYS_Deinit();
             }
         }
@@ -355,7 +350,7 @@ private:
 public:
     llm_yolo() : StackFlow("yolo")
     {
-        task_count_ = 1;
+        task_count_ = 2;
     }
 
     void task_output(const std::weak_ptr<llm_task> llm_task_obj_weak,
@@ -503,10 +498,10 @@ public:
                     if (!input_url.empty()) {
                         std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                         std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
-                        llm_channel->subscriber(
-                            input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                                this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
-                            });
+                        llm_channel->subscriber(input_url, [this, _llm_task_obj, _llm_channel](
+                                                               pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                            this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
+                        });
                     }
                 }
                 llm_task_[work_id_num] = llm_task_obj;
@@ -550,10 +545,11 @@ public:
             if (!input_url.empty()) {
                 std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                 std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
-                llm_channel->subscriber(input_url,
-                                        [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                                            this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
-                                        });
+                llm_channel->subscriber(
+                    input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                        this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
+                    });
+                ret = 0;
             }
             llm_task_obj->inputs_.push_back(data);
         }

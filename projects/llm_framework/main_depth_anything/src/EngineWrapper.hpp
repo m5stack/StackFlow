@@ -30,7 +30,7 @@ public:
         Release();
     }
 
-    int Init(const char* strModelPath, uint32_t nNpuType = 0);
+    int Init(const char* strModelPath, uint32_t nNpuType = 0, uint32_t npuMode = 0);
 
     int SetInput(void* pInput, int index);
 
