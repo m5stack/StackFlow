@@ -30,7 +30,7 @@ STATIC_LIB += static_file * 2
 STATIC_FILES += Glob('mode_*.json')
 
 
-env['COMPONENTS'].append({'target':'llm_depth_anything-1.6',
+env['COMPONENTS'].append({'target':'llm_depth_anything-1.7',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

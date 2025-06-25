@@ -5,7 +5,7 @@ import shutil
 os.environ['SDK_PATH'] = os.path.normpath(str(Path(os.getcwd())/'..'/'..'/'SDK'))
 os.environ['EXT_COMPONENTS_PATH'] = os.path.normpath(str(Path(os.getcwd())/'..'/'..'/'ext_components'))
 
-version = 'v0.0.8'
+version = 'v0.0.9'
 static_lib = 'static_lib'
 update = False
 
