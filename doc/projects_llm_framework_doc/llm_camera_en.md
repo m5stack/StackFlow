@@ -37,6 +37,7 @@ Send JSON:
 - enoutput: Whether to enable user result output. If you do not need to obtain camera images, do not enable this parameter, as the video stream will increase the communication pressure on the channel.
 - enable_webstream: Whether to enable webstream output, webstream will listen on tcp:8989 port, and once a client connection is received, it will push jpeg images in HTTP protocol multipart/x-mixed-replace type.
 - rtsp: Whether to enable rtsp stream output, rtsp will establish an RTSP TCP server at rtsp://{DevIp}:8554/axstream0, and you can pull the video stream from this port using the RTSP protocol. The video stream format is 1280x720 H265. Note that this video stream is only valid on the AX630C MIPI camera, and the UVC camera cannot use RTSP.
+- VinParam.bAiispEnable: Whether to enable AI-ISP, enabled by default. Set to 0 to disable, only valid when using AX630C MIPI camera.
 
 Response JSON:
 

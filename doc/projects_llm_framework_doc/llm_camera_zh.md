@@ -37,6 +37,7 @@
 - enoutput：是否起用用户结果输出。如果不需要获取摄像头图片，请不要开启该参数，视频流会增加信道的通信压力。
 - enable_webstream：是否启用 webstream 流输出，webstream 会监听 tcp:8989 端口，一但收到客户端连接，将会以 HTTP 协议 multipart/x-mixed-replace 类型推送 jpeg 图片。
 - rtsp：是否启用 rtsp 流输出，rtsp 会建立一个 rtsp://{DevIp}:8554/axstream0 RTSP TCP 服务端，可使用RTSP 协议向该端口拉取视频流。视频流的格式为 1280x720 H265。注意，该视频流只在 AX630C MIPI 摄像头上有效，UVC 摄像头无法使用 RTSP。
+- VinParam.bAiispEnable：是否开启 AI-ISP，默认开启。关闭为 0，仅在使用 AX630C MIPI 摄像头时有效。
 
 响应 json：
 
