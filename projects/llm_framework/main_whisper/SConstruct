@@ -31,7 +31,7 @@ LINK_SEARCH_PATH += [ADir('../static_lib/opencc/lib')]
 # LDFLAGS += ['-l:libcargs.a', '-l:libonnxruntime.a']
 LDFLAGS += ['-l:libopencc.a', '-l:libmarisa.a']
 
-STATIC_FILES += Glob('mode_*.json')
+STATIC_FILES += Glob('models/mode_*.json')
 
 env['COMPONENTS'].append({'target':'llm_whisper-1.7',
                           'SRCS':SRCS,

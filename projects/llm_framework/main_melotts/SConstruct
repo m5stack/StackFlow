@@ -30,7 +30,7 @@ REQUIREMENTS += ['glog', 'fst']
 
 REQUIREMENTS += ['onnxruntime']
 
-STATIC_FILES += Glob('mode_*.json')
+STATIC_FILES += Glob('models/mode_*.json')
 
 env['COMPONENTS'].append({'target':'llm_melotts-1.8',
                           'SRCS':SRCS,

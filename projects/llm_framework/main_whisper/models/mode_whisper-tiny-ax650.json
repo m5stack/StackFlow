@@ -1,0 +1,42 @@
+{
+    "mode": "whisper-tiny-ax650",
+    "type": "asr",
+    "homepage":"https://huggingface.co/openai/whisper-tiny",
+    "capabilities": [
+        "Automatic_Speech_Recognition",
+        "English",
+        "Chinese",
+        "Japanese"
+    ],
+    "input_type": [
+        "sys.pcm"
+    ],
+    "output_type": [
+        "asr.utf-8"
+    ],
+    "mode_param": {
+        "model_type": "tiny",
+        "language": "en",
+        "encoder": "tiny-encoder.axmodel",
+        "decoder_main": "tiny-decoder-main.axmodel",
+        "decoder_loop": "tiny-decoder-loop.axmodel",
+        "positional_embedding": "tiny-positional_embedding.bin",
+        "tokens": "tiny-tokens.txt",
+        "t2s": "t2s.json",
+        "whisper_sample_rate": 16000,
+        "whisper_n_fft": 400,
+        "awake_delay": 1000,
+        "whisper_hop_length": 160,
+        "whisper_chunk_size": 30,
+        "whisper_n_mels": 80,
+        "whisper_sot": 50258,
+        "whisper_eot": 50257,
+        "whisper_blank": 220,
+        "whisper_no_timestamps": 50363,
+        "whisper_no_speech": 50362,
+        "whisper_translate": 50358,
+        "whisper_transcribe": 50359,
+        "whisper_vocab_size": 51865,
+        "whisper_n_text_ctx": 448
+    }
+}
