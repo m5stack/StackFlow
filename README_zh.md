@@ -92,10 +92,15 @@ StackFlow 语音助手的主要工作模式：
 | [smolvlm-256M-ax630c](https://huggingface.co/HuggingFaceTB/SmolVLM-256M-Instruct) | VLM | 330M | 多模态文本生成 | [mode_smolvlm-256M-ax630c.json](projects/llm_framework/main_vlm/models/mode_smolvlm-256M-ax630c.json) | NPU |
 | [smolvlm-500M-ax630c](https://huggingface.co/HuggingFaceTB/SmolVLM-500M-Instruct) | VLM | 605M | 多模态文本生成 | [mode_smolvlm-256M-ax630c.json](projects/llm_framework/main_vlm/models/mode_smolvlm-500M-ax630c.json) | NPU |
 | [yolo11n](https://github.com/ultralytics/ultralytics) | CV | 2.8M | 目标检测 | [mode_yolo11n.json](projects/llm_framework/main_yolo/mode_yolo11n.json) | NPU |
+| [yolo11n-npu1](https://github.com/ultralytics/ultralytics) | CV | 2.8M | 目标检测 | [mode_yolo11n-npu1.json](projects/llm_framework/main_yolo/mode_yolo11n-npu1.json) | NPU |
 | [yolo11n-seg](https://github.com/ultralytics/ultralytics) | CV | 3.0M | 实例分割 | [mode_yolo11n-seg.json](projects/llm_framework/main_yolo/mode_yolo11n-seg.json) | NPU |
+| [yolo11n-seg-npu1](https://github.com/ultralytics/ultralytics) | CV | 3.0M | 实例分割 | [mode_yolo11n-seg-npu1.json](projects/llm_framework/main_yolo/mode_yolo11n-seg-npu1.json) | NPU |
 | [yolo11n-pose](https://github.com/ultralytics/ultralytics) | CV | 3.1M | 姿态检测 | [mode_yolo11n-pose.json](projects/llm_framework/main_yolo/mode_yolo11n-pose.json) | NPU |
+| [yolo11n-pose-npu1](https://github.com/ultralytics/ultralytics) | CV | 3.1M | 姿态检测 | [mode_yolo11n-pose-npu1.json](projects/llm_framework/main_yolo/mode_yolo11n-pose-npu1.json) | NPU |
 | [yolo11n-hand-pose](https://github.com/ultralytics/ultralytics) | CV | 3.2M | 姿态检测 | [mode_yolo11n-hand-pose.json](projects/llm_framework/main_yolo/mode_yolo11n-hand-pose.json) | NPU |
+| [yolo11n-hand-pose-npu1](https://github.com/ultralytics/ultralytics) | CV | 3.2M | 姿态检测 | [mode_yolo11n-hand-pose-npu1.json](projects/llm_framework/main_yolo/mode_yolo11n-hand-pose-npu1.json) | NPU |
 | [depth-anything-ax630c](https://github.com/DepthAnything/Depth-Anything-V2) | CV | 29M | 单目深度估计 | [mode_depth-anything-ax630c.json](projects/llm_framework/main_depth_anything/mode_depth-anything-ax630c.json) | NPU |
+| [depth-anything-npu1-ax630c](https://github.com/DepthAnything/Depth-Anything-V2) | CV | 29M | 单目深度估计 | [mode_depth-anything-npu1-ax630c.json](projects/llm_framework/main_depth_anything/mode_depth-anything-npu1-ax630c.json) | NPU |
 
 ## 环境要求 ##
 当前 StackFlow 的 AI 单元是建立在 AXERA 加速平台之上的，主要的芯片平台为 ax630c、ax650n。系统要求为 ubuntu。

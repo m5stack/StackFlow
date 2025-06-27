@@ -1,0 +1,25 @@
+{
+    "mode":"depth-anything-npu1-ax630c",
+    "type":"cv",
+    "homepage":"https://github.com/DepthAnything/Depth-Anything-V2",
+    "compile_flage":"pulsar2 build --input cv/model/depth_anything_vits14-sim-384x256.onnx --config cv/config/depth_anything_u8.json --output_dir cv/axmodel/depth-anything-u8-npu1 --output_name depth_anything.axmodel --target_hardware AX620E --compiler.check 0 --npu_mode NPU1",
+    "pulsar_version":"3.3-f0b32d03",
+    "capabilities":[
+        "Segmentation"
+    ],
+    "input_type":[
+        "cv.jpeg.base64"
+    ],
+    "output_type":[
+        "cv.jpeg.base64"
+    ],
+    "mode_param":{
+        "depth_anything_model":"depth-anything-npu1-ax630c.axmodel",
+        "model_type":"segment",
+        "img_h":256,
+        "img_w":384,
+        "npu_type":1
+    },
+    "mode_param_bak":{
+    }
+}

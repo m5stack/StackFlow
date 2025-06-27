@@ -1,0 +1,33 @@
+{
+    "mode":"yolo11n-hand-pose-npu1",
+    "type":"cv",
+    "homepage":"https://github.com/ultralytics/ultralytics",
+    "compile_flage":"pulsar2 build --input cv/model/yolo11n-hand-pose-cut.onnx --config cv/config/yolo11_hand_pose_config.json --output_dir cv/axmodel/yolo11n-hand-pose-npu1 --output_name yolo11n-hand-pose-npu1.axmodel --target_hardware AX620E --compiler.check 0 --npu_mode NPU1",
+    "pulsar_version":"3.3-f0b32d03",
+    "capabilities":[
+        "Pose"
+    ],
+    "input_type":[
+        "yolo.jpeg.base64"
+    ],
+    "output_type":[
+        "yolo.box",
+        "yolo.boxV2"
+    ],
+    "mode_param":{
+        "yolo_model":"yolo11n-hand-pose-npu1.axmodel",
+        "model_type":"pose",
+        "img_h":320,
+        "img_w":320,
+        "cls_num":1,
+        "point_num":21,
+        "pron_threshold":0.45,
+        "nms_threshold":0.45,
+        "npu_type":1,
+        "cls_name":[
+            "hand"
+        ]
+    },
+    "mode_param_bak":{
+    }
+}
