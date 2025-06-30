@@ -1134,7 +1134,7 @@ AX_S32 main(AX_S32 argc, AX_CHAR *argv[])
     // init engine
     AX_ENGINE_NPU_ATTR_T npu_attr;
     memset(&npu_attr, 0, sizeof(npu_attr));
-#if defined(CHIP_AX650)
+#if defined(CONFIG_AX_650N_MSP_ENABLED)
     if (nNpuType == 0) {
         npu_attr.eHardMode = AX_ENGINE_VIRTUAL_NPU_DISABLE;
     } else if (nNpuType >= 1 && nNpuType <= 4) {

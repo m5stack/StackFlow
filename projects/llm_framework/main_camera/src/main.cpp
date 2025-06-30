@@ -13,7 +13,9 @@
 #include <iostream>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
 #include "camera.h"
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 #include "axera_camera.h"
+#endif
 #include <glob.h>
 #include <opencv2/opencv.hpp>
 #include "hv/TcpServer.h"
@@ -172,7 +174,7 @@ public:
     {
         out_callback_ = out_callback;
     }
-
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
     static bool parse_axera_config(const nlohmann::json &config_body, const nlohmann::json &file_body,
                                    void **custom_config)
     {
@@ -473,11 +475,13 @@ public:
                 (stVencChnAttr.stVencAttr.u32PicHeightSrc < frame_height)) {
                 return true;
             }
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
             init_rtsp(&stVencChnAttr);
+#endif
         }
         return false;
     }
-
+#endif
     bool parse_config(const nlohmann::json &config_body)
     {
         try {
@@ -502,11 +506,15 @@ public:
             hal_camera_open  = camera_open;
             hal_camera_close = camera_close;
             hal_parse_config = NULL;
-        } else if (devname_.find("axera_") != std::string::npos) {
+        }
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+        else if (devname_.find("axera_") != std::string::npos) {
             hal_camera_open  = axera_camera_open;
             hal_camera_close = axera_camera_close;
             hal_parse_config = llm_task::parse_axera_config;
-        } else {
+        }
+#endif
+        else {
             return true;
         }
         {

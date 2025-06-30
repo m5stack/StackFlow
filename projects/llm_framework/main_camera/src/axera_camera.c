@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 #include "camera.h"
-#include "axera_camera.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -18,6 +17,8 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/prctl.h>
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+#include "axera_camera.h"
 #include "AXRtspWrapper.h"
 #include "ax_venc_api.h"
 #include "ax_global_type.h"
@@ -29,6 +30,9 @@
 #include "common_vin.h"
 #include "ax_sys_api.h"
 #include "ax_ivps_api.h"
+#endif
+
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 
 #ifndef ALIGN_UP
 #define ALIGN_UP(x, a) ((((x) + ((a) - 1)) / a) * a)
@@ -1721,3 +1725,4 @@ int axera_camera_close(camera_t *camera)
 
     return 0;
 }
+#endif

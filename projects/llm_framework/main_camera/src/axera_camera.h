@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+// #if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+
 typedef enum {
     SAMPLE_VIN_NONE                      = -1,
     SAMPLE_VIN_SINGLE_DUMMY              = 0,
@@ -73,3 +75,4 @@ void init_jpeg(AX_VENC_CHN_ATTR_T *stVencChnAttr);
 }
 #endif
 #endif
+// #endif

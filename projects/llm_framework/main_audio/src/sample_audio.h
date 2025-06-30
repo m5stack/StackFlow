@@ -7,8 +7,10 @@
 #include "ax_ai_api.h"
 #include "ax_ao_api.h"
 #include "ax_global_type.h"
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 #include "ax_acodec_api.h"
 #include "ax_aac.h"
+#endif
 
 typedef struct {
     unsigned int card;
@@ -26,9 +28,11 @@ typedef struct {
         AX_AP_DNVQE_ATTR_T stVqeAttr;
         AX_AP_UPTALKVQE_ATTR_T aistVqeAttr;
     };
+    #if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
     AX_ACODEC_FREQ_ATTR_T stHpfAttr;
     AX_ACODEC_FREQ_ATTR_T stLpfAttr;
     AX_ACODEC_EQ_ATTR_T stEqAttr;
+    #endif
     int gResample;
     union {
         AX_AUDIO_SAMPLE_RATE_E enInSampleRate;
