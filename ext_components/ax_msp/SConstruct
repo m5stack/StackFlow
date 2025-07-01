@@ -29,6 +29,7 @@ if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
     for dirn in third_party:
         INCLUDE.append(os.path.join(MSP_PATH,'third-party',dirn,'include'))
         LINK_SEARCH_PATH.append(os.path.join(MSP_PATH,'third-party',dirn,'lib/arm64/glibc'))
+    INCLUDE.append(os.path.join(MSP_PATH,'third-party/tinyalsa/include/tinyalsa'))
     INCLUDE.append(os.path.join(MSP_PATH,'third-party/live/out/arm64/glibc/include'))
     LINK_SEARCH_PATH.append(os.path.join(MSP_PATH,'third-party/live/out/arm64/glibc/lib'))
     INCLUDE.append(os.path.join(MSP_PATH,'third-party/openssl/arm64/include'))

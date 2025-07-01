@@ -22,6 +22,7 @@ static void __sigint(int iSigNo)
 }
 
 #include "sample_audio.h"
+#include "alsa_audio.h"
 
 #define CONFIG_AUTO_SET(obj, key)             \
     if (config_body.contains(#key))           \
