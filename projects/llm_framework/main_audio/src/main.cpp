@@ -142,8 +142,13 @@ public:
         nlohmann::json error_body;
         std::string base_model_path;
         std::string base_model_config_path;
-        std::list<std::string> config_file_paths =
-            get_config_file_paths(base_model_path, base_model_config_path, "audio");
+        std::list<std::string> config_file_paths;
+        if (access("/sys/devices/platform/soc/4851000.i2c/i2c-1/1-0043", F_OK) == 0) {
+            config_file_paths = get_config_file_paths(base_model_path, base_model_config_path, "audio_kit");
+        } else {
+            config_file_paths = get_config_file_paths(base_model_path, base_model_config_path, "audio");
+        }
+
         try {
             config_body = nlohmann::json::parse(data);
             for (auto file_name : config_file_paths) {
@@ -241,18 +246,7 @@ public:
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.enBitwidth);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.enLinkMode);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.enSamplerate);
-
-                if (config_body.contains("aistAttr.enLayoutMode"))
-                    mode_config_.aistAttr.enLayoutMode = config_body["aistAttr.enLayoutMode"];
-                else if (file_body["cap_param"].contains("aistAttr.enLayoutMode")) {
-                    mode_config_.aistAttr.enLayoutMode = file_body["cap_param"]["aistAttr.enLayoutMode"];
-                    if (access("/sys/devices/platform/soc/4851000.i2c/i2c-1/1-0043", F_OK) == 0) {
-                        if (mode_config_.aistAttr.enLayoutMode == AX_AI_REF_MIC) {
-                            mode_config_.aistAttr.enLayoutMode = AX_AI_MIC_REF;
-                        }
-                    }
-                }
-
+                CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.enLayoutMode);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.U32Depth);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.u32PeriodSize);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.u32PeriodCount);

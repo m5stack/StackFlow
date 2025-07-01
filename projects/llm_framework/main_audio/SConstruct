@@ -26,7 +26,7 @@ LINK_SEARCH_PATH += [ADir('../static_lib')]
 REQUIREMENTS += ['ax_sys', 'ax_interpreter', 'ax_audio', 'ax_audio_3a', 'ax_fdk', 'ax_opus']
 REQUIREMENTS += ['tinyalsa', 'opus', 'samplerate', 'fdk-aac']
 
-STATIC_FILES += [AFile('audio.json')]
+STATIC_FILES += [AFile('audio.json'), AFile('audio_kit.json')]
 STATIC_FILES += Glob('mode_*.json')
 
 env['COMPONENTS'].append({'target':'llm_audio-1.6',
