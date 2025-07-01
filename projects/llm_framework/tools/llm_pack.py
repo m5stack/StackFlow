@@ -354,13 +354,13 @@ if __name__ == "__main__":
     Tasks = {
         'lib-llm':[create_lib_deb,'lib-llm', '1.8', src_folder, revision],
         'llm-sys':[create_bin_deb,'llm-sys', '1.6', src_folder, revision],
-        # 'llm-audio':[create_bin_deb,'llm-audio', '1.6', src_folder, revision],
+        'llm-audio':[create_bin_deb,'llm-audio', '1.6', src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', '1.8', src_folder, revision],
         'llm-asr':[create_bin_deb,'llm-asr', '1.6', src_folder, revision],
         'llm-llm':[create_bin_deb,'llm-llm', '1.8', src_folder, revision],
         'llm-tts':[create_bin_deb,'llm-tts', '1.6', src_folder, revision],
         'llm-melotts':[create_bin_deb,'llm-melotts', '1.8', src_folder, revision],
-        # 'llm-camera':[create_bin_deb,'llm-camera', '1.9', src_folder, revision, 'lib-llm'],
+        'llm-camera':[create_bin_deb,'llm-camera', '1.9', src_folder, revision, 'lib-llm'],
         'llm-vlm':[create_bin_deb,'llm-vlm', '1.8', src_folder, revision],
         'llm-yolo':[create_bin_deb,'llm-yolo', '1.9', src_folder, revision],
         # 'llm-skel':[create_bin_deb,'llm-skel', version, src_folder, revision],
@@ -368,6 +368,7 @@ if __name__ == "__main__":
         'llm-vad':[create_bin_deb,'llm-vad', '1.7', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.7', src_folder, revision],
         'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.7', src_folder, revision],
+        'llm-model-melotts-en-default-ax650':[create_data_deb,'llm-model-melotts-en-default-ax650', '0.6', src_folder, revision],
     }
     {
         'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
