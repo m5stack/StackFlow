@@ -22,6 +22,7 @@ static void __sigint(int iSigNo)
 }
 
 #include "sample_audio.h"
+#include "alsa_audio.h"
 
 #define CONFIG_AUTO_SET(obj, key)             \
     if (config_body.contains(#key))           \
@@ -68,7 +69,7 @@ private:
 
     void hw_cap()
     {
-        ax_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
+        alsa_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
                      cap_config.bit, llm_audio::on_cap_sample);
     }
 
