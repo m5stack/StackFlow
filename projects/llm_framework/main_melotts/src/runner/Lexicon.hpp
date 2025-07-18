@@ -37,7 +37,7 @@ public:
             const std::string& verbalizer_filename)
         : max_phrase_length(0)
     {
-        SLOGD("Dictionary loading: %s Pronunciation table loading: %s tagger_filename: %s verbalizer_filename: %s",
+        SLOGI("Dictionary loading: %s Pronunciation table loading: %s tagger_filename: %s verbalizer_filename: %s",
               tokens_filename.c_str(), lexicon_filename.c_str(), tagger_filename.c_str(), verbalizer_filename.c_str());
 
         m_processor = new wetext::Processor(tagger_filename, verbalizer_filename);
@@ -92,13 +92,13 @@ public:
         lexicon["。"] = lexicon["."];
         lexicon["！"] = lexicon["!"];
         lexicon["？"] = lexicon["?"];
-        SLOGD("Dictionary loading complete, containing %zu entries, longest phrase length: %zu", lexicon.size(),
+        SLOGI("Dictionary loading complete, containing %zu entries, longest phrase length: %zu", lexicon.size(),
               max_phrase_length);
     }
 
     Lexicon(const std::string& lexicon_filename, const std::string& tokens_filename) : max_phrase_length(0)
     {
-        SLOGD("Dictionary loading: %s Pronunciation table loading: %s", tokens_filename.c_str(),
+        SLOGI("Dictionary loading: %s Pronunciation table loading: %s", tokens_filename.c_str(),
               lexicon_filename.c_str());
 
         std::unordered_map<std::string, int> tokens;
@@ -151,7 +151,7 @@ public:
         lexicon["。"] = lexicon["."];
         lexicon["！"] = lexicon["!"];
         lexicon["？"] = lexicon["?"];
-        SLOGD("Dictionary loading complete, containing %zu entries, longest phrase length: %zu", lexicon.size(),
+        SLOGI("Dictionary loading complete, containing %zu entries, longest phrase length: %zu", lexicon.size(),
               max_phrase_length);
     }
 

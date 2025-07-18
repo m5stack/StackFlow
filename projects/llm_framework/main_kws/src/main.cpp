@@ -34,6 +34,8 @@ static void __sigint(int iSigNo)
 static std::string base_model_path_;
 static std::string base_model_config_path_;
 
+typedef std::function<void(const std::string &data, bool finish)> task_callback_t;
+
 #define CONFIG_AUTO_SET(obj, key)             \
     if (config_body.contains(#key))           \
         mode_config_.key = config_body[#key]; \
@@ -50,16 +52,17 @@ public:
     std::string model_;
     std::string response_format_;
     std::vector<std::string> inputs_;
-    std::string kws_;
+    std::vector<std::string> kws_;
     bool enoutput_;
+    bool enoutput_json_;
     bool enstream_;
     bool enwake_audio_;
     std::atomic_bool audio_flage_;
+    task_callback_t out_callback_;
     int delay_audio_frame_ = 100;
     buffer_t *pcmdata;
     std::string wake_wav_file_;
 
-    std::function<void(const std::string &)> out_callback_;
     std::function<void(const std::string &)> play_awake_wav;
 
     bool parse_config(const nlohmann::json &config_body)
@@ -68,7 +71,6 @@ public:
             model_           = config_body.at("model");
             response_format_ = config_body.at("response_format");
             enoutput_        = config_body.at("enoutput");
-            kws_             = config_body.at("kws");
             if (config_body.contains("enwake_audio")) {
                 enwake_audio_ = config_body["enwake_audio"];
             } else {
@@ -83,6 +85,16 @@ public:
                     }
                 }
             }
+            if (config_body.contains("kws")) {
+                if (config_body["kws"].is_string()) {
+                    kws_.push_back(config_body["kws"].get<std::string>());
+                } else if (config_body["kws"].is_array()) {
+                    for (auto _in : config_body["kws"]) {
+                        kws_.push_back(_in.get<std::string>());
+                    }
+                }
+            }
+            enoutput_json_ = response_format_.find("json") == std::string::npos ? false : true;
         } catch (...) {
             SLOGE("setup config_body error");
             return true;
@@ -173,7 +185,9 @@ public:
             mode_config_.keywords_file                   = base_model + mode_config_.keywords_file;
 
             std::ofstream temp_awake_key("/tmp/kws_awake.txt.tmp");
-            temp_awake_key << kws_;
+            for (const auto &keyword : kws_) {
+                temp_awake_key << keyword << std::endl;
+            }
             temp_awake_key.close();
             std::ostringstream awake_key_compile_cmd;
             if (file_exists("/opt/m5stack/scripts/text2token.py"))
@@ -206,7 +220,7 @@ public:
         return 0;
     }
 
-    void set_output(std::function<void(const std::string &)> out_callback)
+    void set_output(task_callback_t out_callback)
     {
         out_callback_ = out_callback;
     }
@@ -242,16 +256,17 @@ public:
                 play_awake_wav(wake_wav_file_);
             }
             if (out_callback_) {
-                out_callback_("True");
+                if (enoutput_json_)
+                    out_callback_(r.AsJsonString(), true);
+                else
+                    out_callback_("", true);
             }
         }
     }
 
     void trigger()
     {
-        if (out_callback_) {
-            out_callback_("True");
-        }
+        if (out_callback_) out_callback_("", true);
     }
 
     bool delete_model()
@@ -299,6 +314,39 @@ public:
                                            std::make_shared<stackflow_data>(data->get_param(0), data->get_param(1)));
                 return LLM_NONE;
             });
+    }
+
+    void task_output(const std::weak_ptr<llm_task> llm_task_obj_weak,
+                     const std::weak_ptr<llm_channel_obj> llm_channel_weak, const std::string &data, bool finish)
+    {
+        auto llm_task_obj = llm_task_obj_weak.lock();
+        auto llm_channel  = llm_channel_weak.lock();
+        if (!(llm_task_obj && llm_channel)) {
+            return;
+        }
+        std::string tmp_msg1;
+        const std::string *next_data = &data;
+        if (data.empty()) {
+            llm_channel->send(llm_task_obj->response_format_, true, LLM_NO_ERROR);
+            return;
+        }
+        if (finish) {
+            tmp_msg1  = data + ".";
+            next_data = &tmp_msg1;
+        }
+        if (llm_channel->enstream_) {
+            static int count = 0;
+            nlohmann::json data_body;
+            data_body["index"]  = count++;
+            data_body["delta"]  = (*next_data);
+            data_body["finish"] = finish;
+            if (finish) count = 0;
+            SLOGI("send stream:%s", next_data->c_str());
+            llm_channel->send(llm_task_obj->response_format_, data_body, LLM_NO_ERROR);
+        } else if (finish) {
+            SLOGI("send utf-8:%s", next_data->c_str());
+            llm_channel->send(llm_task_obj->response_format_, (*next_data), LLM_NO_ERROR);
+        }
     }
 
     void play_awake_wav(const std::string &wav_file)
@@ -465,13 +513,9 @@ public:
             llm_channel->set_output(llm_task_obj->enoutput_);
             llm_channel->set_stream(llm_task_obj->enstream_);
             llm_task_obj->play_awake_wav = std::bind(&llm_kws::play_awake_wav, this, std::placeholders::_1);
-            llm_task_obj->set_output([_llm_task_obj, _llm_channel](const std::string &data) {
-                auto llm_task_obj = _llm_task_obj.lock();
-                auto llm_channel  = _llm_channel.lock();
-                if (llm_task_obj && llm_channel) {
-                    llm_channel->send(llm_task_obj->response_format_, true, LLM_NO_ERROR);
-                }
-            });
+            llm_task_obj->set_output(std::bind(&llm_kws::task_output, this, std::weak_ptr<llm_task>(llm_task_obj),
+                                               std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
+                                               std::placeholders::_2));
 
             for (const auto input : llm_task_obj->inputs_) {
                 if (input.find("sys") != std::string::npos) {
