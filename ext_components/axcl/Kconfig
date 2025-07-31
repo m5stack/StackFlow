@@ -1,0 +1,5 @@
+menuconfig AXCL_ENABLED
+    bool "Enable axera axcl support"
+    default n
+    help
+        enable axera axcl support
