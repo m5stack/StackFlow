@@ -33,7 +33,7 @@ REQUIREMENTS += ['spdlog', 'axcl_pcie_dma', 'axcl_pcie_msg', 'axcl_token', 'axcl
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 
 
-INCLUDE += [ADir('src/runner'), ADir('src/runner/utils')]
+INCLUDE += [ADir('src/runner'), ADir('src/runner/utils'), ADir('src/runner/ax_model_runner')]
 INCLUDE += [ADir('../include/sentencepiece'),
             ADir('../include/protobuf-lite'),
             ADir('../include/abseil-cpp'),

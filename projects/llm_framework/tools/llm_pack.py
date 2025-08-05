@@ -368,7 +368,14 @@ if __name__ == "__main__":
         'llm-vad':[create_bin_deb,'llm-vad', '1.7', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.7', src_folder, revision],
         'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.7', src_folder, revision],
-        'llm-model-melotts-en-default-ax650':[create_data_deb,'llm-model-melotts-en-default-ax650', '0.6', src_folder, revision],
+        # 'llm-model-melotts-en-au-ax650':[create_data_deb,'llm-model-melotts-en-au-ax650', '0.6', src_folder, revision],
+        # 'llm-model-melotts-en-br-ax650':[create_data_deb,'llm-model-melotts-en-br-ax650', '0.6', src_folder, revision],
+        # 'llm-model-melotts-en-default-ax650':[create_data_deb,'llm-model-melotts-en-default-ax650', '0.6', src_folder, revision],
+        # 'llm-model-melotts-en-india-ax650':[create_data_deb,'llm-model-melotts-en-india-ax650', '0.6', src_folder, revision],
+        # 'llm-model-melotts-en-us-ax650':[create_data_deb,'llm-model-melotts-en-us-ax650', '0.6', src_folder, revision],
+        # 'llm-model-melotts-es-es-ax650':[create_data_deb,'llm-model-melotts-es-es-ax650', '0.5', src_folder, revision],
+        # 'llm-model-melotts-zh-cn-ax650':[create_data_deb,'llm-model-melotts-zh-cn-ax650', '0.6', src_folder, revision],
+        # 'llm-model-melotts-ja-jp-ax650':[create_data_deb,'llm-model-melotts-ja-jp-ax650', '0.6', src_folder, revision],
     }
     {
         'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],

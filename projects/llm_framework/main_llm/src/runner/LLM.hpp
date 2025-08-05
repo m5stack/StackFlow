@@ -18,7 +18,9 @@
 
 #define ALIGN_DOWN(x, a) ((x) & ~((a) - 1))
 
-typedef void (*LLMRuningCallback)(int *p_token, int n_token, const char *p_str, float token_per_sec, void *reserve);
+// typedef void (*LLMRuningCallback)(int *p_token, int n_token, const char *p_str, float token_per_sec, void *reserve);
+typedef std::function<void(int *, int, const char *, float, void *)> LLMRuningCallback;
+
 
 struct LLMAttrType
 {
@@ -708,6 +710,90 @@ public:
         }
 
         return 0;
+    }
+
+    bool save_kvcache(std::string target_path, std::string system_prompt, int precompute_len, std::vector<std::vector<unsigned short>> &k_caches, std::vector<std::vector<unsigned short>> &v_caches)
+    {
+        for (size_t i = 0; i < k_caches.size(); i++)
+        {
+            std::string k_cache_path = target_path + "/k_cache_" + std::to_string(i) + ".bin";
+            std::string v_cache_path = target_path + "/v_cache_" + std::to_string(i) + ".bin";
+            std::ofstream k_cache_file(k_cache_path);
+            std::ofstream v_cache_file(v_cache_path);
+            if (!k_cache_file.is_open() || !v_cache_file.is_open())
+            {
+                ALOGE("save kvcache failed");
+                return false;
+            }
+            k_cache_file.write((char *)k_caches[i].data(), k_caches[i].size() * sizeof(unsigned short));
+            v_cache_file.write((char *)v_caches[i].data(), v_caches[i].size() * sizeof(unsigned short));
+            k_cache_file.close();
+            v_cache_file.close();
+        }
+        nlohmann::json j;
+        j["system_prompt"] = system_prompt;
+        j["precompute_len"] = precompute_len;
+        std::string config_path = target_path + "/config.json";
+        std::ofstream config_file(config_path);
+        config_file << j.dump();
+        config_file.close();
+        return true;
+    }
+
+    bool load_kvcache(std::string target_path, int axmodel_num, std::vector<std::vector<unsigned short>> &k_caches, std::vector<std::vector<unsigned short>> &v_caches, std::string &system_prompt, int &precompute_len)
+    {
+        k_caches.resize(axmodel_num);
+        v_caches.resize(axmodel_num);
+        for (size_t i = 0; i < k_caches.size(); i++)
+        {
+            std::string k_cache_path = target_path + "/k_cache_" + std::to_string(i) + ".bin";
+            std::string v_cache_path = target_path + "/v_cache_" + std::to_string(i) + ".bin";
+            if (file_exist(k_cache_path) && file_exist(v_cache_path))
+            {
+                std::vector<unsigned short> k_cache;
+                std::vector<unsigned short> v_cache;
+                std::ifstream k_cache_file(k_cache_path);
+                std::ifstream v_cache_file(v_cache_path);
+
+                k_cache_file.seekg(0, std::ios::end);
+                k_cache.resize(k_cache_file.tellg() / sizeof(unsigned short));
+                k_cache_file.seekg(0, std::ios::beg);
+
+                v_cache_file.seekg(0, std::ios::end);
+                v_cache.resize(v_cache_file.tellg() / sizeof(unsigned short));
+                v_cache_file.seekg(0, std::ios::beg);
+
+                k_cache_file.read((char *)k_cache.data(), k_cache.size() * sizeof(unsigned short));
+                v_cache_file.read((char *)v_cache.data(), v_cache.size() * sizeof(unsigned short));
+
+                k_cache_file.close();
+                v_cache_file.close();
+                k_caches[i] = k_cache;
+                v_caches[i] = v_cache;
+            }
+            else
+            {
+                ALOGE("k_cache %s or v_cache %s not exist", k_cache_path.c_str(), v_cache_path.c_str());
+                return false;
+            }
+        }
+
+        std::string config_path = target_path + "/config.json";
+        if (file_exist(config_path))
+        {
+            std::ifstream config_file(config_path);
+            nlohmann::json j;
+            config_file >> j;
+            system_prompt = j["system_prompt"].get<std::string>();
+            precompute_len = j["precompute_len"].get<int>();
+            config_file.close();
+        }
+        else
+        {
+            ALOGE("config %s not exist", config_path.c_str());
+            return false;
+        }
+        return true;
     }
 
     // int Encode(cv::Mat src, std::vector<unsigned short> &out_embed)

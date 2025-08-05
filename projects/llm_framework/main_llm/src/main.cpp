@@ -46,6 +46,8 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
 
 class llm_task {
 private:
+    std::shared_ptr<BaseTokenizer> tokenizer_;
+    LLaMaEmbedSelector embed_selector_;
     static std::atomic<unsigned int> next_port_;
     std::atomic_bool tokenizer_server_flage_;
     unsigned int port_;
@@ -60,6 +62,13 @@ public:
     std::vector<std::string> inputs_;
     std::string prompt_;
     task_callback_t out_callback_;
+    std::vector<unsigned short> prompt_data_;
+    std::string last_reply_;
+    std::string kvcache_path_;
+    std::vector<std::vector<unsigned short>> k_caches_, v_caches_;
+    std::vector<int> token_ids_;
+    int precompute_len = 0;
+    static int ax_init_flage_;
     bool enoutput_;
     bool enstream_;
 
@@ -124,24 +133,35 @@ public:
             SLOGI("base_model %s", base_model.c_str());
 
             CONFIG_AUTO_SET(file_body["mode_param"], tokenizer_type);
-            CONFIG_AUTO_SET(file_body["mode_param"], filename_tokenizer_model);
+            CONFIG_AUTO_SET(file_body["mode_param"], url_tokenizer_model);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokens_embed);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_post_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
-            CONFIG_AUTO_SET(file_body["mode_param"], b_use_topk);
-            CONFIG_AUTO_SET(file_body["mode_param"], b_bos);
-            CONFIG_AUTO_SET(file_body["mode_param"], b_eos);
+            // CONFIG_AUTO_SET(file_body["mode_param"], b_use_topk);
+            // CONFIG_AUTO_SET(file_body["mode_param"], b_bos);
+            // CONFIG_AUTO_SET(file_body["mode_param"], b_eos);
             CONFIG_AUTO_SET(file_body["mode_param"], axmodel_num);
             CONFIG_AUTO_SET(file_body["mode_param"], tokens_embed_num);
             CONFIG_AUTO_SET(file_body["mode_param"], tokens_embed_size);
             CONFIG_AUTO_SET(file_body["mode_param"], b_use_mmap_load_embed);
-            CONFIG_AUTO_SET(file_body["mode_param"], b_dynamic_load_axmodel_layer);
+            // CONFIG_AUTO_SET(file_body["mode_param"], b_dynamic_load_axmodel_layer);
             CONFIG_AUTO_SET(file_body["mode_param"], max_token_len);
-            CONFIG_AUTO_SET(file_body["mode_param"], temperature);
-            CONFIG_AUTO_SET(file_body["mode_param"], top_p);
+            // CONFIG_AUTO_SET(file_body["mode_param"], temperature);
+            // CONFIG_AUTO_SET(file_body["mode_param"], top_p);
+            if (config_body.contains("dev_ids")) {
+                mode_config_.dev_ids.clear();
+                for (auto &id : config_body["dev_ids"]) {
+                    mode_config_.dev_ids.push_back(id.get<int>());
+                }
+            } else if (file_body["mode_param"].contains("dev_ids")) {
+                mode_config_.dev_ids.clear();
+                for (auto &id : file_body["mode_param"]["dev_ids"]) {
+                    mode_config_.dev_ids.push_back(id.get<int>());
+                }
+            }
 
-            if (mode_config_.filename_tokenizer_model.find("http:") != std::string::npos) {
-                mode_config_.filename_tokenizer_model = "http://localhost:" + std::to_string(port_);
+            if (mode_config_.url_tokenizer_model.find("http:") != std::string::npos) {
+                mode_config_.url_tokenizer_model = "http://localhost:" + std::to_string(port_);
                 std::string tokenizer_file;
                 if (file_exists(std::string("/opt/m5stack/scripts/") + model_ + std::string("_tokenizer.py"))) {
                     tokenizer_file = std::string("/opt/m5stack/scripts/") + model_ + std::string("_tokenizer.py");
@@ -169,12 +189,12 @@ public:
                     tokenizer_server_flage_.store(true);
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
                           (base_model + "tokenizer").c_str(), ("'" + prompt_ + "'").c_str());
-                    std::this_thread::sleep_for(std::chrono::seconds(20));
+                    std::this_thread::sleep_for(std::chrono::seconds(5));
                 }
             } else {
-                mode_config_.filename_tokenizer_model = base_model + mode_config_.filename_tokenizer_model;
+                mode_config_.url_tokenizer_model = base_model + mode_config_.url_tokenizer_model;
             }
-            SLOGI("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
+            SLOGI("url_tokenizer_model: %s", mode_config_.url_tokenizer_model.c_str());
             mode_config_.filename_tokens_embed     = base_model + mode_config_.filename_tokens_embed;
             mode_config_.filename_post_axmodel     = base_model + mode_config_.filename_post_axmodel;
             mode_config_.template_filename_axmodel = base_model + mode_config_.template_filename_axmodel;
@@ -191,6 +211,25 @@ public:
                 lLaMa_.reset();
                 return -2;
             }
+            if (!kvcache_path_.empty() && kvcache_path_ != "") {
+                if (lLaMa_->load_kvcache(kvcache_path_, mode_config_.axmodel_num, k_caches_, v_caches_,
+                                 mode_config_.system_prompt, precompute_len)) {
+                    ALOGI("load kvcache from path: %s success,precompute_len: %d", kvcache_path_.c_str(),
+                          precompute_len);
+                } else {
+                    ALOGW("load kvcache from path: %s failed,generate kvcache", kvcache_path_.c_str());
+                    lLaMa_->GenerateKVCachePrefill(token_ids_, k_caches_, v_caches_, precompute_len);
+                    if (!lLaMa_->save_kvcache(kvcache_path_, mode_config_.system_prompt, precompute_len, k_caches_,
+                                      v_caches_)) {
+                        ALOGE("save kvcache failed");
+                    }
+                    ALOGI("generate kvcache to path: %s", kvcache_path_.c_str());
+                }
+            } else {
+                lLaMa_->GenerateKVCachePrefill(token_ids_, k_caches_, v_caches_, precompute_len);
+            }
+            SLOGI("precompute_len: %d", precompute_len);
+            SLOGI("system_prompt: %s", mode_config_.system_prompt.c_str());
 
         } catch (...) {
             SLOGE("config false");
@@ -206,9 +245,9 @@ public:
             case TKT_LLaMa:
                 oss_prompt << "<|user|>\n" << input << "</s><|assistant|>\n";
                 break;
-            case TKT_MINICPM:
-                oss_prompt << "<用户>" << input << "<AI>";
-                break;
+            // case TKT_MINICPM:
+            //     oss_prompt << "<用户>" << input << "<AI>";
+            //     break;
             case TKT_Phi3:
                 oss_prompt << input << " ";
                 break;
@@ -253,7 +292,15 @@ public:
     {
 #if 1
         try {
-            std::string out = lLaMa_->Run(prompt_complete(msg));
+            std::vector<int> tokens_ids, tokens_diff;
+            lLaMa_->Encode(prompt_data_, prompt_complete(msg), last_reply_, tokens_ids, tokens_diff);
+            if (auto ret = lLaMa_->SetKVCache(k_caches_, v_caches_, precompute_len, tokens_diff.size()); ret != 0) {
+                ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
+                return;
+            }
+            last_reply_ = lLaMa_->Run(prompt_data_);
+            lLaMa_->GetKVCache(k_caches_, v_caches_, precompute_len);
+            std::string out = lLaMa_->Run(prompt_data_);
             if (out_callback_) out_callback_(out, true);
         } catch (...) {
             SLOGW("lLaMa_->Run have error!");
@@ -290,6 +337,27 @@ public:
 #endif
     }
 
+    void _ax_init()
+    {
+        if (!ax_init_flage_) {
+            int ret = axclInit(nullptr);
+            if (0 != ret) {
+                fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
+            }
+        }
+        ax_init_flage_++;
+    }
+
+    void _ax_deinit()
+    {
+        if (ax_init_flage_ > 0) {
+            --ax_init_flage_;
+            if (!ax_init_flage_) {
+                axclFinalize();
+            }
+        }
+    }
+
     bool pause()
     {
         if (lLaMa_) lLaMa_->Stop();
@@ -320,6 +388,7 @@ public:
 
     llm_task(const std::string &workid) : tokenizer_server_flage_(false), port_(getNextPort())
     {
+        _ax_init();
         inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
     }
 
@@ -351,8 +420,10 @@ public:
         if (lLaMa_) {
             lLaMa_->Deinit();
         }
+        _ax_deinit();
     }
 };
+int llm_task::ax_init_flage_ = 0;
 
 std::atomic<unsigned int> llm_task::next_port_{8080};
 
