@@ -4,14 +4,12 @@
  * SPDX-License-Identifier: MIT
  */
 #include "StackFlow.h"
-#include "Encoder.hpp"
-#include "DecoderMain.hpp"
-#include "DecoderLoop.hpp"
-#include "EngineWrapper.hpp"
-#include <ax_sys_api.h>
+#include <axcl.h>
 #include "AudioFile.h"
 #include "opencc.h"
 #include <librosa/librosa.h>
+
+#include "middleware/axcl_runtime_runner.hpp"
 
 #include <signal.h>
 #include <sys/stat.h>
@@ -38,6 +36,7 @@ static void __sigint(int iSigNo)
 
 static std::string base_model_path_;
 static std::string base_model_config_path_;
+const char *CONFIG_FILE_DEFAULT = "/usr/local/axcl/axcl.json";
 
 typedef struct {
     std::string encoder;
@@ -77,10 +76,10 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
 
 class llm_task {
 private:
+    std::unique_ptr<middleware::runner> encoder_;
+    std::unique_ptr<middleware::runner> decoder_main_;
+    std::unique_ptr<middleware::runner> decoder_loop_;
     whisper_config mode_config_;
-    std::unique_ptr<Encoder> encoder_;
-    std::unique_ptr<DecoderMain> decoder_main_;
-    std::unique_ptr<DecoderLoop> decoder_loop_;
 
 public:
     std::vector<float> positional_embedding;
@@ -103,6 +102,28 @@ public:
     buffer_t *pcmdata;
 
     std::function<void(void)> pause;
+
+    std::unique_ptr<middleware::runner> load_runner(const std::string &model_path)
+    {
+        std::unique_ptr<middleware::runner> runner = std::make_unique<middleware::runtime_runner>();
+
+        if (!runner->init(CONFIG_FILE_DEFAULT, 0, 0)) {
+            fprintf(stderr, "[ERROR] Init failed.\n");
+            return nullptr;
+        }
+
+        if (!runner->load(model_path)) {
+            fprintf(stderr, "[ERROR] Loading model {%s} failed.\n", model_path.c_str());
+            return nullptr;
+        }
+
+        if (!runner->prepare(true, true, 0, 0)) {
+            fprintf(stderr, "[ERROR] Prepare for model {%s} failed.\n", model_path.c_str());
+            return nullptr;
+        }
+
+        return std::move(runner);
+    }
 
     bool parse_config(const nlohmann::json &config_body)
     {
@@ -306,21 +327,9 @@ public:
                 mode_config_.token_tables.push_back(line.substr(0, i));
             }
 
-            encoder_      = std::make_unique<Encoder>();
-            decoder_main_ = std::make_unique<DecoderMain>();
-            decoder_loop_ = std::make_unique<DecoderLoop>();
-            if (0 != encoder_->Init(mode_config_.encoder.c_str())) {
-                SLOGE("encoder init failed!\n");
-                return -4;
-            }
-            if (0 != decoder_main_->Init(mode_config_.decoder_main.c_str())) {
-                SLOGE("Init decoder_main model failed!\n");
-                return -5;
-            }
-            if (0 != decoder_loop_->Init(mode_config_.decoder_loop.c_str())) {
-                SLOGE("Init decoder_main model failed!\n");
-                return -6;
-            }
+            encoder_      = load_runner(mode_config_.encoder);
+            decoder_main_ = load_runner(mode_config_.decoder_main);
+            decoder_loop_ = load_runner(mode_config_.decoder_loop);
         } catch (...) {
             SLOGE("config false");
             return -6;
@@ -399,12 +408,12 @@ public:
         std::vector<int> tokens(1);
         bool is_broke = false;
 
-        std::vector<float> n_layer_cross_k(encoder_->GetOutputSize(0) / sizeof(float));
-        std::vector<float> n_layer_cross_v(encoder_->GetOutputSize(1) / sizeof(float));
+        std::vector<float> n_layer_cross_k(encoder_->get_output_size(0) / sizeof(float));
+        std::vector<float> n_layer_cross_v(encoder_->get_output_size(1) / sizeof(float));
 
         std::vector<float> decoder_main_logits(4 * mode_config_.whisper_vocab_size);
-        std::vector<float> n_layer_self_k_cache(decoder_main_->GetOutputSize(1) / sizeof(float));
-        std::vector<float> n_layer_self_v_cache(decoder_main_->GetOutputSize(2) / sizeof(float));
+        std::vector<float> n_layer_self_k_cache(decoder_main_->get_output_size(1) / sizeof(float));
+        std::vector<float> n_layer_self_v_cache(decoder_main_->get_output_size(2) / sizeof(float));
 
         std::vector<float> continous_mel(mode_config_.whisper_n_mels * n_len);
         for (int i = 0; i < n_mel; i++) {
@@ -413,8 +422,8 @@ public:
 
         start     = get_current_time();
         start_all = get_current_time();
-        encoder_->SetInput(continous_mel.data(), 0);
-        int ret = encoder_->Run();
+        axclrtMemcpy(encoder_->get_input_pointer(0), continous_mel.data(), sizeof(float) * continous_mel.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
+        int ret = encoder_->run(false);
         if (ret) {
             SLOGE("encoder run failed!");
             return;
@@ -427,15 +436,15 @@ public:
 
         // decoder_main
         start = get_current_time();
-        decoder_main_->SetInput(SOT_SEQUENCE.data(), 0);
-        decoder_main_->SetInput(encoder_->GetOutputPtr(0), 1);
-        decoder_main_->SetInput(encoder_->GetOutputPtr(1), 2);
-        ret = decoder_main_->Run();
+        axclrtMemcpy(decoder_main_->get_input_pointer(0), SOT_SEQUENCE.data(), sizeof(int) * SOT_SEQUENCE.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
+        axclrtMemcpy(decoder_main_->get_input_pointer(1), encoder_->get_output_pointer(0), decoder_main_->get_input_size(1), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_main_->get_input_pointer(2), encoder_->get_output_pointer(1), decoder_main_->get_input_size(2), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        ret = decoder_main_->run(false);
         if (ret) {
             SLOGE("decoder_main run failed!");
             return;
         }
-        decoder_main_->GetOutput(decoder_main_logits.data(), 0);
+        axclrtMemcpy(decoder_main_logits.data(), decoder_main_->get_output_pointer(0), sizeof(float) * decoder_main_logits.size(), AXCL_MEMCPY_DEVICE_TO_HOST);
 
         end = get_current_time();
 
@@ -453,10 +462,10 @@ public:
             mask[n] = mode_config_.neg_inf;
         }
 
-        decoder_loop_->SetInput(decoder_main_->GetOutputPtr(1), 1);
-        decoder_loop_->SetInput(decoder_main_->GetOutputPtr(2), 2);
-        decoder_loop_->SetInput(encoder_->GetOutputPtr(0), 3);
-        decoder_loop_->SetInput(encoder_->GetOutputPtr(1), 4);
+        axclrtMemcpy(decoder_loop_->get_input_pointer(1), decoder_main_->get_output_pointer(1), decoder_loop_->get_input_size(1), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_loop_->get_input_pointer(2), decoder_main_->get_output_pointer(2), decoder_loop_->get_input_size(2), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_loop_->get_input_pointer(3), encoder_->get_output_pointer(0), decoder_loop_->get_input_size(3), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_loop_->get_input_pointer(4), encoder_->get_output_pointer(1), decoder_loop_->get_input_size(4), AXCL_MEMCPY_DEVICE_TO_DEVICE);
 
         for (int i = 0; i < mode_config_.whisper_n_text_ctx - SOT_SEQUENCE.size(); i++) {
             if (max_token_id == mode_config_.whisper_eot) {
@@ -469,19 +478,19 @@ public:
 
             // inference
             start = get_current_time();
-            decoder_loop_->SetInput(tokens.data(), 0);
-            decoder_loop_->SetInput(positional_embedding.data() + offset * WHISPER_N_TEXT_STATE, 5);
-            decoder_loop_->SetInput(mask.data(), 6);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(0), tokens.data(), sizeof(int) * tokens.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(5), positional_embedding.data() + offset * WHISPER_N_TEXT_STATE, decoder_loop_->get_input_size(5), AXCL_MEMCPY_HOST_TO_DEVICE);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(6), mask.data(), sizeof(float) * mask.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
 
-            ret = decoder_loop_->Run();
+            ret = decoder_loop_->run(false);
             if (ret) {
                 SLOGE("decoder_loop run failed!\n");
                 return;
             }
 
-            decoder_loop_->SetInput(decoder_loop_->GetOutputPtr(1), 1);
-            decoder_loop_->SetInput(decoder_loop_->GetOutputPtr(2), 2);
-            decoder_loop_->GetOutput(logits.data(), 0);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(1), decoder_loop_->get_output_pointer(1), sizeof(float) * n_layer_self_k_cache.size(), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(2), decoder_loop_->get_output_pointer(2), sizeof(float) * n_layer_self_v_cache.size(), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+            axclrtMemcpy(logits.data(), decoder_loop_->get_output_pointer(0), sizeof(float) * logits.size(), AXCL_MEMCPY_DEVICE_TO_HOST);
 
             offset += 1;
             mask[mode_config_.whisper_n_text_ctx - offset - 1] = 0;
@@ -527,16 +536,9 @@ public:
     void _ax_init()
     {
         if (!ax_init_flage_) {
-            int ret = AX_SYS_Init();
+            int ret = axclInit(nullptr);
             if (0 != ret) {
                 fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
-            }
-            AX_ENGINE_NPU_ATTR_T npu_attr;
-            memset(&npu_attr, 0, sizeof(npu_attr));
-            npu_attr.eHardMode = AX_ENGINE_VIRTUAL_NPU_DISABLE;
-            ret                = AX_ENGINE_Init(&npu_attr);
-            if (0 != ret) {
-                fprintf(stderr, "Init ax-engine failed{0x%8x}.\n", ret);
             }
         }
         ax_init_flage_++;
@@ -547,8 +549,7 @@ public:
         if (ax_init_flage_ > 0) {
             --ax_init_flage_;
             if (!ax_init_flage_) {
-                AX_ENGINE_Deinit();
-                AX_SYS_Deinit();
+                axclFinalize();
             }
         }
     }
@@ -572,9 +573,9 @@ public:
     ~llm_task()
     {
         stop();
-        if (encoder_) encoder_->Release();
-        if (decoder_main_) decoder_main_->Release();
-        if (decoder_loop_) decoder_loop_->Release();
+        if (encoder_) encoder_->final();
+        if (decoder_main_) decoder_main_->final();
+        if (decoder_loop_) decoder_loop_->final();
         _ax_deinit();
         buffer_destroy(pcmdata);
     }
