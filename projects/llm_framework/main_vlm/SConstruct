@@ -8,7 +8,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = append_srcs_dir(ADir('src'))
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['pthread','atomic','rt', 'dl', 'm', 'ax_msp', 'utilities', 'eventpp', 'StackFlow']
+REQUIREMENTS = ['pthread','atomic','rt', 'dl', 'm', 'ax_msp', 'axcl', 'utilities', 'eventpp', 'StackFlow']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = []
@@ -22,14 +22,12 @@ python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/reso
 DEFINITIONS += ['-O2']
 DEFINITIONS += ['-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
-REQUIREMENTS += ['ax_engine', 'ax_interpreter', 'ax_sys']
+REQUIREMENTS += ['spdlog', 'axcl_pcie_dma', 'axcl_pcie_msg', 'axcl_token', 'axcl_comm', 'axcl_pkg', 'axcl_rt', 'utilities']
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 
 
-INCLUDE += [ADir('src/runner'), ADir('src/runner/utils')]
-INCLUDE += [ADir('../include/sentencepiece'),
-            ADir('../include/protobuf-lite'),
-            ADir('../include/abseil-cpp'),
+INCLUDE += [ADir('src/runner'), ADir('src/runner/utils'), ADir('src/runner/ax_model_runner')]
+INCLUDE += [ADir('../include/abseil-cpp'),
             ADir('../include/opencv4'),
             ADir('../include/re2')]
 

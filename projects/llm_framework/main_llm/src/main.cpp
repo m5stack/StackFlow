@@ -29,7 +29,7 @@ using namespace StackFlows;
 int main_exit_flage = 0;
 static void __sigint(int iSigNo)
 {
-    SLOGW("llm_sys will be exit!");
+    SLOGW("llm_llm will be exit!");
     main_exit_flage = 1;
 }
 

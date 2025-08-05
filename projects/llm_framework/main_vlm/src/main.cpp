@@ -60,6 +60,7 @@ public:
     std::vector<unsigned short> img_embed;
     std::string prompt_;
     task_callback_t out_callback_;
+    static int ax_init_flage_;
     bool enoutput_;
     bool enstream_;
     bool encamera_;
@@ -126,23 +127,26 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokenizer_model);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokens_embed);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_post_axmodel);
-            CONFIG_AUTO_SET(file_body["mode_param"], filename_vpm_resampler_axmodedl);
+            CONFIG_AUTO_SET(file_body["mode_param"], filename_image_encoder_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
-            CONFIG_AUTO_SET(file_body["mode_param"], b_use_topk);
-            CONFIG_AUTO_SET(file_body["mode_param"], b_vpm_two_stage);
             CONFIG_AUTO_SET(file_body["mode_param"], b_bos);
             CONFIG_AUTO_SET(file_body["mode_param"], b_eos);
             CONFIG_AUTO_SET(file_body["mode_param"], axmodel_num);
             CONFIG_AUTO_SET(file_body["mode_param"], tokens_embed_num);
-            CONFIG_AUTO_SET(file_body["mode_param"], img_token_id);
             CONFIG_AUTO_SET(file_body["mode_param"], tokens_embed_size);
             CONFIG_AUTO_SET(file_body["mode_param"], b_use_mmap_load_embed);
-            CONFIG_AUTO_SET(file_body["mode_param"], b_dynamic_load_axmodel_layer);
             CONFIG_AUTO_SET(file_body["mode_param"], max_token_len);
-            CONFIG_AUTO_SET(file_body["mode_param"], temperature);
-            CONFIG_AUTO_SET(file_body["mode_param"], top_p);
-            CONFIG_AUTO_SET(file_body["mode_param"], vpm_width);
-            CONFIG_AUTO_SET(file_body["mode_param"], vpm_height);
+            if (config_body.contains("dev_ids")) {
+                mode_config_.dev_ids.clear();
+                for (auto &id : config_body["dev_ids"]) {
+                    mode_config_.dev_ids.push_back(id.get<int>());
+                }
+            } else if (file_body["mode_param"].contains("dev_ids")) {
+                mode_config_.dev_ids.clear();
+                for (auto &id : file_body["mode_param"]["dev_ids"]) {
+                    mode_config_.dev_ids.push_back(id.get<int>());
+                }
+            }
 
             if (mode_config_.filename_tokenizer_model.find("http:") != std::string::npos) {
                 mode_config_.filename_tokenizer_model = "http://localhost:" + std::to_string(port_);
@@ -173,16 +177,16 @@ public:
                     tokenizer_server_flage_.store(true);
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
                           (base_model + "tokenizer").c_str(), ("'" + prompt_ + "'").c_str());
-                    std::this_thread::sleep_for(std::chrono::seconds(15));
+                    std::this_thread::sleep_for(std::chrono::seconds(5));
                 }
             } else {
                 mode_config_.filename_tokenizer_model = base_model + mode_config_.filename_tokenizer_model;
             }
             SLOGI("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
-            mode_config_.filename_tokens_embed           = base_model + mode_config_.filename_tokens_embed;
-            mode_config_.filename_post_axmodel           = base_model + mode_config_.filename_post_axmodel;
-            mode_config_.filename_vpm_resampler_axmodedl = base_model + mode_config_.filename_vpm_resampler_axmodedl;
-            mode_config_.template_filename_axmodel       = base_model + mode_config_.template_filename_axmodel;
+            mode_config_.filename_tokens_embed          = base_model + mode_config_.filename_tokens_embed;
+            mode_config_.filename_post_axmodel          = base_model + mode_config_.filename_post_axmodel;
+            mode_config_.filename_image_encoder_axmodel = base_model + mode_config_.filename_image_encoder_axmodel;
+            mode_config_.template_filename_axmodel      = base_model + mode_config_.template_filename_axmodel;
 
             mode_config_.runing_callback = [this](int *p_token, int n_token, const char *p_str, float token_per_sec,
                                                   void *reserve) {
@@ -210,9 +214,6 @@ public:
         switch (mode_config_.tokenizer_type) {
             case TKT_LLaMa:
                 oss_prompt << "<|user|>\n" << input << "</s><|assistant|>\n";
-                break;
-            case TKT_MINICPM:
-                oss_prompt << "<用户>" << input << "<AI>";
                 break;
             case TKT_Phi3:
                 oss_prompt << input << " ";
@@ -287,6 +288,27 @@ public:
         }
     }
 
+    void _ax_init()
+    {
+        if (!ax_init_flage_) {
+            int ret = axclInit(nullptr);
+            if (0 != ret) {
+                fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
+            }
+        }
+        ax_init_flage_++;
+    }
+
+    void _ax_deinit()
+    {
+        if (ax_init_flage_ > 0) {
+            --ax_init_flage_;
+            if (!ax_init_flage_) {
+                axclFinalize();
+            }
+        }
+    }
+
     bool pause()
     {
         lLaMa_->Stop();
@@ -317,6 +339,7 @@ public:
 
     llm_task(const std::string &workid) : tokenizer_server_flage_(false), port_(getNextPort())
     {
+        _ax_init();
     }
 
     void start()
@@ -333,14 +356,14 @@ public:
         if (tokenizer_pid_ != -1) {
             kill(tokenizer_pid_, SIGTERM);
             waitpid(tokenizer_pid_, nullptr, WNOHANG);
-            // tokenizer_pid_ = -1;
         }
         if (lLaMa_) {
             lLaMa_->Deinit();
-            // lLaMa_.reset();
         }
+        _ax_deinit();
     }
 };
+int llm_task::ax_init_flage_ = 0;
 
 std::atomic<unsigned int> llm_task::next_port_{8090};
 
