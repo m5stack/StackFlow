@@ -27,6 +27,7 @@ public:
     [[nodiscard]] bool prepare(const bool& input_cached, const bool& output_cached, const uint32_t& group, const uint32_t& batch) override;
 
     [[nodiscard]] bool run(const bool& parallel) override;
+    [[nodiscard]] bool set() override;
 
     [[nodiscard]] uint32_t get_input_count() const override;
     [[nodiscard]] uint32_t get_output_count() const override;

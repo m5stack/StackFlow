@@ -28,6 +28,7 @@ public:
     [[nodiscard]] virtual bool prepare(const bool& input_cached, const bool& output_cached, const uint32_t& group, const uint32_t& batch) = 0;
 
     [[nodiscard]] virtual bool run(const bool& parallel) = 0;
+    [[nodiscard]] virtual bool set() = 0;
 
     [[nodiscard]] virtual uint32_t get_input_count() const = 0;
     [[nodiscard]] virtual uint32_t get_output_count() const = 0;

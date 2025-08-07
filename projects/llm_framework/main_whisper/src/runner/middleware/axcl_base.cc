@@ -23,6 +23,7 @@
 
 static int static_module_count{0};
 static std::mutex static_module_mutex;
+static axclrtContext context{nullptr};
 
 static bool module_init(const std::string& config, const uint32_t& index, const middleware::axcl_base::npu_func& func) {
     // 1. init axcl, using scalar_guard to ensure the finalization
@@ -58,7 +59,14 @@ static bool module_init(const std::string& config, const uint32_t& index, const 
             "Specified device index{%d} is out of range{total %d}.\n", index, lst.num);
         return false;
     }
+    // 4.5 create the context
+    if (const auto ret = axclrtCreateContext(&context, lst.devices[index]); 0 != ret) {
+        utilities::glog.print(utilities::log::type::error,
+            "Create axcl context failed{0x%08X}.\n", ret);
+        return false;
+    }
 
+    utilities::glog.print(utilities::log::type::info, "context: %p\n", context);
     // 5. set device
     if (const auto ret = axclrtSetDevice(lst.devices[index]); 0 != ret) {
         utilities::glog.print(utilities::log::type::error,
@@ -101,6 +109,15 @@ bool middleware::axcl_base::init(const std::string &config, const uint32_t &inde
     }
 
     return flag;
+}
+
+bool middleware::axcl_base::set_context() {
+    if (const auto ret = axclrtSetCurrentContext(context); 0 != ret) {
+        utilities::glog.print(utilities::log::type::error,
+            "Set axcl context failed{0x%08X}.\n", ret);
+        return false;
+    }
+    return true;
 }
 
 bool middleware::axcl_base::final(const npu_func& func) {

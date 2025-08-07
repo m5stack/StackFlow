@@ -39,6 +39,10 @@ bool middleware::runtime_runner::run(const bool& parallel) {
     return this->impl_->run(parallel);
 }
 
+bool middleware::runtime_runner::set() {
+    return this->impl_->set();
+}
+
 uint32_t middleware::runtime_runner::get_input_count() const {
     return this->impl_->get_input_count();
 }

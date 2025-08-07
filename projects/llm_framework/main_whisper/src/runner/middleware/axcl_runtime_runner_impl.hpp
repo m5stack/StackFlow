@@ -254,6 +254,13 @@ struct middleware::runtime_runner::impl {
         return true;
     }
 
+    [[nodiscard]] bool set() {
+        if (const auto ret = axcl_base::set_context(); !ret) {
+            return false;
+        }
+        return true;
+    }
+
     [[nodiscard]] bool run(const bool& parallel) const {
         std::ignore = parallel;
 

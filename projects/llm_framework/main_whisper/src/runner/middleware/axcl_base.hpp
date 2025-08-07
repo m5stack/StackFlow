@@ -24,6 +24,7 @@ public:
 
     [[nodiscard]] static bool init(const std::string& config, const uint32_t& index, const npu_func& func);
     [[nodiscard]] static bool final(const npu_func& func);
+    [[nodiscard]] static bool set_context();
 
     [[nodiscard]] bool flush_input() const override;
     [[nodiscard]] bool invalidate_output() const override;

@@ -76,9 +76,6 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
 
 class llm_task {
 private:
-    std::unique_ptr<middleware::runner> encoder_;
-    std::unique_ptr<middleware::runner> decoder_main_;
-    std::unique_ptr<middleware::runner> decoder_loop_;
     whisper_config mode_config_;
 
 public:
@@ -87,6 +84,9 @@ public:
     std::string response_format_;
     std::vector<std::string> inputs_;
     std::string language_;
+    std::unique_ptr<middleware::runner> encoder_;
+    std::unique_ptr<middleware::runner> decoder_main_;
+    std::unique_ptr<middleware::runner> decoder_loop_;
     bool enoutput_;
     bool enstream_;
     bool ensleep_;
@@ -424,7 +424,7 @@ public:
         start_all = get_current_time();
         axclrtMemcpy(encoder_->get_input_pointer(0), continous_mel.data(), sizeof(float) * continous_mel.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
         int ret = encoder_->run(false);
-        if (ret) {
+        if (!ret) {
             SLOGE("encoder run failed!");
             return;
         }
@@ -440,7 +440,7 @@ public:
         axclrtMemcpy(decoder_main_->get_input_pointer(1), encoder_->get_output_pointer(0), decoder_main_->get_input_size(1), AXCL_MEMCPY_DEVICE_TO_DEVICE);
         axclrtMemcpy(decoder_main_->get_input_pointer(2), encoder_->get_output_pointer(1), decoder_main_->get_input_size(2), AXCL_MEMCPY_DEVICE_TO_DEVICE);
         ret = decoder_main_->run(false);
-        if (ret) {
+        if (!ret) {
             SLOGE("decoder_main run failed!");
             return;
         }
@@ -483,7 +483,7 @@ public:
             axclrtMemcpy(decoder_loop_->get_input_pointer(6), mask.data(), sizeof(float) * mask.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
 
             ret = decoder_loop_->run(false);
-            if (ret) {
+            if (!ret) {
                 SLOGE("decoder_loop run failed!\n");
                 return;
             }
@@ -533,33 +533,11 @@ public:
         awake_flage_ = true;
     }
 
-    void _ax_init()
-    {
-        if (!ax_init_flage_) {
-            int ret = axclInit(nullptr);
-            if (0 != ret) {
-                fprintf(stderr, "AXCL_Init failed! ret = 0x%x\n", ret);
-            }
-        }
-        ax_init_flage_++;
-    }
-
-    void _ax_deinit()
-    {
-        if (ax_init_flage_ > 0) {
-            --ax_init_flage_;
-            if (!ax_init_flage_) {
-                axclFinalize();
-            }
-        }
-    }
-
     llm_task(const std::string &workid)
     {
         ensleep_     = false;
         awake_flage_ = false;
         pcmdata      = buffer_create();
-        _ax_init();
     }
 
     void start()
@@ -576,7 +554,6 @@ public:
         if (encoder_) encoder_->final();
         if (decoder_main_) decoder_main_->final();
         if (decoder_loop_) decoder_loop_->final();
-        _ax_deinit();
         buffer_destroy(pcmdata);
     }
 };
@@ -666,6 +643,9 @@ public:
             send("None", "None", error_body, unit_name_);
             return;
         }
+        llm_task_obj->encoder_->set();
+        llm_task_obj->decoder_main_->set();
+        llm_task_obj->decoder_loop_->set();
         std::string tmp_msg1;
         const std::string *next_data = &data;
         int ret;
