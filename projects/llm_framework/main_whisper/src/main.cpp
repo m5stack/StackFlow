@@ -538,7 +538,7 @@ public:
         if (!ax_init_flage_) {
             int ret = axclInit(nullptr);
             if (0 != ret) {
-                fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
+                fprintf(stderr, "AXCL_Init failed! ret = 0x%x\n", ret);
             }
         }
         ax_init_flage_++;

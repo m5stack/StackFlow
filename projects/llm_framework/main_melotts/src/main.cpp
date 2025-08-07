@@ -5,9 +5,9 @@
  */
 #include "StackFlow.h"
 #include "OnnxWrapper.hpp"
-#include "EngineWrapper.hpp"
+#include "AxclWrapper.h"
+
 #include "Lexicon.hpp"
-#include <ax_sys_api.h>
 #include "AudioFile.h"
 
 #include <signal.h>
@@ -34,6 +34,7 @@ static void __sigint(int iSigNo)
 
 static std::string base_model_path_;
 static std::string base_model_config_path_;
+const char *CONFIG_FILE_DEFAULT = "/usr/local/axcl/axcl.json";
 
 typedef struct {
     std::string mode;
@@ -73,7 +74,7 @@ private:
 public:
     melotts_config mode_config_;
     std::unique_ptr<OnnxWrapper> encoder_;
-    std::unique_ptr<EngineWrapper> decoder_;
+    std::unique_ptr<AxclWrapper> decoder_;
     std::unique_ptr<Lexicon> lexicon_;
     std::vector<float> g_matrix;
     std::string model_;
@@ -203,13 +204,13 @@ public:
             fread(g_matrix.data(), sizeof(float), g_matrix.size(), fp);
             fclose(fp);
             encoder_ = std::make_unique<OnnxWrapper>();
-            decoder_ = std::make_unique<EngineWrapper>();
             if (0 != encoder_->Init(mode_config_.encoder)) {
                 SLOGE("encoder init failed!");
                 return -4;
             }
-            if (0 != decoder_->Init(mode_config_.decoder.c_str())) {
-                SLOGE("Init decoder model failed!");
+            decoder_ = std::make_unique<AxclWrapper>();
+            if (!decoder_->initialize(CONFIG_FILE_DEFAULT, 0, 0, mode_config_.decoder, true, true, 0, 0)) {
+                SLOGE("Init failed.");
                 return -5;
             }
         } catch (...) {
@@ -280,9 +281,9 @@ public:
             auto zp_info   = encoder_output.at(0).GetTensorTypeAndShapeInfo();
             auto zp_shape  = zp_info.GetShape();
 
-            int zp_size         = decoder_->GetInputSize(0) / sizeof(float);
+            int zp_size         = decoder_->getInputSize(0) / sizeof(float);
             int dec_len         = zp_size / zp_shape[1];
-            int audio_slice_len = decoder_->GetOutputSize(0) / sizeof(float);
+            int audio_slice_len = decoder_->getInputSize(0) / sizeof(float);
 
             const int overlap_size = 1024;
             const int fade_size    = 512;
@@ -312,17 +313,14 @@ public:
                     }
                 }
 
-                decoder_->SetInput(zp.data(), 0);
-                decoder_->SetInput(g_matrix.data(), 1);
-
-                if (0 != decoder_->Run()) {
-                    SLOGE("Decoder run failed at slice %d", i);
-                    throw std::string("decoder_ RunSync error");
-                }
-
+                axclrtMemcpy(decoder_->getInputPointer(0), zp.data(), sizeof(float) * zp_size,
+                             AXCL_MEMCPY_HOST_TO_DEVICE);
+                axclrtMemcpy(decoder_->getInputPointer(1), g_matrix.data(), sizeof(float) * g_matrix.size(),
+                             AXCL_MEMCPY_HOST_TO_DEVICE);
+                auto ret = decoder_->run(false);
                 std::vector<float> decoder_output(audio_slice_len);
-                decoder_->GetOutput(decoder_output.data(), 0);
-
+                axclrtMemcpy(decoder_output.data(), decoder_->getOutputPointer(0),
+                             sizeof(float) * decoder_output.size(), AXCL_MEMCPY_DEVICE_TO_HOST);
                 if (i == 0) {
                     int main_part_size = static_cast<int>(decoder_output.size()) - overlap_size;
                     main_part_size     = std::max(0, main_part_size);
@@ -332,7 +330,6 @@ public:
                     if (decoder_output.size() > main_part_size) {
                         previous_tail.assign(decoder_output.begin() + main_part_size, decoder_output.end());
                     }
-
                 } else {
                     if (previous_tail.empty()) {
                         pcmlist.insert(pcmlist.end(), decoder_output.begin(), decoder_output.end());
@@ -379,7 +376,6 @@ public:
                         previous_tail.clear();
                     }
                 }
-
                 if (static_cast<int>(pcmlist.size()) >= audio_len) {
                     break;
                 }
@@ -438,38 +434,9 @@ public:
         return result;
     }
 
-    void _ax_init()
-    {
-        if (!ax_init_flage_) {
-            int ret = AX_SYS_Init();
-            if (0 != ret) {
-                fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
-            }
-            AX_ENGINE_NPU_ATTR_T npu_attr;
-            memset(&npu_attr, 0, sizeof(npu_attr));
-            ret = AX_ENGINE_Init(&npu_attr);
-            if (0 != ret) {
-                fprintf(stderr, "Init ax-engine failed{0x%8x}.\n", ret);
-            }
-        }
-        ax_init_flage_++;
-    }
-
-    void _ax_deinit()
-    {
-        if (ax_init_flage_ > 0) {
-            --ax_init_flage_;
-            if (!ax_init_flage_) {
-                AX_ENGINE_Deinit();
-                AX_SYS_Deinit();
-            }
-        }
-    }
-
     llm_task(const std::string &workid)
     {
         enaudio_ = true;
-        _ax_init();
     }
 
     void start()
@@ -483,8 +450,7 @@ public:
     ~llm_task()
     {
         stop();
-        if (decoder_) decoder_->Release();
-        _ax_deinit();
+        if (decoder_) decoder_->finalize();
     }
 };
 int llm_task::ax_init_flage_ = 0;
@@ -550,6 +516,7 @@ public:
         if (!(llm_task_obj && llm_channel)) {
             return;
         }
+        llm_task_obj->decoder_->set();
         if (data.empty() || (data == "None")) return;
         nlohmann::json error_body;
         const std::string *next_data = &data;

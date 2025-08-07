@@ -8,7 +8,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = append_srcs_dir(ADir('src'))
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['pthread', 'utilities', 'ax_msp', 'eventpp', 'StackFlow']
+REQUIREMENTS = ['pthread', 'utilities', 'ax_msp', 'axcl', 'eventpp', 'StackFlow']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = []
@@ -17,10 +17,10 @@ LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
-DEFINITIONS += ['-O3', '-fopenmp', '-std=c++17']
+DEFINITIONS += ['-O3', '-fopenmp', '-std=c++17', '-DENV_HAS_STD_FILESYSTEM', '-DENV_HAS_POSIX_FILE_STAT', '-DENV_AXCL_RUNTIME_API_ENABLE', '-DENV_AXCL_NATIVE_API_ENABLE']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
 LINK_SEARCH_PATH += [ADir('../static_lib')]
-REQUIREMENTS += ['ax_engine', 'ax_interpreter', 'ax_sys']
+REQUIREMENTS += ['axcl_rt', 'axcl_pkg', 'axcl_comm', 'spdlog', 'axcl_token', 'axcl_pcie_msg', 'axcl_pcie_dma']
 REQUIREMENTS += ['samplerate']
 
 INCLUDE += [ADir('../include')]
