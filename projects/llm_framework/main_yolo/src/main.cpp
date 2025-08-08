@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "StackFlow.h"
-#include "EngineWrapper.hpp"
+#include "middleware/AxclWrapper.h"
 #include "base/common.hpp"
 #include <ax_sys_api.h>
 #include <sys/stat.h>
@@ -29,6 +29,7 @@ static void __sigint(int iSigNo)
 
 static std::string base_model_path_;
 static std::string base_model_config_path_;
+const char *CONFIG_FILE_DEFAULT = "/usr/local/axcl/axcl.json";
 
 typedef struct {
     std::string yolo_model;
@@ -61,7 +62,7 @@ private:
 public:
     yolo_config mode_config_;
     std::string model_;
-    std::unique_ptr<EngineWrapper> yolo_;
+    std::unique_ptr<AxclWrapper> yolo_;
     std::string response_format_;
     std::vector<std::string> inputs_;
     std::vector<unsigned char> image_data_;
@@ -134,8 +135,8 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], model_type);
             CONFIG_AUTO_SET(file_body["mode_param"], npu_type);
             mode_config_.yolo_model = base_model + mode_config_.yolo_model;
-            yolo_                   = std::make_unique<EngineWrapper>();
-            if (0 != yolo_->Init(mode_config_.yolo_model.c_str(), 0, mode_config_.npu_type)) {
+            yolo_                   = std::make_unique<AxclWrapper>();
+            if (!yolo_->initialize(CONFIG_FILE_DEFAULT, 0, 0, mode_config_.yolo_model, true, true, 0, 0)) {
                 SLOGE("Init yolo_model model failed!\n");
                 return -5;
             }
@@ -226,18 +227,24 @@ public:
     {
         try {
             int ret = -1;
+            yolo_->set();
             std::vector<uint8_t> image(mode_config_.img_w * mode_config_.img_h * 3, 0);
             common::get_input_data_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, bgr2rgb);
             cv::Mat img_mat(mode_config_.img_h, mode_config_.img_w, CV_8UC3, image.data());
-            yolo_->SetInput((void *)image.data(), 0);
-            if (0 != yolo_->Run()) {
+
+            axclrtMemcpy(yolo_->getInputPointer(0), img_mat.data, img_mat.total() * img_mat.elemSize(),
+                          AXCL_MEMCPY_HOST_TO_DEVICE);
+
+            if (!yolo_->run(false)) {
                 SLOGE("Run yolo model failed!\n");
                 throw std::string("yolo_ RunSync error");
             }
+
             std::vector<detection::Object> objects;
-            yolo_->Post_Process(img_mat, mode_config_.img_w, mode_config_.img_h, mode_config_.cls_num,
+            yolo_->post_process(img_mat, mode_config_.img_w, mode_config_.img_h, mode_config_.cls_num,
                                 mode_config_.point_num, mode_config_.pron_threshold, mode_config_.nms_threshold,
                                 objects, mode_config_.model_type);
+
             nlohmann::json yolo_output = nlohmann::json::array();
             if (response_format_.compare(0, 10, "yolo.boxV2") == 0) {
                 nlohmann::json out_obj;
@@ -288,30 +295,8 @@ public:
         return false;
     }
 
-    void _ax_init()
-    {
-        if (!ax_init_flage_) {
-            int ret = AX_SYS_Init();
-            if (0 != ret) {
-                fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
-            }
-        }
-        ax_init_flage_++;
-    }
-
-    void _ax_deinit()
-    {
-        if (ax_init_flage_ > 0) {
-            --ax_init_flage_;
-            if (!ax_init_flage_) {
-                AX_SYS_Deinit();
-            }
-        }
-    }
-
     llm_task(const std::string &workid)
     {
-        _ax_init();
         inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
     }
 
@@ -335,8 +320,7 @@ public:
     ~llm_task()
     {
         stop();
-        if (yolo_) yolo_->Release();
-        _ax_deinit();
+        if (yolo_) yolo_->finalize();
     }
 };
 int llm_task::ax_init_flage_ = 0;
