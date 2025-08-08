@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "StackFlow.h"
-#include "EngineWrapper.hpp"
+#include "middleware/AxclWrapper.h"
 #include "base/common.hpp"
 #include <ax_sys_api.h>
 #include <sys/stat.h>
@@ -23,10 +23,11 @@ static void __sigint(int iSigNo)
 
 static std::string base_model_path_;
 static std::string base_model_config_path_;
+const char *CONFIG_FILE_DEFAULT = "/usr/local/axcl/axcl.json";
 
 typedef struct {
     std::string depth_anything_model;
-    std::string model_type = "detect";
+    std::string model_type = "segment";
     int img_h              = 640;
     int img_w              = 640;
     uint32_t npu_type      = 0;
@@ -50,7 +51,7 @@ private:
 public:
     depth_anything_config mode_config_;
     std::string model_;
-    std::unique_ptr<EngineWrapper> depth_anything_;
+    std::unique_ptr<AxclWrapper> depth_anything_;
     std::string response_format_;
     std::vector<std::string> inputs_;
     std::vector<unsigned char> image_data_;
@@ -118,8 +119,8 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], model_type);
             CONFIG_AUTO_SET(file_body["mode_param"], npu_type);
             mode_config_.depth_anything_model = base_model + mode_config_.depth_anything_model;
-            depth_anything_                   = std::make_unique<EngineWrapper>();
-            if (0 != depth_anything_->Init(mode_config_.depth_anything_model.c_str(), 0, mode_config_.npu_type)) {
+            depth_anything_                   = std::make_unique<AxclWrapper>();
+            if (!depth_anything_->initialize(CONFIG_FILE_DEFAULT, 0, 0, mode_config_.depth_anything_model, true, true, 0, 0)) {
                 SLOGE("Init depth_anything_model model failed!\n");
                 return -5;
             }
@@ -207,16 +208,17 @@ public:
     {
         try {
             int ret = -1;
+            depth_anything_->set();
             std::vector<uint8_t> image(mode_config_.img_w * mode_config_.img_h * 3, 0);
-            common::get_input_data_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, bgr2rgb);
-            cv::Mat img_mat(mode_config_.img_h, mode_config_.img_w, CV_8UC3, image.data());
-            depth_anything_->SetInput((void *)image.data(), 0);
-            if (0 != depth_anything_->Run()) {
+            common::get_input_data_no_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, true);
+            axclrtMemcpy(depth_anything_->getInputPointer(0), image.data(), image.size(),
+                          AXCL_MEMCPY_HOST_TO_DEVICE);
+            if (!depth_anything_->run(false)) {
                 SLOGE("Run depth_anything model failed!\n");
                 throw std::string("depth_anything_ RunSync error");
             }
             std::string depth_anything_output;
-            depth_anything_->Post_Process(img_mat, mode_config_.model_type, depth_anything_output);
+            depth_anything_->post_process(src, mode_config_.img_h, mode_config_.img_w, mode_config_.model_type, depth_anything_output);
             if (out_callback_) out_callback_(depth_anything_output, true);
         } catch (...) {
             SLOGW("depth_anything_->Run have error!");
@@ -225,30 +227,8 @@ public:
         return false;
     }
 
-    void _ax_init()
-    {
-        if (!ax_init_flage_) {
-            int ret = AX_SYS_Init();
-            if (0 != ret) {
-                fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
-            }
-        }
-        ax_init_flage_++;
-    }
-
-    void _ax_deinit()
-    {
-        if (ax_init_flage_ > 0) {
-            --ax_init_flage_;
-            if (!ax_init_flage_) {
-                AX_SYS_Deinit();
-            }
-        }
-    }
-
     llm_task(const std::string &workid)
     {
-        _ax_init();
         inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
     }
 
@@ -272,8 +252,7 @@ public:
     ~llm_task()
     {
         stop();
-        if (depth_anything_) depth_anything_->Release();
-        _ax_deinit();
+        if (depth_anything_) depth_anything_->finalize();
     }
 };
 int llm_task::ax_init_flage_ = 0;

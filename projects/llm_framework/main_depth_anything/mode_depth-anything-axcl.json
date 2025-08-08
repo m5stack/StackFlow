@@ -1,0 +1,25 @@
+{
+    "mode":"depth-anything-axcl",
+    "type":"cv",
+    "homepage":"https://huggingface.co/AXERA-TECH/Depth-Anything-V2/",
+    "compile_flage":"pulsar2 build --input cv/model/depth_anything_v2_vits.onnx --config cv/config/depth_anything_u8.json --output_dir cv/axmodel/depth-anything-u8 --output_name depth_anything_v2_vits_ax650.axmodel --target_hardware AX650 --compiler.check 0 --npu_mode NPU3",
+    "pulsar_version":"3.3-ae03a08f",
+    "capabilities":[
+        "Segmentation"
+    ],
+    "input_type":[
+        "cv.jpeg.base64"
+    ],
+    "output_type":[
+        "cv.jpeg.base64"
+    ],
+    "mode_param":{
+        "depth_anything_model":"depth_anything_v2_vits_ax650.axmodel",
+        "model_type":"segment",
+        "img_h":518,
+        "img_w":518,
+        "npu_type":3
+    },
+    "mode_param_bak":{
+    }
+}
