@@ -58,7 +58,7 @@ public:
     std::atomic_bool audio_flage_;
     std::atomic_bool awake_flage_;
     int awake_delay_       = 50;
-    int delay_audio_frame_ = 100;
+    int delay_audio_frame_ = 10;
     buffer_t *pcmdata;
 
     std::function<void(void)> pause;
@@ -183,11 +183,11 @@ public:
     {
         static int count = 0;
         if (count < delay_audio_frame_) {
-            buffer_write_char(pcmdata, raw.c_str(), raw.length());
+            buffer_write_char(pcmdata, raw.data(), raw.length());
             count++;
             return;
         }
-        buffer_write_char(pcmdata, raw.c_str(), raw.length());
+        buffer_write_char(pcmdata, raw.data(), raw.length());
         buffer_position_set(pcmdata, 0);
         count = 0;
         std::vector<float> floatSamples;

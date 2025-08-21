@@ -60,7 +60,7 @@ public:
     std::string superior_id_;
     task_callback_t out_callback_;
     int awake_delay_       = 50;
-    int delay_audio_frame_ = 100;
+    int delay_audio_frame_ = 3;
     buffer_t *pcmdata;
     std::string wake_wav_file_;
 
@@ -158,7 +158,7 @@ public:
             count++;
             return;
         }
-        buffer_write_char(pcmdata, raw.c_str(), raw.length());
+        buffer_write_char(pcmdata, raw.data(), raw.length());
         buffer_position_set(pcmdata, 0);
         count = 0;
         std::vector<float> floatSamples;

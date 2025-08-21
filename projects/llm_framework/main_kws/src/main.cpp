@@ -59,7 +59,7 @@ public:
     bool enwake_audio_;
     std::atomic_bool audio_flage_;
     task_callback_t out_callback_;
-    int delay_audio_frame_ = 100;
+    int delay_audio_frame_ = 10;
     buffer_t *pcmdata;
     std::string wake_wav_file_;
 
@@ -233,7 +233,7 @@ public:
             count++;
             return;
         }
-        buffer_write_char(pcmdata, raw.c_str(), raw.length());
+        buffer_write_char(pcmdata, raw.data(), raw.length());
         buffer_position_set(pcmdata, 0);
         count = 0;
         std::vector<float> floatSamples;
