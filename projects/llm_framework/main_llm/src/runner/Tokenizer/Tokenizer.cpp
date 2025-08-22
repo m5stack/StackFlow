@@ -8,6 +8,7 @@
 // #include "chatglm.h"
 
 #include "httplib.h"
+#include "http_utils.hpp"
 #include "json.hpp"
 
 #include "sample_log.h"
@@ -21,8 +22,7 @@
 #include <cstring>
 #include <csignal>
 
-class TokenizerLLaMa : public BaseTokenizer
-{
+class TokenizerLLaMa : public BaseTokenizer {
 protected:
     sentencepiece::SentencePieceProcessor sp;
     bool _b_bos, _b_eos;
@@ -33,8 +33,7 @@ public:
     bool Init(std::string model_path, bool b_bos = true, bool b_eos = false) override
     {
         auto ret = sp.Load(model_path);
-        if (!ret.ok())
-        {
+        if (!ret.ok()) {
             ALOGE("%s", ret.error_message());
             return false;
         }
@@ -44,43 +43,37 @@ public:
         return ret.ok();
     }
 
-    bool Encode(std::string input, std::vector<int> &output, bool b_img_prompt = false) override
+    bool Encode(std::string input, std::vector<int> &output, ImageInfo img_info) override
     {
         auto ret = sp.Encode(input, &output);
-        if (!ret.ok())
-        {
+        if (!ret.ok()) {
             ALOGE("%s", ret.error_message());
             return false;
         }
-        if (_b_bos)
-        {
+        if (_b_bos) {
             output.insert(output.begin(), sp.bos_id());
         }
-        if (_b_eos)
-        {
+        if (_b_eos) {
             output.push_back(sp.eos_id());
         }
         return true;
     }
 
-    std::vector<int> Encode(std::string input, bool b_img_prompt = false) override
+    std::vector<int> Encode(std::string input, ImageInfo img_info) override
     {
         std::vector<int> output;
-        Encode(input, output, b_img_prompt);
+        Encode(input, output, img_info);
         return output;
     }
 
-    std::string Decode(const std::vector<int> input) override
+    std::string Decode(const std::vector<int> &input) override
     {
         sentencepiece::SentencePieceText spt;
         sp.Decode(input, &spt);
         std::string out = spt.pieces()[0].piece();
-        if (*(unsigned short *)out.data() == 38626)
-        {
+        if (*(unsigned short *)out.data() == 38626) {
             return " " + spt.text();
-        }
-        else
-        {
+        } else {
             return spt.text();
         }
     }
@@ -98,40 +91,32 @@ public:
     {
         std::ostringstream oss_prompt;
         int messages_len = messages_.size();
-        for(auto &message : messages_)
-        {
-            messages_len --;
-            switch (message.first)
-            {
-            case ROLE_USER:
-            {
-                oss_prompt << "<|user|>\n" << message.second << "</s>";
-            }
-            break;
-            case ROLE_SYSTEM:
-            break;
-            case ROLE_ASSISTANT:
-            break;
-            case ROLE_ASSISTANT_HELP:
-            {
-                if(messages_len == 0)
-                {
-                    oss_prompt << "<|assistant|>\n";
-                }
-            }
-            break;
-            default:
-                break;
+        for (auto &message : messages_) {
+            messages_len--;
+            switch (message.first) {
+                case ROLE_USER: {
+                    oss_prompt << "<|user|>\n" << message.second << "</s>";
+                } break;
+                case ROLE_SYSTEM:
+                    break;
+                case ROLE_ASSISTANT:
+                    break;
+                case ROLE_ASSISTANT_HELP: {
+                    if (messages_len == 0) {
+                        oss_prompt << "<|assistant|>\n";
+                    }
+                } break;
+                default:
+                    break;
             }
         }
         return oss_prompt.str();
     }
 };
 
-class TokenizerMINICPM : public TokenizerLLaMa
-{
+class TokenizerMINICPM : public TokenizerLLaMa {
 public:
-    std::string Decode(const std::vector<int> input) override
+    std::string Decode(const std::vector<int> &input) override
     {
         sentencepiece::SentencePieceText spt;
         sp.Decode(input, &spt);
@@ -141,38 +126,30 @@ public:
     {
         std::ostringstream oss_prompt;
         int messages_len = messages_.size();
-        for(auto &message : messages_)
-        {
-            messages_len --;
-            switch (message.first)
-            {
-            case ROLE_USER:
-            {
-                oss_prompt << "<用户>" << message.second;
-            }
-            break;
-            case ROLE_SYSTEM:
-            break;
-            case ROLE_ASSISTANT:
-            break;
-            case ROLE_ASSISTANT_HELP:
-            {
-                if(messages_len == 0)
-                {
-                    oss_prompt << "<AI>";
-                }
-            }
-            break;
-            default:
-                break;
+        for (auto &message : messages_) {
+            messages_len--;
+            switch (message.first) {
+                case ROLE_USER: {
+                    oss_prompt << "<用户>" << message.second;
+                } break;
+                case ROLE_SYSTEM:
+                    break;
+                case ROLE_ASSISTANT:
+                    break;
+                case ROLE_ASSISTANT_HELP: {
+                    if (messages_len == 0) {
+                        oss_prompt << "<AI>";
+                    }
+                } break;
+                default:
+                    break;
             }
         }
         return oss_prompt.str();
     }
 };
 
-class TokenizerPhi3 : public BaseTokenizer
-{
+class TokenizerPhi3 : public BaseTokenizer {
     sentencepiece::SentencePieceProcessor sp;
     bool _b_bos, _b_eos;
 
@@ -182,8 +159,7 @@ public:
     bool Init(std::string model_path, bool b_bos = true, bool b_eos = false) override
     {
         auto ret = sp.Load(model_path);
-        if (!ret.ok())
-        {
+        if (!ret.ok()) {
             ALOGE("%s", ret.error_message());
             return false;
         }
@@ -193,46 +169,40 @@ public:
         return ret.ok();
     }
 
-    bool Encode(std::string input, std::vector<int> &output, bool b_img_prompt = false) override
+    bool Encode(std::string input, std::vector<int> &output, ImageInfo img_info) override
     {
         auto ret = sp.Encode(input, &output);
-        if (!ret.ok())
-        {
+        if (!ret.ok()) {
             ALOGE("%s", ret.error_message());
             return false;
         }
-        output.insert(output.begin(), 32010); //"<|user|>"
-        output.push_back(32007);              //"<|end|>"
-        output.push_back(32001);              //"<|assistant|>"
-        if (_b_bos)
-        {
+        output.insert(output.begin(), 32010);  //"<|user|>"
+        output.push_back(32007);               //"<|end|>"
+        output.push_back(32001);               //"<|assistant|>"
+        if (_b_bos) {
             output.insert(output.begin(), sp.bos_id());
         }
-        if (_b_eos)
-        {
+        if (_b_eos) {
             output.push_back(sp.eos_id());
         }
         return true;
     }
 
-    std::vector<int> Encode(std::string input, bool b_img_prompt = false) override
+    std::vector<int> Encode(std::string input, ImageInfo img_info) override
     {
         std::vector<int> output;
-        Encode(input, output, b_img_prompt);
+        Encode(input, output, img_info);
         return output;
     }
 
-    std::string Decode(const std::vector<int> input) override
+    std::string Decode(const std::vector<int> &input) override
     {
         sentencepiece::SentencePieceText spt;
         sp.Decode(input, &spt);
         std::string out = spt.pieces()[0].piece();
-        if (*(unsigned short *)out.data() == 38626)
-        {
+        if (*(unsigned short *)out.data() == 38626) {
             return " " + spt.text();
-        }
-        else
-        {
+        } else {
             return spt.text();
         }
     }
@@ -251,42 +221,35 @@ public:
     {
         return id == GetEosID() || id > 31999;
     }
+
     std::string apply_chat_template() override
     {
         std::ostringstream oss_prompt;
         int messages_len = messages_.size();
-        for(auto &message : messages_)
-        {
-            messages_len --;
-            switch (message.first)
-            {
-            case ROLE_USER:
-            {
-                oss_prompt << message.second;
-            }
-            break;
-            case ROLE_SYSTEM:
-            break;
-            case ROLE_ASSISTANT:
-            break;
-            case ROLE_ASSISTANT_HELP:
-            {
-                if(messages_len == 0)
-                {
-                    oss_prompt << " ";
-                }
-            }
-            break;
-            default:
-                break;
+        for (auto &message : messages_) {
+            messages_len--;
+            switch (message.first) {
+                case ROLE_USER: {
+                    oss_prompt << message.second;
+                } break;
+                case ROLE_SYSTEM:
+                    break;
+                case ROLE_ASSISTANT:
+                    break;
+                case ROLE_ASSISTANT_HELP: {
+                    if (messages_len == 0) {
+                        oss_prompt << " ";
+                    }
+                } break;
+                default:
+                    break;
             }
         }
         return oss_prompt.str();
     }
 };
 
-class TokenizerQwen : public BaseTokenizer
-{
+class TokenizerQwen : public BaseTokenizer {
     std::shared_ptr<QwenTokenizer> sp;
     bool _b_bos, _b_eos;
 
@@ -295,8 +258,7 @@ private:
 public:
     bool Init(std::string model_path, bool b_bos = true, bool b_eos = false) override
     {
-        if (!file_exist(model_path))
-        {
+        if (!file_exist(model_path)) {
             ALOGE("tokenizer model file(%s) not exist", model_path.c_str());
             return false;
         }
@@ -308,14 +270,12 @@ public:
         return true;
     }
 
-    bool Encode(std::string input, std::vector<int> &output, bool b_img_prompt = false) override
+    bool Encode(std::string input, std::vector<int> &output, ImageInfo img_info) override
     {
-        if (_b_bos)
-        {
+        if (_b_bos) {
             // input += "<|im_start|>";
         }
-        if (_b_eos)
-        {
+        if (_b_eos) {
             input += "<|endoftext|>";
         }
         output = sp->encode(input, 1024);
@@ -323,14 +283,14 @@ public:
         return true;
     }
 
-    std::vector<int> Encode(std::string input, bool b_img_prompt = false) override
+    std::vector<int> Encode(std::string input, ImageInfo img_info) override
     {
         std::vector<int> output;
-        Encode(input, output, b_img_prompt);
+        Encode(input, output, img_info);
         return output;
     }
 
-    std::string Decode(const std::vector<int> input) override
+    std::string Decode(const std::vector<int> &input) override
     {
         return sp->decode(input);
     }
@@ -348,108 +308,32 @@ public:
     {
         std::ostringstream oss_prompt;
         int messages_len = messages_.size();
-        for(auto &message : messages_)
-        {
-            messages_len --;
-            switch (message.first)
-            {
-            case ROLE_USER:
-            {
-                oss_prompt << "<|im_start|>user\n" << message.second << "<|im_end|>\n";
-            }
-            break;
-            case ROLE_SYSTEM:
-            {
-                oss_prompt << "<|im_start|>system\n" << message.second << ".<|im_end|>\n";
-            }
-            break;
-            case ROLE_ASSISTANT:
-            {
-                oss_prompt << "<|im_start|>assistant\n" << message.second << ".<|im_end|>\n";
-            }
-            break;
-            case ROLE_ASSISTANT_HELP:
-            {
-                if(messages_len == 0)
-                {
-                    oss_prompt << "<|im_start|>assistant\n";
-                }
-            }
-            break;
-            default:
-                break;
+        for (auto &message : messages_) {
+            messages_len--;
+            switch (message.first) {
+                case ROLE_USER: {
+                    oss_prompt << "<|im_start|>user\n" << message.second << "<|im_end|>\n";
+                } break;
+                case ROLE_SYSTEM: {
+                    oss_prompt << "<|im_start|>system\n" << message.second << ".<|im_end|>\n";
+                } break;
+                case ROLE_ASSISTANT: {
+                    oss_prompt << "<|im_start|>assistant\n" << message.second << ".<|im_end|>\n";
+                } break;
+                case ROLE_ASSISTANT_HELP: {
+                    if (messages_len == 0) {
+                        oss_prompt << "<|im_start|>assistant\n";
+                    }
+                } break;
+                default:
+                    break;
             }
         }
         return oss_prompt.str();
     }
 };
 
-// class TokenizerGLM3 : public BaseTokenizer
-// {
-//     std::shared_ptr<chatglm::ChatGLM3Tokenizer> sp;
-//     bool _b_bos, _b_eos;
-
-// private:
-//     /* data */
-// public:
-//     bool Init(std::string model_path, bool b_bos = true, bool b_eos = false) override
-//     {
-//         if (!file_exist(model_path))
-//         {
-//             ALOGE("tokenizer model file(%s) not exist", model_path.c_str());
-//             return false;
-//         }
-//         // std::vector<char> sp_model_data;
-//         // read_file(model_path, sp_model_data);
-//         // std::string_view serialized_model_proto(sp_model_data.data(), sp_model_data.size());
-
-//         sp.reset(new chatglm::ChatGLM3Tokenizer(model_path));
-
-//         this->_b_bos = b_bos;
-//         this->_b_eos = b_eos;
-//         return true;
-//     }
-
-//     bool Encode(std::string input, std::vector<int> &output) override
-//     {
-//         if (_b_bos)
-//         {
-//             // input += "<|im_start|>";
-//         }
-//         if (_b_eos)
-//         {
-//             // input += "<|endoftext|>";
-//         }
-//         output = sp->encode(input, 1024);
-
-//         return true;
-//     }
-
-//     std::vector<int> Encode(std::string input) override
-//     {
-//         std::vector<int> output;
-//         Encode(input, output);
-//         return output;
-//     }
-
-//     std::string Decode(const std::vector<int> input) override
-//     {
-//         return sp->decode(input);
-//     }
-
-//     int GetBosID() override
-//     {
-//         return sp->sp.bos_id();
-//     }
-
-//     int GetEosID() override
-//     {
-//         return sp->sp.eos_id();
-//     }
-// };
-
-class Tokenizer_Http : public BaseTokenizer
-{
+class Tokenizer_Http : public BaseTokenizer {
     std::shared_ptr<httplib::Client> cli;
     bool _b_bos, _b_eos;
 
@@ -457,14 +341,15 @@ class Tokenizer_Http : public BaseTokenizer
 
     int bos_id, eos_id;
 
+    std::string uid;
+
 private:
     /* data */
 public:
     bool Init(std::string model_path = "http://localhost:8080", bool b_bos = true, bool b_eos = false) override
     {
         base_url = model_path;
-        try
-        {
+        try {
             cli = std::make_shared<httplib::Client>(base_url);
             cli->set_connection_timeout(1);
             cli->set_read_timeout(1);
@@ -472,30 +357,26 @@ public:
             {
                 auto ret = cli->Get("/bos_id");
                 auto rep = ret.value();
-                if (rep.status != 200)
-                {
+                if (rep.status != 200) {
                     ALOGE("get bos_id failed, status: %d", rep.status);
                     return false;
                 }
                 nlohmann::json j = nlohmann::json::parse(rep.body);
-                bos_id = j["bos_id"];
+                bos_id           = j["bos_id"];
             }
 
             {
                 auto ret = cli->Get("/eos_id");
                 auto rep = ret.value();
-                if (rep.status != 200)
-                {
+                if (rep.status != 200) {
                     ALOGE("get eos_id failed, status: %d", rep.status);
                     return false;
                 }
                 nlohmann::json j = nlohmann::json::parse(rep.body);
-                eos_id = j["eos_id"];
+                eos_id           = j["eos_id"];
             }
             printf("bos_id: %d, eos_id: %d\n", bos_id, eos_id);
-        }
-        catch (const std::exception &e)
-        {
+        } catch (const std::exception &e) {
             std::cerr << e.what() << '\n';
             return false;
         }
@@ -505,77 +386,201 @@ public:
         return true;
     }
 
-    bool Encode(std::string input, std::vector<int> &output, bool b_img_prompt = false) override
+    bool Init(std::string model_path = "http://localhost:8080") override
+    {
+        base_url = model_path;
+        if (!test_connect_http(base_url, 10)) {
+            ALOGE("connect %s failed", base_url.c_str());
+            return false;
+        } else {
+            ALOGI("connect %s ok", base_url.c_str());
+        }
+
+        cli = std::make_shared<httplib::Client>(base_url);
+        cli->set_connection_timeout(10);
+        cli->set_read_timeout(10);
+        cli->set_write_timeout(10);
+
+        int try_count = 10;
+        int count     = try_count;
+        while (count-- > 0) {
+            try {
+                auto ret = cli->Get("/get_uid");
+                auto rep = ret.value();
+                if (rep.status != 200) {
+                    ALOGE("get uid failed, status: %d", rep.status);
+                    return false;
+                }
+                nlohmann::json j = nlohmann::json::parse(rep.body);
+                uid              = j["uid"];
+                ALOGI("uid: %s", uid.c_str());
+                break;
+            } catch (const std::exception &e) {
+                std::cerr << e.what() << '\n';
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            ALOGE("get uid failed, try again %d/%d", count, try_count);
+        }
+
+        count = 10;
+        while (count-- > 0) {
+            try {
+                auto ret = cli->Get("/bos_id?uid=" + uid);
+                auto rep = ret.value();
+                if (rep.status != 200) {
+                    ALOGE("get bos_id failed, status: %d", rep.status);
+                    return false;
+                }
+                nlohmann::json j = nlohmann::json::parse(rep.body);
+                bos_id           = j["bos_id"];
+                break;
+            } catch (const std::exception &e) {
+                std::cerr << e.what() << '\n';
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            ALOGE("get bos_id failed, try again %d/%d", count, try_count);
+        }
+
+        count = 10;
+        while (count-- > 0) {
+            try {
+                auto ret = cli->Get("/eos_id?uid=" + uid);
+                auto rep = ret.value();
+                if (rep.status != 200) {
+                    ALOGE("get eos_id failed, status: %d", rep.status);
+                    return false;
+                }
+                nlohmann::json j = nlohmann::json::parse(rep.body);
+                eos_id           = j["eos_id"];
+                break;
+            } catch (const std::exception &e) {
+                std::cerr << e.what() << '\n';
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            ALOGE("get eos_id failed, try again %d/%d", count, try_count);
+        }
+
+        printf("bos_id: %d, eos_id: %d\n", bos_id, eos_id);
+
+        return true;
+    }
+
+    bool Encode(std::string input, std::string last_reply, std::vector<int> &tokens, std::vector<int> &tokens_diff,
+                ImageInfo img_info) override
     {
         nlohmann::json j;
+        j["uid"]  = uid;
         j["text"] = input;
-        j["img_prompt"] = b_img_prompt;
-        auto ret = cli->Post("/encode", j.dump(), "application/json");
-        auto rep = ret.value();
-        if (rep.status != 200)
-        {
+        if (!last_reply.empty() and last_reply != "") {
+            j["last_reply"] = last_reply;
+        }
+
+        j["img_prompt"] = img_info.img_prompt;
+        auto ret        = cli->Post("/encode", j.dump(), "application/json");
+        auto rep        = ret.value();
+        if (rep.status != 200) {
             ALOGE("encode failed, status: %d", rep.status);
             return false;
         }
         nlohmann::json j2;
-        try
-        {
+        try {
             j2 = nlohmann::json::parse(rep.body);
+        } catch (const std::exception &e) {
+            ALOGE("json parse failed: %s", e.what());
+            ALOGE("%s", rep.body.c_str());
+            return false;
         }
-        catch (const std::exception &e)
-        {
+
+        std::vector<int> _token_ids   = j2["token_ids"];
+        std::vector<int> _tokens_diff = j2["diff"];
+
+        tokens      = _token_ids;
+        tokens_diff = _tokens_diff;
+
+        return true;
+    }
+
+    bool Encode(std::string input, std::vector<int> &output, ImageInfo img_info) override
+    {
+        nlohmann::json j;
+        j["text"]       = input;
+        j["img_prompt"] = img_info.img_prompt;
+        auto ret        = cli->Post("/encode", j.dump(), "application/json");
+        auto rep        = ret.value();
+        if (rep.status != 200) {
+            ALOGE("encode failed, status: %d", rep.status);
+            return false;
+        }
+        nlohmann::json j2;
+        try {
+            j2 = nlohmann::json::parse(rep.body);
+        } catch (const std::exception &e) {
             ALOGE("json parse failed: %s", e.what());
             ALOGE("%s", rep.body.c_str());
             return false;
         }
 
         std::vector<int> out = j2["token_ids"];
-        output = out;
-        // output = sp->encode(input, 1024);
-        if (_b_bos)
-        {
+        output               = out;
+
+        if (_b_bos) {
             output.insert(output.begin(), bos_id);
         }
-        if (_b_eos)
-        {
+        if (_b_eos) {
             output.push_back(eos_id);
         }
 
         return true;
     }
 
-    std::vector<int> Encode(std::string input, bool b_img_prompt = false) override
+    bool Reset(std::string system_prompt, std::vector<int> &tokens) override
+    {
+        nlohmann::json j;
+        j["uid"] = uid;
+        if (!system_prompt.empty() and system_prompt != "") {
+            j["system_prompt"] = system_prompt;
+        }
+
+        auto ret = cli->Post("/reset", j.dump(), "application/json");
+        auto rep = ret.value();
+        if (rep.status != 200) {
+            ALOGE("reset failed, status: %d", rep.status);
+            return false;
+        }
+        nlohmann::json j_rep        = nlohmann::json::parse(rep.body);
+        std::vector<int> _token_ids = j_rep["token_ids"];
+        tokens                      = _token_ids;
+        return true;
+    }
+
+    std::vector<int> Encode(std::string input, ImageInfo img_info) override
     {
         std::vector<int> output;
-        Encode(input, output, b_img_prompt);
+        Encode(input, output, img_info);
         return output;
     }
 
-    std::string Decode(const std::vector<int> input) override
+    std::string Decode(const std::vector<int> &input) override
     {
-        int cnt = 2;
+        int cnt             = 2;
         std::string out_str = "";
-        while (cnt--)
-        {
+        while (cnt--) {
             nlohmann::json j;
             j["token_ids"] = input;
-            auto ret = cli->Post("/decode", j.dump(), "application/json");
-            auto rep = ret.value();
-            if (rep.status != 200)
-            {
+            j["uid"]       = uid;
+            auto ret       = cli->Post("/decode", j.dump(), "application/json");
+            auto rep       = ret.value();
+            if (rep.status != 200) {
                 ALOGE("decode failed, status: %d, try again", rep.status);
                 ALOGE("%s", rep.body.c_str());
                 usleep(1000 * 1000);
                 continue;
             }
-            try
-            {
+            try {
                 nlohmann::json j2 = nlohmann::json::parse(rep.body);
-                out_str = j2["text"];
+                out_str           = j2["text"];
                 break;
-            }
-            catch (const std::exception &e)
-            {
+            } catch (const std::exception &e) {
                 ALOGE("json parse failed: %s, try again", e.what());
                 ALOGE("%s", rep.body.c_str());
                 usleep(1000 * 1000);
@@ -594,34 +599,25 @@ public:
     {
         return eos_id;
     }
+
     std::string apply_chat_template() override
     {
         std::ostringstream oss_prompt;
         int messages_len = messages_.size();
-        for(auto &message : messages_)
-        {
-            messages_len --;
-            switch (message.first)
-            {
-            case ROLE_USER:
-            {
-                oss_prompt << message.second ;
-            }
-            break;
-            case ROLE_SYSTEM:
-            {
-            }
-            break;
-            case ROLE_ASSISTANT:
-            {
-            }
-            break;
-            case ROLE_ASSISTANT_HELP:
-            {
-            }
-            break;
-            default:
-                break;
+        for (auto &message : messages_) {
+            messages_len--;
+            switch (message.first) {
+                case ROLE_USER: {
+                    oss_prompt << message.second;
+                } break;
+                case ROLE_SYSTEM: {
+                } break;
+                case ROLE_ASSISTANT: {
+                } break;
+                case ROLE_ASSISTANT_HELP: {
+                } break;
+                default:
+                    break;
             }
         }
         return oss_prompt.str();
@@ -801,7 +797,7 @@ public:
         return ret.success;
     }
 
-    bool Encode(std::string input, std::vector<int> &output, bool b_img_prompt = false) override
+    bool Encode(std::string input, std::vector<int> &output, ImageInfo img_info) override
     {
         nlohmann::json rpcobj;
         rpcobj["method"] = "encode";
@@ -815,14 +811,14 @@ public:
         return ret.success;
     }
 
-    std::vector<int> Encode(std::string input, bool b_img_prompt = false) override
+    std::vector<int> Encode(std::string input, ImageInfo img_info) override
     {
         std::vector<int> output;
-        Encode(input, output, b_img_prompt);
+        Encode(input, output, img_info);
         return output;
     }
 
-    std::string Decode(const std::vector<int> input) override
+    std::string Decode(const std::vector<int> &input) override
     {
         nlohmann::json rpcobj;
         rpcobj["method"] = "decode";
@@ -897,22 +893,20 @@ public:
 
 std::shared_ptr<BaseTokenizer> CreateTokenizer(TokenizerType type)
 {
-    switch (type)
-    {
-    case TKT_LLaMa:
-        return std::make_shared<TokenizerLLaMa>();
-    case TKT_MINICPM:
-        return std::make_shared<TokenizerMINICPM>();
-    case TKT_HTTP:
-        return std::make_shared<Tokenizer_Http>();
-    case TKT_Qwen:
-        return std::make_shared<TokenizerQwen>();
-    case TKT_Phi3:
-        return std::make_shared<TokenizerPhi3>();
-    case TKT_AUTO:
-        return std::make_shared<Tokenizer_Auto>();
-    default:
-        return nullptr;
+    switch (type) {
+        case TKT_LLaMa:
+            return std::make_shared<TokenizerLLaMa>();
+        case TKT_MINICPM:
+            return std::make_shared<TokenizerMINICPM>();
+        case TKT_HTTP:
+            return std::make_shared<Tokenizer_Http>();
+        case TKT_Qwen:
+            return std::make_shared<TokenizerQwen>();
+        case TKT_Phi3:
+            return std::make_shared<TokenizerPhi3>();
+        case TKT_AUTO:
+            return std::make_shared<Tokenizer_Auto>();
+        default:
+            return nullptr;
     }
 }
-
