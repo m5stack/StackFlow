@@ -130,6 +130,7 @@ public:
             std::string base_model = base_model_path_ + model_ + "/";
             SLOGI("base_model %s", base_model.c_str());
 
+            CONFIG_AUTO_SET(file_body["mode_param"], system_prompt);   
             CONFIG_AUTO_SET(file_body["mode_param"], tokenizer_type);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokenizer_model);
             CONFIG_AUTO_SET(file_body["mode_param"], url_tokenizer_model);
