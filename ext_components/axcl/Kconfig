@@ -2,4 +2,36 @@ menuconfig AXCL_ENABLED
     bool "Enable axera axcl support"
     default n
     help
-        enable axera axcl support
+        Enable axera axcl support.
+
+if AXCL_ENABLED
+
+config AXCL_RUNTIME_API_ENABLE
+    bool "Enable AXCL runtime API"
+    default y
+    help
+        Enable AXCL runtime API support.
+        This option is only available if AXCL is enabled.
+
+config AXCL_NATIVE_API_ENABLE
+    bool "Enable AXCL native API"
+    default y
+    help
+        Enable AXCL native API support.
+        This option is only available if AXCL is enabled.
+
+config AXCL_HAS_STD_FILESYSTEM
+    bool "Enable std::filesystem support in AXCL"
+    default y
+    help
+        Enable std::filesystem support in AXCL.
+        This option is only available if AXCL is enabled.
+
+config AXCL_HAS_POSIX_FILE_STAT
+    bool "Enable POSIX file stat support in AXCL"
+    default y
+    help
+        Enable POSIX file stat (e.g., struct stat) support in AXCL.
+        This option is only available if AXCL is enabled.
+
+endif # AXCL_ENABLED
