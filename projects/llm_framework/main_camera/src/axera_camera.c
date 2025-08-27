@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 #include "camera.h"
-#include "axera_camera.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -18,6 +17,9 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/prctl.h>
+#include <global_config.h>
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+#include "axera_camera.h"
 #include "AXRtspWrapper.h"
 #include "ax_venc_api.h"
 #include "ax_global_type.h"
@@ -29,6 +31,9 @@
 #include "common_vin.h"
 #include "ax_sys_api.h"
 #include "ax_ivps_api.h"
+#endif
+
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 
 #ifndef ALIGN_UP
 #define ALIGN_UP(x, a) ((((x) + ((a) - 1)) / a) * a)
@@ -115,8 +120,6 @@ AX_VIN_CHN_ATTR_T gSc850slChn0Attr = {
     .tFrameRateCtrl = {AX_INVALID_FRMRATE, AX_INVALID_FRMRATE},
 };
 
-
-
 struct axera_camera_index_t {
     char name[48];
     SAMPLE_VIN_CASE_E index;
@@ -136,8 +139,6 @@ struct axera_camera_index_t {
                           {"axera_single_lvds", SYS_CASE_SINGLE_LVDS},
                           {"axera_single_os04a10_online", SYS_CASE_SINGLE_OS04A10_ONLINE},
                           {"axera_single_sc850sl", SAMPLE_VIN_SINGLE_SC850SL}};
-
-
 
 /* comm pool */
 COMMON_SYS_POOL_CFG_T gtSysCommPoolSingleDummySdr[] = {
@@ -1611,9 +1612,9 @@ int axera_camera_open_from(camera_t *camera)
         return -10;
     }
 
-    axera_obj.VinParam.eSysMode     = axera_config->VinParam.eSysMode; // COMMON_VIN_SENSOR;
-    axera_obj.VinParam.eHdrMode     = axera_config->VinParam.eHdrMode; // AX_SNS_LINEAR_MODE;
-    axera_obj.VinParam.bAiispEnable = axera_config->VinParam.bAiispEnable; // AX_TRUE;
+    axera_obj.VinParam.eSysMode     = axera_config->VinParam.eSysMode;      // COMMON_VIN_SENSOR;
+    axera_obj.VinParam.eHdrMode     = axera_config->VinParam.eHdrMode;      // AX_SNS_LINEAR_MODE;
+    axera_obj.VinParam.bAiispEnable = axera_config->VinParam.bAiispEnable;  // AX_TRUE;
     // axera_obj.gCams.tChnAttr
     __sample_case_config(&axera_obj.gCams, &axera_obj.VinParam, &axera_obj.tCommonArgs, &axera_obj.tPrivArgs);
     COMMON_SYS_Init(&axera_obj.tCommonArgs);
@@ -1721,3 +1722,4 @@ int axera_camera_close(camera_t *camera)
 
     return 0;
 }
+#endif

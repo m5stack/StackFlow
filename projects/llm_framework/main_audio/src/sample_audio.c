@@ -116,6 +116,7 @@ void ax_play(unsigned int card, unsigned int device, float Volume, int channel, 
             goto AO_DEINIT;
         }
     }
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
     if (play_config.stHpfAttr.bEnable) {
         ret = AX_ACODEC_TxHpfSetAttr(card, &play_config.stHpfAttr);
         if (ret) {
@@ -152,10 +153,14 @@ void ax_play(unsigned int card, unsigned int device, float Volume, int channel, 
             goto DIS_LPF;
         }
     }
+#endif
     ret = AX_AO_EnableDev(card, device);
     if (ret) {
         printf("AX_AO_EnableDev failed! ret = %x \n", ret);
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
         goto DIS_EQ;
+#endif
+        goto DIS_AO_DEVICE;
     }
     if (play_config.gResample) {
         ret = AX_AO_EnableResample(card, device, play_config.enInSampleRate);
@@ -184,7 +189,11 @@ void ax_play(unsigned int card, unsigned int device, float Volume, int channel, 
                 AX_POOL_ReleaseBlock(stFrmInfo.u32BlkId);
                 break;
             }
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
             ret = AX_AO_SendFrame(card, device, &stFrmInfo, NULL, 0.f, -1);
+#else
+            ret = AX_AO_SendFrame(card, device, &stFrmInfo, -1);
+#endif
             if (ret != AX_SUCCESS) {
                 AX_POOL_ReleaseBlock(stFrmInfo.u32BlkId);
                 printf("AX_AO_SendFrame error, ret: %x\n", ret);
@@ -205,6 +214,7 @@ void ax_play(unsigned int card, unsigned int device, float Volume, int channel, 
         while (1) {
             ret = AX_AO_QueryDevStat(card, device, &stStatus);
             if (stStatus.u32DevBusyNum == 0) {
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
                 if (play_config.gInsertSilence) {
                     break;
                 } else {
@@ -212,11 +222,15 @@ void ax_play(unsigned int card, unsigned int device, float Volume, int channel, 
                         break;
                     }
                 }
+#else
+                break;
+#endif
             }
             usleep(10 * 1000);
         }
     }
     printf("ao success.\n");
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 DIS_EQ:
     if (play_config.stEqAttr.bEnable) {
         ret = AX_ACODEC_TxEqDisable(card);
@@ -238,7 +252,7 @@ DIS_HPF:
             printf("AX_ACODEC_TxHpfDisable failed! ret= %x\n", ret);
         }
     }
-
+#endif
 DIS_AO_DEVICE:
     ret = AX_AO_DisableDev(card, device);
     if (ret) {
@@ -329,7 +343,7 @@ void ax_cap_start(unsigned int card, unsigned int device, float Volume, int chan
         }
         outRate = rate;
     }
-
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
     if (cap_config.stHpfAttr.bEnable) {
         ret = AX_ACODEC_RxHpfSetAttr(card, &cap_config.stHpfAttr);
         if (ret) {
@@ -366,11 +380,14 @@ void ax_cap_start(unsigned int card, unsigned int device, float Volume, int chan
             goto DIS_LPF;
         }
     }
-
+#endif
     ret = AX_AI_EnableDev(card, device);
     if (ret) {
         printf("AX_AI_EnableDev failed! ret = %x \n", ret);
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
         goto DIS_EQ;
+#endif
+        goto AI_DETACHPOOL;
     }
 
     if (cap_config.gResample) {
@@ -415,7 +432,7 @@ DIS_AI_DEVICE:
         printf("AX_AI_DisableDev failed! ret= %x\n", ret);
         goto FREE_SYS;
     }
-
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 DIS_EQ:
     if (cap_config.stEqAttr.bEnable) {
         ret = AX_ACODEC_RxEqDisable(card);
@@ -437,7 +454,7 @@ DIS_HPF:
             printf("AX_ACODEC_RxHpfDisable failed! ret= %x\n", ret);
         }
     }
-
+#endif
 AI_DETACHPOOL:
     ret = AX_AI_DetachPool(card, device);
     if (AX_SUCCESS != ret) {

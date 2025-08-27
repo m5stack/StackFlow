@@ -1,0 +1,32 @@
+{
+    "mode":"yolo11n-pose-ax650",
+    "type":"cv",
+    "homepage":"https://github.com/ultralytics/ultralytics",
+    "compile_flage":"pulsar2 build  --target_hardware AX650 --input Workspace/cv/model/yolo11n-seg-cut.onnx --output_dir yolo11n-seg-ax650 --config Workspace/cv/config/yolo11_seg_config.json --output_name yolo11n-seg.axmodel --npu_mode NPU3",
+    "pulsar_version":"4.1-patch1-c37957c7",
+    "capabilities":[
+        "Pose"
+    ],
+    "input_type":[
+        "yolo.jpeg.base64"
+    ],
+    "output_type":[
+        "yolo.box",
+        "yolo.boxV2"
+    ],
+    "mode_param":{
+        "yolo_model":"yolo11n-pose.axmodel",
+        "model_type":"pose",
+        "img_h":320,
+        "img_w":320,
+        "cls_num":1,
+        "point_num":17,
+        "pron_threshold":0.45,
+        "nms_threshold":0.45,
+        "cls_name":[
+            "person"
+        ]
+    },
+    "mode_param_bak":{
+    }
+}

@@ -55,3 +55,60 @@ if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
                             'REGISTER':'static'
                             })
 
+if 'CONFIG_AX_650N_MSP_ENABLED' in os.environ:
+    MSP_PATH = ''
+    if 'CONFIG_MSP_V3_0_0_ENABLED' in os.environ:
+        MSP_PATH = os.environ.get('EXT_MSP_PATH', check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_ax650n_msp.tar.gz", 'm5stack_ax650n_msp.tar.gz'))
+    
+    SRCS=[]
+    INCLUDE=[]
+    PRIVATE_INCLUDE=[]
+    REQUIREMENTS=[]
+    STATIC_LIB=[]
+    DYNAMIC_LIB=[]
+    DEFINITIONS=[]
+    DEFINITIONS_PRIVATE=['']
+    LDFLAGS=[]
+    LINK_SEARCH_PATH=[]
+    
+    env["MSP_PATH"] = MSP_PATH
+    # , os.path.join(MSP_PATH, 'sample/common')
+    INCLUDE += [os.path.join(MSP_PATH, 'out/include'), os.path.join(MSP_PATH, 'sample'), os.path.join(MSP_PATH, 'sample/rtsp')]
+    LINK_SEARCH_PATH += [os.path.join(MSP_PATH, 'out/lib')]
+    REQUIREMENTS += ['dl', 'm', 'pthread']
+    third_party = ['drm','faac','fdk-aac','ffmpeg','libsamplerate','mp4','opencv','opus','tinyalsa']
+    for dirn in third_party:
+        INCLUDE.append(os.path.join(MSP_PATH,'third-party',dirn,'include'))
+        LINK_SEARCH_PATH.append(os.path.join(MSP_PATH,'third-party',dirn,'lib/arm64/glibc'))
+    INCLUDE.append(os.path.join(MSP_PATH,'third-party/tinyalsa/include/tinyalsa'))
+    INCLUDE.append(os.path.join(MSP_PATH,'third-party/live/out/include/liveMedia'))
+    INCLUDE.append(os.path.join(MSP_PATH,'third-party/live/out/include/groupsock'))
+    INCLUDE.append(os.path.join(MSP_PATH,'third-party/live/out/include/UsageEnvironment'))
+    INCLUDE.append(os.path.join(MSP_PATH,'third-party/live/out/include/BasicUsageEnvironment'))
+    INCLUDE.append(os.path.join(MSP_PATH,'component/isp_proton/sensor/platform/tcm'))
+    LINK_SEARCH_PATH.append(os.path.join(MSP_PATH,'third-party/libsamplerate/lib'))
+    INCLUDE.append(os.path.join(MSP_PATH,'third-party/openssl/include'))
+    LINK_SEARCH_PATH.append(os.path.join(MSP_PATH,'third-party/openssl/arm64/glibc/lib'))
+    LINK_SEARCH_PATH.append(os.path.join(MSP_PATH,'third-party/tinyalsa/lib'))
+    LINK_SEARCH_PATH.append(os.path.join(MSP_PATH,'third-party/fdk-aac/lib'))
+    LINK_SEARCH_PATH.append(os.path.join(MSP_PATH,'third-party/opus/lib'))
+    LINK_SEARCH_PATH.append(os.path.join(MSP_PATH,'app/lib'))
+
+    if 'CONFIG_SAMPLE_COMMON_ENABLED' in os.environ:
+        if 'CONFIG_MSP_V3_0_0_ENABLED' in os.environ:
+            INCLUDE.append(os.path.join(MSP_PATH,'sample/common'))
+            SRCS += AGlob(os.path.join(MSP_PATH,'sample/common/*.c*'))
+
+    env['COMPONENTS'].append({'target':os.path.basename(env['component_dir']),
+                            'SRCS':SRCS,
+                            'INCLUDE':INCLUDE,
+                            'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
+                            'REQUIREMENTS':REQUIREMENTS,
+                            'STATIC_LIB':STATIC_LIB,
+                            'DYNAMIC_LIB':DYNAMIC_LIB,
+                            'DEFINITIONS':DEFINITIONS,
+                            'DEFINITIONS_PRIVATE':DEFINITIONS_PRIVATE,
+                            'LDFLAGS':LDFLAGS,
+                            'LINK_SEARCH_PATH':LINK_SEARCH_PATH,
+                            'REGISTER':'static'
+                            })

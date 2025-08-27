@@ -41,11 +41,11 @@ SRCS += Glob(os.path.join(env["MSP_PATH"], 'sample/rtsp/*.c*') )
 # INCLUDE.append(ADir('ax_sample'))
 # SRCS += Glob('ax_sample/*.c*')
 
-REQUIREMENTS += ['ax_sys', 'ax_interpreter']
-REQUIREMENTS += ['ax_engine', 'ax_interpreter', 'ax_sys', 'ax_vo']
-REQUIREMENTS += ['ax_ae', 'ax_skel', 'ax_venc', 'ax_mipi', 'ax_ives', 'ax_ivps', 'ax_proton', 'ax_audio', 'tinyalsa']
-REQUIREMENTS += ['ax_audio_3a','samplerate', 'ax_fdk', 'fdk-aac', 'ax_awb', 'ax_af', 'ax_nt_stream', 'ax_nt_ctrl']
-REQUIREMENTS += ['liveMedia', 'UsageEnvironment', 'groupsock', 'BasicUsageEnvironment']
+REQUIREMENTS += ['ax_sys', 'ax_interpreter', 'ax_engine']
+if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
+    REQUIREMENTS += ['ax_ae', 'ax_vo', 'ax_skel', 'ax_venc', 'ax_mipi', 'ax_ives', 'ax_ivps', 'ax_proton', 'ax_audio', 'tinyalsa']
+    REQUIREMENTS += ['ax_audio_3a','samplerate', 'ax_fdk', 'fdk-aac', 'ax_awb', 'ax_af', 'ax_nt_stream', 'ax_nt_ctrl']
+    REQUIREMENTS += ['liveMedia', 'UsageEnvironment', 'groupsock', 'BasicUsageEnvironment']
 
 INCLUDE += [ADir('../include/opencv4')]
 static_file = []
