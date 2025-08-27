@@ -10,7 +10,7 @@
 
 #include "middleware/axcl_runtime_runner_impl.hpp"
 
-#if defined(ENV_AXCL_RUNTIME_API_ENABLE)
+#if defined(CONFIG_AXCL_RUNTIME_API_ENABLE)
 middleware::runtime_runner::runtime_runner() {
     this->impl_ = new impl();
 }

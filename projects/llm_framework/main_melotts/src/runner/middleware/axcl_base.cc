@@ -11,7 +11,7 @@
 #include "middleware/axcl_base.hpp"
 
 
-#if defined(ENV_AXCL_RUNTIME_API_ENABLE) || defined(ENV_AXCL_NATIVE_API_ENABLE)
+#if defined(CONFIG_AXCL_RUNTIME_API_ENABLE) || defined(CONFIG_AXCL_NATIVE_API_ENABLE)
 
 #include "utilities/scalar_guard.hpp"
 #include "utilities/file.hpp"

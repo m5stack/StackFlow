@@ -9,10 +9,11 @@
  **************************************************************************************************/
 
 #pragma once
+#include <global_config.h>
 
 #include "middleware/runner.hpp"
 
-#if defined(ENV_AXCL_RUNTIME_API_ENABLE) || defined(ENV_AXCL_NATIVE_API_ENABLE)
+#if defined(CONFIG_AXCL_RUNTIME_API_ENABLE) || defined(CONFIG_AXCL_NATIVE_API_ENABLE)
 
 #include <functional>
 

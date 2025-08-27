@@ -14,7 +14,7 @@
 
 namespace middleware {
 
-#if defined(ENV_AXCL_RUNTIME_API_ENABLE)
+#if defined(CONFIG_AXCL_RUNTIME_API_ENABLE)
 class runtime_runner final : public axcl_base {
 public:
     runtime_runner();

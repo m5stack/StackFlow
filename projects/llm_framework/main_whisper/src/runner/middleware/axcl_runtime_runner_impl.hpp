@@ -19,7 +19,7 @@
 
 #include <axcl.h>
 
-#if defined(ENV_AXCL_RUNTIME_API_ENABLE)
+#if defined(CONFIG_AXCL_RUNTIME_API_ENABLE)
 struct middleware::runtime_runner::impl {
     impl() = default;
 

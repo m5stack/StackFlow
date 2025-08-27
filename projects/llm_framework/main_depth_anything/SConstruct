@@ -16,7 +16,7 @@ LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
-DEFINITIONS += ['-O3', '-std=c++17', '-DENV_HAS_STD_FILESYSTEM', '-DENV_HAS_POSIX_FILE_STAT', '-DENV_AXCL_RUNTIME_API_ENABLE', '-DENV_AXCL_NATIVE_API_ENABLE']
+DEFINITIONS += ['-O3', '-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 REQUIREMENTS += ['axcl_rt', 'axcl_pkg', 'axcl_comm', 'spdlog', 'axcl_token', 'axcl_pcie_msg', 'axcl_pcie_dma']

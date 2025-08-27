@@ -9,20 +9,21 @@
  **************************************************************************************************/
 
 #pragma once
+#include <global_config.h>
 
 #include <fstream>
 #include <cctype>
 
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
 #include <filesystem>
-#endif // ENV_HAS_STD_FILESYSTEM
-#if defined(ENV_HAS_POSIX_FILE_STAT)
+#endif // CONFIG_AXCL_HAS_STD_FILESYSTEM
+#if defined(CONFIG_AXCL_HAS_POSIX_FILE_STAT)
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <cstring>
 #include "utilities/scalar_guard.hpp"
-#endif // ENV_HAS_POSIX_FILE_STAT
+#endif // CONFIG_AXCL_HAS_POSIX_FILE_STAT
 #if defined(ENV_HAS_WIN_API)
 #include <Windows.h>
 #endif // ENV_HAS_WIN_API
@@ -46,9 +47,9 @@ enum class file_type {
 };
 
 inline bool exists(const std::string& path) {
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
     return std::filesystem::exists(path);
-#elif defined(ENV_HAS_POSIX_FILE_STAT)
+#elif defined(CONFIG_AXCL_HAS_POSIX_FILE_STAT)
     struct ::stat path_stat{};
     return 0 == ::stat(path.c_str(), &path_stat);
 #else
@@ -57,9 +58,9 @@ inline bool exists(const std::string& path) {
 }
 
 inline uintmax_t file_size(const std::string& path) {
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
     return std::filesystem::file_size(path);
-#elif defined(ENV_HAS_POSIX_FILE_STAT)
+#elif defined(CONFIG_AXCL_HAS_POSIX_FILE_STAT)
     struct ::stat path_stat{};
     if (0 == ::stat(path.c_str(), &path_stat)) {
         return path_stat.st_size;
@@ -71,7 +72,7 @@ inline uintmax_t file_size(const std::string& path) {
 }
 
 inline file_type status(const std::string& path) {
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
     if (!exists(path)) {
         return file_type::not_found;
     }
@@ -99,7 +100,7 @@ inline file_type status(const std::string& path) {
         return file_type::socket;
     }
     return file_type::unknown;
-#elif defined(ENV_HAS_POSIX_FILE_STAT)
+#elif defined(CONFIG_AXCL_HAS_POSIX_FILE_STAT)
     struct ::stat path_stat{};
     if (0 != ::stat(path.c_str(), &path_stat)) {
         return file_type::not_found;
@@ -133,9 +134,9 @@ inline file_type status(const std::string& path) {
 }
 
 inline bool is_regular_file(const std::string& path) {
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
     return std::filesystem::is_regular_file(path);
-#elif defined(ENV_HAS_POSIX_FILE_STAT)
+#elif defined(CONFIG_AXCL_HAS_POSIX_FILE_STAT)
     struct ::stat path_stat{};
     return 0 == ::stat(path.c_str(), &path_stat) && S_ISREG(path_stat.st_mode);
 #else
@@ -144,9 +145,9 @@ inline bool is_regular_file(const std::string& path) {
 }
 
 inline bool is_directory(const std::string& path) {
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
     return std::filesystem::is_directory(path);
-#elif defined(ENV_HAS_POSIX_FILE_STAT)
+#elif defined(CONFIG_AXCL_HAS_POSIX_FILE_STAT)
     struct ::stat path_stat{};
     return 0 == ::stat(path.c_str(), &path_stat) && S_ISDIR(path_stat.st_mode);
 #else
@@ -155,9 +156,9 @@ inline bool is_directory(const std::string& path) {
 }
 
 inline bool is_empty(const std::string& path) {
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
     return std::filesystem::is_empty(path);
-#elif defined(ENV_HAS_POSIX_FILE_STAT)
+#elif defined(CONFIG_AXCL_HAS_POSIX_FILE_STAT)
     if (!exists(path))
         return false;
 
@@ -206,9 +207,9 @@ inline bool write(const std::string& file, const void* data, const uintmax_t& si
 }
 
 inline bool create_directory(const std::string& path) {
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
     return std::filesystem::create_directories(path);
-#elif defined(ENV_HAS_POSIX_FILE_STAT)
+#elif defined(CONFIG_AXCL_HAS_POSIX_FILE_STAT)
     return 0 == ::mkdir(path.c_str(), 0755);
 #else
 #error "Unsupported platform, native file system API is required."
@@ -216,7 +217,7 @@ inline bool create_directory(const std::string& path) {
 }
 
 inline std::string get_file_name(const std::string& file) {
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
     return std::filesystem::path(file).filename().string();
 #else
     if (const auto pos = file.find_last_of("/\\"); std::string::npos != pos) {
@@ -227,7 +228,7 @@ inline std::string get_file_name(const std::string& file) {
 }
 
 inline std::string get_file_extension(const std::string& file) {
-#if defined(ENV_HAS_STD_FILESYSTEM)
+#if defined(CONFIG_AXCL_HAS_STD_FILESYSTEM)
     return std::filesystem::path(file).extension().string();
 #else
     if (const auto pos = file.find_last_of('.'); std::string::npos != pos) {

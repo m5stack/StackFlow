@@ -22,7 +22,7 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
 
     memset(&config, 0, sizeof(config));
     config.channels          = channel;
-    config.rate              = 48000; // 固定采集为48k
+    config.rate              = 48000;  // TODO: 部分USB MIC仅支持48k，暂时固定采集为48k
     config.period_size       = 512;
     config.period_count      = 4;
     config.format            = PCM_FORMAT_S16_LE;
@@ -56,13 +56,13 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
 
     SRC_STATE *src_state = NULL;
     float *in_float = NULL, *out_float = NULL;
-    int in_frames = pcm_get_buffer_size(pcm);
+    int in_frames  = pcm_get_buffer_size(pcm);
     int out_frames = (int)((float)in_frames * ((float)rate / 48000.0f) + 1);
-    int out_bytes = out_frames * channel * sizeof(short);
+    int out_bytes  = out_frames * channel * sizeof(short);
 
     if (rate != 48000) {
         src_state = src_new(SRC_SINC_FASTEST, channel, NULL);
-        in_float = malloc(in_frames * channel * sizeof(float));
+        in_float  = malloc(in_frames * channel * sizeof(float));
         out_float = malloc(out_frames * channel * sizeof(float));
         if (!src_state || !in_float || !out_float) {
             fprintf(stderr, "Unable to allocate resample buffers\n");
@@ -87,19 +87,18 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
         if (rate == 48000) {
             callback(buffer, frames_read * bytes_per_frame);
         } else {
-            // short转float
             short *in_short = (short *)buffer;
             for (int i = 0; i < frames_read * channel; ++i) {
                 in_float[i] = in_short[i] / 32768.0f;
             }
             SRC_DATA src_data;
-            src_data.data_in = in_float;
-            src_data.input_frames = frames_read;
-            src_data.data_out = out_float;
+            src_data.data_in       = in_float;
+            src_data.input_frames  = frames_read;
+            src_data.data_out      = out_float;
             src_data.output_frames = out_frames;
-            src_data.src_ratio = (double)rate / 48000.0;
-            src_data.end_of_input = 0;
-            int error = src_process(src_state, &src_data);
+            src_data.src_ratio     = (double)rate / 48000.0;
+            src_data.end_of_input  = 0;
+            int error              = src_process(src_state, &src_data);
             if (error) {
                 fprintf(stderr, "SRC error: %s\n", src_strerror(error));
                 break;

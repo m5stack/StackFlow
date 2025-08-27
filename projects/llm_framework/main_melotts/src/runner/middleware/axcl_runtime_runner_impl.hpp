@@ -19,7 +19,7 @@
 
 #include <axcl.h>
 
-#if defined(ENV_AXCL_RUNTIME_API_ENABLE)
+#if defined(CONFIG_AXCL_RUNTIME_API_ENABLE)
 struct middleware::runtime_runner::impl {
     impl() = default;
 
@@ -121,9 +121,6 @@ struct middleware::runtime_runner::impl {
             utilities::glog.print(utilities::log::type::error, "Create model{%s} context failed.\n", model_path.c_str());
             return false;
         }
-
-        utilities::glog.print(utilities::log::type::info, "Model ID: %u, Context ID: %u\n", 
-                         this->model_id_, this->context_id_);
 
         return true;
     }

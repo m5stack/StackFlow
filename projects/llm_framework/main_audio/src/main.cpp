@@ -69,8 +69,13 @@ private:
 
     void hw_cap()
     {
-        alsa_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+        ax_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
                      cap_config.bit, llm_audio::on_cap_sample);
+#else
+        alsa_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
+                       cap_config.bit, llm_audio::on_cap_sample);
+#endif
     }
 
     void _play(const std::string &audio_data)
@@ -143,8 +148,17 @@ public:
         nlohmann::json error_body;
         std::string base_model_path;
         std::string base_model_config_path;
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+        std::list<std::string> config_file_paths;
+        if (access("/sys/devices/platform/soc/4851000.i2c/i2c-1/1-0043", F_OK) == 0) {
+            config_file_paths = get_config_file_paths(base_model_path, base_model_config_path, "audio_kit");
+        } else {
+            config_file_paths = get_config_file_paths(base_model_path, base_model_config_path, "audio");
+        }
+#else
         std::list<std::string> config_file_paths =
             get_config_file_paths(base_model_path, base_model_config_path, "audio");
+#endif
         try {
             config_body = nlohmann::json::parse(data);
             for (auto file_name : config_file_paths) {
@@ -196,20 +210,22 @@ public:
                 CONFIG_AUTO_SET(file_body["play_param"], stVqeAttr.stAgcCfg.enAgcMode);
                 CONFIG_AUTO_SET(file_body["play_param"], stVqeAttr.stAgcCfg.s16TargetLevel);
                 CONFIG_AUTO_SET(file_body["play_param"], stVqeAttr.stAgcCfg.s16Gain);
-                // CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.bEnable);
-                // CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.s32GainDb);
-                // CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.s32Freq);
-                // CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.bEnable);
-                // CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.s32GainDb);
-                // CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.s32Samplerate);
-                // CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.s32Freq);
-                // CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.bEnable);
-                // CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[0]);
-                // CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[1]);
-                // CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[2]);
-                // CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[3]);
-                // CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[4]);
-                // CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32Samplerate);
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+                CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.bEnable);
+                CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.s32GainDb);
+                CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.s32Freq);
+                CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.bEnable);
+                CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.s32GainDb);
+                CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.s32Samplerate);
+                CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.s32Freq);
+                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.bEnable);
+                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[0]);
+                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[1]);
+                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[2]);
+                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[3]);
+                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[4]);
+                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32Samplerate);
+#endif
                 CONFIG_AUTO_SET(file_body["play_param"], gResample);
                 CONFIG_AUTO_SET(file_body["play_param"], enInSampleRate);
                 CONFIG_AUTO_SET(file_body["play_param"], gInstant);
@@ -242,7 +258,7 @@ public:
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.enBitwidth);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.enLinkMode);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.enSamplerate);
-
+                // CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.enLayoutMode);
                 if (config_body.contains("aistAttr.enLayoutMode"))
                     mode_config_.aistAttr.enLayoutMode = config_body["aistAttr.enLayoutMode"];
                 else if (file_body["cap_param"].contains("aistAttr.enLayoutMode")) {
@@ -253,7 +269,6 @@ public:
                         }
                     }
                 }
-
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.U32Depth);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.u32PeriodSize);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.u32PeriodCount);
@@ -267,21 +282,23 @@ public:
                 CONFIG_AUTO_SET(file_body["cap_param"], aistVqeAttr.stAgcCfg.s16TargetLevel);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistVqeAttr.stAgcCfg.s16Gain);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistVqeAttr.stAecCfg.enAecMode);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.bEnable);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32GainDb);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32Samplerate);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32Freq);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.bEnable);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.s32GainDb);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.s32Samplerate);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.s32Freq);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.bEnable);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[0]);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[1]);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[2]);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[3]);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[4]);
-                // CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32Samplerate);
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+                CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.bEnable);
+                CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32GainDb);
+                CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32Samplerate);
+                CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32Freq);
+                CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.bEnable);
+                CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.s32GainDb);
+                CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.s32Samplerate);
+                CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.s32Freq);
+                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.bEnable);
+                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[0]);
+                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[1]);
+                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[2]);
+                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[3]);
+                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[4]);
+                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32Samplerate);
+#endif
                 CONFIG_AUTO_SET(file_body["cap_param"], gResample);
                 CONFIG_AUTO_SET(file_body["cap_param"], enOutSampleRate);
                 CONFIG_AUTO_SET(file_body["cap_param"], gDbDetection);

@@ -60,7 +60,7 @@ public:
     std::string superior_id_;
     task_callback_t out_callback_;
     int awake_delay_       = 50;
-    int delay_audio_frame_ = 100;
+    int delay_audio_frame_ = 4;
     buffer_t *pcmdata;
     std::string wake_wav_file_;
 
@@ -158,18 +158,19 @@ public:
             count++;
             return;
         }
-        buffer_write_char(pcmdata, raw.c_str(), raw.length());
         buffer_position_set(pcmdata, 0);
-        count = 0;
+
         std::vector<float> floatSamples;
         {
             int16_t audio_val;
-            while (buffer_read_u16(pcmdata, (unsigned short *)&audio_val, 1)) {
-                float normalizedSample = (float)audio_val / INT16_MAX;
+            while (buffer_read_i16(pcmdata, &audio_val, 1)) {
+                float normalizedSample = static_cast<float>(audio_val) / INT16_MAX;
                 floatSamples.push_back(normalizedSample);
             }
         }
-        buffer_position_set(pcmdata, 0);
+        buffer_resize(pcmdata, 0);
+        count = 0;
+
         vad_->AcceptWaveform(floatSamples.data(), floatSamples.size());
 
         if (vad_->IsSpeechDetected() && !printed) {

@@ -13,6 +13,7 @@
 #include <iostream>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
 #include "camera.h"
+#include <global_config.h>
 #if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 #include "axera_camera.h"
 #endif

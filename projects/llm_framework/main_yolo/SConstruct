@@ -16,7 +16,7 @@ LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
-DEFINITIONS += ['-std=c++17', '-O2', '-DENV_HAS_STD_FILESYSTEM', '-DENV_HAS_POSIX_FILE_STAT', '-DENV_AXCL_RUNTIME_API_ENABLE', '-DENV_AXCL_NATIVE_API_ENABLE']
+DEFINITIONS += ['-std=c++17', '-O2']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 REQUIREMENTS += ['axcl_rt', 'axcl_pkg', 'axcl_comm', 'spdlog', 'axcl_token', 'axcl_pcie_msg', 'axcl_pcie_dma']
@@ -30,15 +30,6 @@ STATIC_LIB += static_file * 2
 
 STATIC_FILES += Glob('models/mode_*.json')
 
-
-
-# REQUIREMENTS += ['Backward_cpp']
-# DYNAMIC_LIB += [ AFile('../static_lib/libdw.so.1'),
-#                 AFile('../static_lib/libelf.so.1'),
-#                 AFile('../static_lib/libz.so.1'),
-#                 AFile('../static_lib/liblzma.so.5'),
-#                 AFile('../static_lib/libbz2.so.1.0')]
-# DEFINITIONS += ["-DENABLE_BACKWARD"]
 
 env['COMPONENTS'].append({'target':'llm_yolo-1.9',
                           'SRCS':SRCS,
