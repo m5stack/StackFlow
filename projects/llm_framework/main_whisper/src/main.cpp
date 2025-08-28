@@ -99,7 +99,7 @@ public:
     static int ax_init_flage_;
     task_callback_t out_callback_;
     int awake_delay_       = 50;
-    int delay_audio_frame_ = 3001;
+    int delay_audio_frame_ = 3000;
     buffer_t *pcmdata;
 
     std::function<void(void)> pause;
@@ -343,6 +343,7 @@ public:
             count++;
             if (endpoint_flage_) return;
         }
+        buffer_write_char(pcmdata, raw.data(), raw.length());
         endpoint_flage_ = true;
 
         buffer_position_set(pcmdata, 0);
@@ -851,7 +852,7 @@ public:
                                             });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("whisper") != std::string::npos) {
-                    if (input.find("stream.base64") != std::string::npos) llm_task_obj->delay_audio_frame_ = 0;
+                    llm_task_obj->delay_audio_frame_ = 0;
                     llm_channel->subscriber_work_id(
                         "", std::bind(&llm_whisper::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                                       std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,

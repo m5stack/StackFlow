@@ -59,7 +59,7 @@ public:
     bool enwake_audio_;
     std::atomic_bool audio_flage_;
     task_callback_t out_callback_;
-    int delay_audio_frame_ = 11;
+    int delay_audio_frame_ = 10;
     buffer_t *pcmdata;
     std::string wake_wav_file_;
 
@@ -233,6 +233,7 @@ public:
             count++;
             return;
         }
+        buffer_write_char(pcmdata, raw.data(), raw.length());
         buffer_position_set(pcmdata, 0);
 
         std::vector<float> floatSamples;
@@ -529,6 +530,7 @@ public:
                                             });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("kws") != std::string::npos) {
+                    llm_task_obj->delay_audio_frame_ = 0;
                     llm_channel->subscriber_work_id(
                         "", std::bind(&llm_kws::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                                       std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
