@@ -23,7 +23,7 @@ public:
         _use_mmap = use_mmap;
         if (use_mmap)
         {
-             std::ifstream fin(embed_path);
+            std::ifstream fin(embed_path);
             if (!fin.is_open())
             {
                 ALOGE("embed file(%s) open failed", embed_path.c_str());
@@ -126,7 +126,7 @@ public:
             ALOGE("index(%d) > token_num(%d)", index, _token_num);
             return;
         }
-
+        
         if (_use_mmap)
         {
             unsigned short *ptr = (unsigned short *)_embed_map.data();

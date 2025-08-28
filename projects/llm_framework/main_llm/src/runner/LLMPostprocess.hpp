@@ -243,10 +243,11 @@ public:
         this->temperature = temperature;
     }
 
-    void set_repetition_penalty(bool enable, float penalty)
+    void set_repetition_penalty(bool enable, float penalty, int penalty_window)
     {
         enable_repetition_penalty = enable;
         this->repetition_penalty = penalty;
+        this->penalty_window = penalty_window;
     }
 
     void set_diversity_penalty(bool enable, const std::vector<int> &common_phrases, float penalty)
@@ -293,6 +294,49 @@ public:
 
         enable_top_k_sampling = config["enable_top_k_sampling"];
         top_k = config["top_k"];
+        return true;
+    }
+
+    bool load_config(const nlohmann::json& config)
+    {
+        if (config.is_null()) {
+            ALOGE("config is null or invalid");
+            return false;
+        }
+
+        ALOGI("load config: \n%s\n", config.dump(4).c_str());
+
+        if (config.contains("enable_temperature")) {
+            enable_temperature = config["enable_temperature"].get<bool>();
+        }
+        if (config.contains("temperature")) {
+            temperature = config["temperature"].get<float>();
+        }
+
+        if (config.contains("enable_repetition_penalty")) {
+            enable_repetition_penalty = config["enable_repetition_penalty"].get<bool>();
+        }
+        if (config.contains("repetition_penalty")) {
+            repetition_penalty = config["repetition_penalty"].get<float>();
+        }
+        if (config.contains("penalty_window")) {
+            penalty_window = config["penalty_window"].get<int>();
+        }
+
+        if (config.contains("enable_top_p_sampling")) {
+            enable_top_p_sampling = config["enable_top_p_sampling"].get<bool>();
+        }
+        if (config.contains("top_p")) {
+            top_p = config["top_p"].get<float>();
+        }
+
+        if (config.contains("enable_top_k_sampling")) {
+            enable_top_k_sampling = config["enable_top_k_sampling"].get<bool>();
+        }
+        if (config.contains("top_k")) {
+            top_k = config["top_k"].get<int>();
+        }
+
         return true;
     }
 

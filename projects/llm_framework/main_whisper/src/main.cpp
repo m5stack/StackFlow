@@ -93,12 +93,12 @@ public:
     std::atomic_bool superior_flage_;
     std::atomic_bool audio_flage_;
     std::atomic_bool awake_flage_;
-    std::atomic_bool endpoint_flage_;
+    std::atomic_bool endpoint_flage_ = true;
     std::string superior_id_;
     static int ax_init_flage_;
     task_callback_t out_callback_;
     int awake_delay_       = 50;
-    int delay_audio_frame_ = 1000;
+    int delay_audio_frame_ = 3000;
     buffer_t *pcmdata;
 
     std::function<void(void)> pause;
@@ -344,28 +344,32 @@ public:
 
     void sys_pcm_on_data(const std::string &raw)
     {
+        encoder_->set();
+        decoder_main_->set();
+        decoder_loop_->set();
         static int count = 0;
         double start, end;
         double start_all, end_all;
         if (count < delay_audio_frame_) {
-            buffer_write_char(pcmdata, raw.c_str(), raw.length());
+            buffer_write_char(pcmdata, raw.data(), raw.length());
             count++;
             if (endpoint_flage_) return;
         }
+        buffer_write_char(pcmdata, raw.data(), raw.length()); //If delay_audio_frame_ = 0, ensure that a frame is written
         endpoint_flage_ = true;
-        if (delay_audio_frame_ == 0) buffer_resize(pcmdata, 0);
-        buffer_write_char(pcmdata, raw.c_str(), raw.length());
+
         buffer_position_set(pcmdata, 0);
-        count = 0;
+
         std::vector<float> floatSamples;
         {
             int16_t audio_val;
-            while (buffer_read_u16(pcmdata, (unsigned short *)&audio_val, 1)) {
-                float normalizedSample = (float)audio_val / INT16_MAX;
+            while (buffer_read_i16(pcmdata, &audio_val, 1)) {
+                float normalizedSample = static_cast<float>(audio_val) / INT16_MAX;
                 floatSamples.push_back(normalizedSample);
             }
         }
-        buffer_position_set(pcmdata, 0);
+        buffer_resize(pcmdata, 0);
+        count = 0;
 
         if (WHISPER_N_TEXT_STATE_MAP.find(mode_config_.model_type) == WHISPER_N_TEXT_STATE_MAP.end()) {
             fprintf(stderr, "Can NOT find n_text_state for model_type: %s\n", mode_config_.model_type.c_str());
@@ -422,7 +426,8 @@ public:
 
         start     = get_current_time();
         start_all = get_current_time();
-        axclrtMemcpy(encoder_->get_input_pointer(0), continous_mel.data(), sizeof(float) * continous_mel.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
+        axclrtMemcpy(encoder_->get_input_pointer(0), continous_mel.data(), sizeof(float) * continous_mel.size(),
+                     AXCL_MEMCPY_HOST_TO_DEVICE);
         int ret = encoder_->run(false);
         if (!ret) {
             SLOGE("encoder run failed!");
@@ -436,15 +441,19 @@ public:
 
         // decoder_main
         start = get_current_time();
-        axclrtMemcpy(decoder_main_->get_input_pointer(0), SOT_SEQUENCE.data(), sizeof(int) * SOT_SEQUENCE.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
-        axclrtMemcpy(decoder_main_->get_input_pointer(1), encoder_->get_output_pointer(0), decoder_main_->get_input_size(1), AXCL_MEMCPY_DEVICE_TO_DEVICE);
-        axclrtMemcpy(decoder_main_->get_input_pointer(2), encoder_->get_output_pointer(1), decoder_main_->get_input_size(2), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_main_->get_input_pointer(0), SOT_SEQUENCE.data(), sizeof(int) * SOT_SEQUENCE.size(),
+                     AXCL_MEMCPY_HOST_TO_DEVICE);
+        axclrtMemcpy(decoder_main_->get_input_pointer(1), encoder_->get_output_pointer(0),
+                     decoder_main_->get_input_size(1), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_main_->get_input_pointer(2), encoder_->get_output_pointer(1),
+                     decoder_main_->get_input_size(2), AXCL_MEMCPY_DEVICE_TO_DEVICE);
         ret = decoder_main_->run(false);
         if (!ret) {
             SLOGE("decoder_main run failed!");
             return;
         }
-        axclrtMemcpy(decoder_main_logits.data(), decoder_main_->get_output_pointer(0), sizeof(float) * decoder_main_logits.size(), AXCL_MEMCPY_DEVICE_TO_HOST);
+        axclrtMemcpy(decoder_main_logits.data(), decoder_main_->get_output_pointer(0),
+                     sizeof(float) * decoder_main_logits.size(), AXCL_MEMCPY_DEVICE_TO_HOST);
 
         end = get_current_time();
 
@@ -462,10 +471,14 @@ public:
             mask[n] = mode_config_.neg_inf;
         }
 
-        axclrtMemcpy(decoder_loop_->get_input_pointer(1), decoder_main_->get_output_pointer(1), decoder_loop_->get_input_size(1), AXCL_MEMCPY_DEVICE_TO_DEVICE);
-        axclrtMemcpy(decoder_loop_->get_input_pointer(2), decoder_main_->get_output_pointer(2), decoder_loop_->get_input_size(2), AXCL_MEMCPY_DEVICE_TO_DEVICE);
-        axclrtMemcpy(decoder_loop_->get_input_pointer(3), encoder_->get_output_pointer(0), decoder_loop_->get_input_size(3), AXCL_MEMCPY_DEVICE_TO_DEVICE);
-        axclrtMemcpy(decoder_loop_->get_input_pointer(4), encoder_->get_output_pointer(1), decoder_loop_->get_input_size(4), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_loop_->get_input_pointer(1), decoder_main_->get_output_pointer(1),
+                     decoder_loop_->get_input_size(1), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_loop_->get_input_pointer(2), decoder_main_->get_output_pointer(2),
+                     decoder_loop_->get_input_size(2), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_loop_->get_input_pointer(3), encoder_->get_output_pointer(0),
+                     decoder_loop_->get_input_size(3), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+        axclrtMemcpy(decoder_loop_->get_input_pointer(4), encoder_->get_output_pointer(1),
+                     decoder_loop_->get_input_size(4), AXCL_MEMCPY_DEVICE_TO_DEVICE);
 
         for (int i = 0; i < mode_config_.whisper_n_text_ctx - SOT_SEQUENCE.size(); i++) {
             if (max_token_id == mode_config_.whisper_eot) {
@@ -478,9 +491,13 @@ public:
 
             // inference
             start = get_current_time();
-            axclrtMemcpy(decoder_loop_->get_input_pointer(0), tokens.data(), sizeof(int) * tokens.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
-            axclrtMemcpy(decoder_loop_->get_input_pointer(5), positional_embedding.data() + offset * WHISPER_N_TEXT_STATE, decoder_loop_->get_input_size(5), AXCL_MEMCPY_HOST_TO_DEVICE);
-            axclrtMemcpy(decoder_loop_->get_input_pointer(6), mask.data(), sizeof(float) * mask.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(0), tokens.data(), sizeof(int) * tokens.size(),
+                         AXCL_MEMCPY_HOST_TO_DEVICE);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(5),
+                         positional_embedding.data() + offset * WHISPER_N_TEXT_STATE, decoder_loop_->get_input_size(5),
+                         AXCL_MEMCPY_HOST_TO_DEVICE);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(6), mask.data(), sizeof(float) * mask.size(),
+                         AXCL_MEMCPY_HOST_TO_DEVICE);
 
             ret = decoder_loop_->run(false);
             if (!ret) {
@@ -488,9 +505,12 @@ public:
                 return;
             }
 
-            axclrtMemcpy(decoder_loop_->get_input_pointer(1), decoder_loop_->get_output_pointer(1), sizeof(float) * n_layer_self_k_cache.size(), AXCL_MEMCPY_DEVICE_TO_DEVICE);
-            axclrtMemcpy(decoder_loop_->get_input_pointer(2), decoder_loop_->get_output_pointer(2), sizeof(float) * n_layer_self_v_cache.size(), AXCL_MEMCPY_DEVICE_TO_DEVICE);
-            axclrtMemcpy(logits.data(), decoder_loop_->get_output_pointer(0), sizeof(float) * logits.size(), AXCL_MEMCPY_DEVICE_TO_HOST);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(1), decoder_loop_->get_output_pointer(1),
+                         sizeof(float) * n_layer_self_k_cache.size(), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+            axclrtMemcpy(decoder_loop_->get_input_pointer(2), decoder_loop_->get_output_pointer(2),
+                         sizeof(float) * n_layer_self_v_cache.size(), AXCL_MEMCPY_DEVICE_TO_DEVICE);
+            axclrtMemcpy(logits.data(), decoder_loop_->get_output_pointer(0), sizeof(float) * logits.size(),
+                         AXCL_MEMCPY_DEVICE_TO_HOST);
 
             offset += 1;
             mask[mode_config_.whisper_n_text_ctx - offset - 1] = 0;
@@ -643,9 +663,6 @@ public:
             send("None", "None", error_body, unit_name_);
             return;
         }
-        llm_task_obj->encoder_->set();
-        llm_task_obj->decoder_main_->set();
-        llm_task_obj->decoder_loop_->set();
         std::string tmp_msg1;
         const std::string *next_data = &data;
         int ret;
@@ -690,6 +707,14 @@ public:
                 return;
             }
             next_data = &tmp_msg4;
+        }
+        SLOGE("raw.length(): %d", (*next_data).length());
+        std::ofstream out_file("output_data.pcm", std::ios::binary | std::ios::app);
+        if (out_file.is_open()) {
+            out_file.write(next_data->data(), next_data->size());
+            out_file.close();
+        } else {
+            SLOGE("Failed to open file for writing.");
         }
         llm_task_obj->sys_pcm_on_data((*next_data));
     }
@@ -754,9 +779,7 @@ public:
         if (!(llm_task_obj && llm_channel)) {
             return;
         }
-        if (data == "true" || data == "false") {
-            llm_task_obj->endpoint_flage_ = (data == "true");
-        }
+        if (data == "false") llm_task_obj->endpoint_flage_ = false;
     }
 
     void work(const std::string &work_id, const std::string &object, const std::string &data) override
@@ -847,7 +870,6 @@ public:
                                          std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
                                          std::placeholders::_2));
                 } else if (input.find("vad") != std::string::npos) {
-                    llm_task_obj->endpoint_flage_ = true;
                     // task_pause(work_id, "");
                     llm_channel->subscriber_work_id(
                         input, std::bind(&llm_whisper::vad_endpoint, this, std::weak_ptr<llm_task>(llm_task_obj),
@@ -898,11 +920,10 @@ public:
                                              std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
             llm_task_obj->inputs_.push_back(data);
         } else if (data.find("vad") != std::string::npos) {
-            llm_task_obj->endpoint_flage_ = true;
-            ret                           = llm_channel->subscriber_work_id(
+            ret = llm_channel->subscriber_work_id(
                 data,
                 std::bind(&llm_whisper::vad_endpoint, this, std::weak_ptr<llm_task>(llm_task_obj),
-                                                    std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
+                          std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
         }
         if (ret) {
             error_body["code"]    = -20;

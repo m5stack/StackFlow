@@ -330,6 +330,7 @@ public:
                     if (decoder_output.size() > main_part_size) {
                         previous_tail.assign(decoder_output.begin() + main_part_size, decoder_output.end());
                     }
+
                 } else {
                     if (previous_tail.empty()) {
                         pcmlist.insert(pcmlist.end(), decoder_output.begin(), decoder_output.end());
@@ -376,6 +377,7 @@ public:
                         previous_tail.clear();
                     }
                 }
+
                 if (static_cast<int>(pcmlist.size()) >= audio_len) {
                     break;
                 }

@@ -58,7 +58,7 @@ public:
     std::atomic_bool audio_flage_;
     std::atomic_bool awake_flage_;
     int awake_delay_       = 50;
-    int delay_audio_frame_ = 11;
+    int delay_audio_frame_ = 10;
     buffer_t *pcmdata;
 
     std::function<void(void)> pause;
@@ -187,6 +187,7 @@ public:
             count++;
             return;
         }
+        buffer_write_char(pcmdata, raw.data(), raw.length());
         buffer_position_set(pcmdata, 0);
 
         std::vector<float> floatSamples;
@@ -523,6 +524,7 @@ public:
                                             });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("asr") != std::string::npos) {
+                    llm_task_obj->delay_audio_frame_ = 0;
                     llm_channel->subscriber_work_id(
                         "", std::bind(&llm_asr::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                                       std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,

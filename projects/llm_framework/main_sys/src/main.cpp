@@ -39,7 +39,7 @@ static void __sigint(int iSigNo)
 
 void get_run_config()
 {
-    key_sql["config_serial_dev"]            = std::string("/dev/ttyS1");
+    key_sql["config_serial_dev"]            = std::string("/dev/tty1");
     key_sql["config_serial_baud"]           = 115200;
     key_sql["config_serial_data_bits"]      = 8;
     key_sql["config_serial_stop_bits"]      = 1;
@@ -90,7 +90,7 @@ void uart_reset_check()
     uart_reset_check_obj(uart_parm.parity, 110);
     uart_parm.wait_flage = 1;
     if (reset_init) {
-        const char *dev_name = "/dev/ttyS1";
+        const char *dev_name = "/dev/tty1";
         int uart_fd          = linux_uart_init((char *)dev_name, &uart_parm);
         char uart_buff[32];
         struct timespec _run_time_start;
@@ -106,7 +106,7 @@ void uart_reset_check()
                     flage_strp = (char *)flage_str;
                 }
                 if (*flage_strp == '\0') {
-                    key_sql["config_serial_dev"]       = std::string("/dev/ttyS1");
+                    key_sql["config_serial_dev"]       = std::string("/dev/tty1");
                     key_sql["config_serial_baud"]      = 115200;
                     key_sql["config_serial_data_bits"] = 8;
                     key_sql["config_serial_stop_bits"] = 1;

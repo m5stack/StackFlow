@@ -23,7 +23,7 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
     memset(&config, 0, sizeof(config));
     config.channels          = channel;
     config.rate              = 48000;  // TODO: 部分USB MIC仅支持48k，暂时固定采集为48k
-    config.period_size       = 512;
+    config.period_size       = 120;
     config.period_count      = 4;
     config.format            = PCM_FORMAT_S16_LE;
     config.start_threshold   = 0;

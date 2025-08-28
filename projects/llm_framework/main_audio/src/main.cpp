@@ -69,7 +69,7 @@ private:
 
     void hw_cap()
     {
-#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+#if (defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)) && !defined(CONFIG_AXCL_ENABLED)
         ax_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
                      cap_config.bit, llm_audio::on_cap_sample);
 #else
@@ -148,7 +148,7 @@ public:
         nlohmann::json error_body;
         std::string base_model_path;
         std::string base_model_config_path;
-#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+#if (defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)) && !defined(CONFIG_AXCL_ENABLED)
         std::list<std::string> config_file_paths;
         if (access("/sys/devices/platform/soc/4851000.i2c/i2c-1/1-0043", F_OK) == 0) {
             config_file_paths = get_config_file_paths(base_model_path, base_model_config_path, "audio_kit");
@@ -210,7 +210,7 @@ public:
                 CONFIG_AUTO_SET(file_body["play_param"], stVqeAttr.stAgcCfg.enAgcMode);
                 CONFIG_AUTO_SET(file_body["play_param"], stVqeAttr.stAgcCfg.s16TargetLevel);
                 CONFIG_AUTO_SET(file_body["play_param"], stVqeAttr.stAgcCfg.s16Gain);
-#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+#if (defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)) && !defined(CONFIG_AXCL_ENABLED)
                 CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.bEnable);
                 CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.s32GainDb);
                 CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.s32Freq);
@@ -282,7 +282,7 @@ public:
                 CONFIG_AUTO_SET(file_body["cap_param"], aistVqeAttr.stAgcCfg.s16TargetLevel);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistVqeAttr.stAgcCfg.s16Gain);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistVqeAttr.stAecCfg.enAecMode);
-#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+#if (defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)) && !defined(CONFIG_AXCL_ENABLED)
                 CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.bEnable);
                 CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32GainDb);
                 CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32Samplerate);
