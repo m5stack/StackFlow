@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "StackFlow.h"
-#include "middleware/AxclWrapper.h"
+#include "AxclWrapper.h"
 #include "base/common.hpp"
 #include <ax_sys_api.h>
 #include <sys/stat.h>

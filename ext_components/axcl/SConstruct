@@ -23,10 +23,13 @@ if "CONFIG_AXCL_ENABLED" in os.environ:
     REQUIREMENTS = []
     STATIC_LIB = []
     DYNAMIC_LIB = []
-    DEFINITIONS = []
+    DEFINITIONS = ['-O2', '-std=c++17']
     DEFINITIONS_PRIVATE = []
     LDFLAGS = []
     LINK_SEARCH_PATH = []
+
+    SRCS += Glob('middleware/*.cc')
+    INCLUDE.append(ADir("."))
     INCLUDE += [
         # os.path.join(env["GIT_REPO_LISTS"]["axcl"]["path"], "include/external"),
         os.path.join(env["GIT_REPO_LISTS"]["axcl"]["path"], "out/axcl_linux_ax650/include")
