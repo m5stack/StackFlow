@@ -34,6 +34,8 @@ struct LLMAttrType {
     std::string filename_post_axmodel = "tinyllama-int8/tinyllama_post.axmodel";
 
     TokenizerType tokenizer_type      = TKT_LLaMa;
+    std::string filename_tokenizer_model;
+    bool b_bos = false, b_eos = false;
     std::string url_tokenizer_model;
     std::vector<int> dev_ids = {0, 1, 2, 3};
 

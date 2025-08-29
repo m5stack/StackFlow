@@ -20,7 +20,7 @@ private:
     std::string uid;
 
 public:
-    bool Init(std::string model_path = "http://localhost:8080") override
+    bool Init(std::string model_path) override
     {
         base_url = model_path;
         if (!test_connect_http(base_url, 10)) {
