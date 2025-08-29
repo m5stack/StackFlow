@@ -801,9 +801,27 @@ public:
                 _attr.prefill_max_kv_cache_num_grp[_attr.prefill_max_kv_cache_num_grp.size() - 1];
             ALOGI("prefill_max_token_num : %d", _attr.prefill_max_token_num);
         }
+        nlohmann::json dynamic_config;
+
+        dynamic_config["enable_temperature"] = _attr.enable_temperature;
+        dynamic_config["temperature"]        = _attr.temperature;
+
+        dynamic_config["enable_repetition_penalty"] = _attr.enable_repetition_penalty;
+        dynamic_config["repetition_penalty"]        = _attr.repetition_penalty;
+        dynamic_config["penalty_window"]            = _attr.penalty_window;
+
+        dynamic_config["enable_top_p_sampling"] = _attr.enable_top_p_sampling;
+        dynamic_config["top_p"]                 = _attr.top_p;
+
+        dynamic_config["enable_top_k_sampling"] = _attr.enable_top_k_sampling;
+        dynamic_config["top_k"]                 = _attr.top_k;
 
         if (!postprocess.load_config(attr.post_config_path)) {
             ALOGW("load postprocess config(%s) failed", attr.post_config_path.c_str());
+        }
+
+        if (!postprocess.load_config(dynamic_config)) {
+            ALOGW("load postprocess config(%s) failed", dynamic_config.dump(4).c_str());
         }
 
         ALOGI("LLM init ok");
@@ -1337,7 +1355,6 @@ public:
 
         return 0;
     }
-
 
     int Encode(std::vector<std::vector<unsigned short>> &imgs_embed, std::vector<unsigned short> &out_embed,
                std::string prompt, std::vector<int> &tokens_ids, std::vector<int> &tokens_diff)
