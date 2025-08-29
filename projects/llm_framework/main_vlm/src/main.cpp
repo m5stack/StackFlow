@@ -135,6 +135,7 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokens_embed);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_post_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_vpm_resampler_axmodedl);
+            CONFIG_AUTO_SET(file_body["mode_param"], filename_image_encoder_axmodedl);
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], b_use_topk);
             CONFIG_AUTO_SET(file_body["mode_param"], b_vpm_two_stage);
@@ -218,6 +219,7 @@ public:
             mode_config_.filename_post_axmodel           = base_model + mode_config_.filename_post_axmodel;
             mode_config_.template_filename_axmodel       = base_model + mode_config_.template_filename_axmodel;
             mode_config_.filename_vpm_resampler_axmodedl = base_model + mode_config_.filename_vpm_resampler_axmodedl;
+            mode_config_.filename_image_encoder_axmodedl = base_model + mode_config_.filename_image_encoder_axmodedl;
             mode_config_.runing_callback = [this](int *p_token, int n_token, const char *p_str, float token_per_sec,
                                                   void *reserve) {
                 if (this->out_callback_) {
@@ -341,7 +343,7 @@ public:
 
             if (lLaMa_ctx_) {
                 if (image_data_.empty()) {
-                    lLaMa_ctx_->Encode(prompt_data_, prompt_complete(prompt_), last_reply, tokens_ids, tokens_diff);
+                    lLaMa_ctx_->Encode(prompt_data_, prompt_complete(msg), last_reply, tokens_ids, tokens_diff);
                     if (auto ret = lLaMa_ctx_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
                         ret != 0) {
                         ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
@@ -349,28 +351,31 @@ public:
                     }
                     last_reply = lLaMa_ctx_->Run(prompt_data_);
                     lLaMa_ctx_->GetKVCache(k_caches, v_caches, precompute_len);
+                    if (out_callback_) out_callback_(last_reply, true);
+                } else {
+                    cv::Mat src = cv::imdecode(image_data_, cv::IMREAD_COLOR);
+                    if (src.empty()) return;
+                    image_data_.clear();
+                    std::vector<unsigned short> img_embed;
+                    if (auto ret = lLaMa_ctx_->Encode(src, img_embed); ret != 0) {
+                        ALOGE("lLaMaCtx.Encode failed");
+                        return;
+                    }
+                    if (auto ret =
+                            lLaMa_ctx_->Encode(img_embed, prompt_data_, prompt_complete(msg), tokens_ids, tokens_diff);
+                        ret != 0) {
+                        ALOGE("lLaMaCtx.Encode failed");
+                        return;
+                    }
+                    if (auto ret = lLaMa_ctx_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
+                        ret != 0) {
+                        ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
+                        return;
+                    }
+                    last_reply = lLaMa_ctx_->Run(prompt_data_);
+                    lLaMa_ctx_->GetKVCache(k_caches, v_caches, precompute_len);
+                    if (out_callback_) out_callback_(last_reply, true);
                 }
-                cv::Mat src = cv::imdecode(image_data_, cv::IMREAD_COLOR);
-                if (src.empty()) return;
-                image_data_.clear();
-                std::vector<unsigned short> img_embed;
-                if (auto ret = lLaMa_ctx_->Encode(src, img_embed); ret != 0) {
-                    ALOGE("lLaMaCtx.Encode failed");
-                    return;
-                }
-                if (auto ret =
-                        lLaMa_ctx_->Encode(img_embed, prompt_data_, prompt_complete(prompt_), tokens_ids, tokens_diff);
-                    ret != 0) {
-                    ALOGE("lLaMaCtx.Encode failed");
-                    return;
-                }
-                if (auto ret = lLaMa_ctx_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
-                    ret != 0) {
-                    ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
-                    return;
-                }
-                last_reply = lLaMa_ctx_->Run(prompt_data_);
-                lLaMa_ctx_->GetKVCache(k_caches, v_caches, precompute_len);
             }
         } catch (...) {
             SLOGW("lLaMa_->Run have error!");

@@ -469,19 +469,7 @@ public:
             if (_attr.b_dynamic_load_axmodel_layer) {
                 layer.layer.deinit();
             }
-            // ALOGI("%f %f %f %f %f", bfloat16(embed[0]).fp32(), bfloat16(embed[1]).fp32(), bfloat16(embed[2]).fp32(),
-            // bfloat16(embed[3]).fp32(), bfloat16(embed[4]).fp32());
         }
-
-        // ALOGI("prefill time cost: %.2f s", t_cost.cost() / 1000);
-
-        // print token_ids
-        // printf("%s\n", input_str.c_str());
-        // for (size_t i = 0; i < token_ids.size(); i++)
-        // {
-        //     printf("%d ", token_ids[i]);
-        // }
-        // printf("\n");
 
         int next_token = -1;
         t_cqdm cqdm    = create_cqdm(_attr.max_token_len, 32);
@@ -522,10 +510,7 @@ public:
                 break;
             }
 
-            // ALOGI("out %d %d", indices, next_token);
             embed_selector.getByIndex(next_token, embed);
-            // ALOGI("%f %f %f %f %f", bfloat16(embed[0]).fp32(), bfloat16(embed[1]).fp32(), bfloat16(embed[2]).fp32(),
-            // bfloat16(embed[3]).fp32(), bfloat16(embed[4]).fp32());
 
             for (int m = 0; m < _attr.axmodel_num; m++) {
                 if (b_stop) {
@@ -580,10 +565,8 @@ public:
                 if (_attr.b_dynamic_load_axmodel_layer) {
                     layer.layer.deinit();
                 }
-                // ALOGI("%f %f %f %f %f", bfloat16(embed[0]).fp32(), bfloat16(embed[1]).fp32(),
-                // bfloat16(embed[2]).fp32(), bfloat16(embed[3]).fp32(), bfloat16(embed[4]).fp32());
             }
-            // ALOGI("");
+
             mask[indices] = 0;
             {
                 // post process
@@ -643,9 +626,6 @@ public:
         fflush(stdout);
         float t_cost_ms = t_cost.cost();
         ALOGN("hit eos,avg %.2f token/s\n", token_ids.size() / (t_cost_ms / 1000));
-
-        // 去掉 len_of_input 那部分
-        // token_ids.erase(token_ids.begin(), token_ids.begin() + len_of_input);
 
         final_out = tokenizer->Decode(token_ids);
 
@@ -1358,23 +1338,6 @@ public:
         return 0;
     }
 
-    int Encode(std::vector<unsigned short> &out_embed, std::string prompt = "What is in the image?")
-    {
-        ImageInfo img_info;
-        img_info.img_prompt        = false;
-        std::vector<int> input_ids = tokenizer->Encode(prompt, img_info);
-        if (input_ids.size() > _attr.prefill_token_num) {
-            ALOGE("input_ids(%ld) > prefill_token_num(%d)", input_ids.size(), _attr.prefill_token_num);
-            return -1;
-        }
-        out_embed.resize(input_ids.size() * _attr.tokens_embed_size);
-
-        for (size_t i = 0; i < input_ids.size(); i++) {
-            embed_selector.getByIndex(input_ids[i], out_embed.data() + i * _attr.tokens_embed_size);
-        }
-
-        return 0;
-    }
 
     int Encode(std::vector<std::vector<unsigned short>> &imgs_embed, std::vector<unsigned short> &out_embed,
                std::string prompt, std::vector<int> &tokens_ids, std::vector<int> &tokens_diff)
