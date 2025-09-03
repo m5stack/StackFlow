@@ -46,8 +46,6 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
 
 class llm_task {
 private:
-    std::shared_ptr<BaseTokenizer> tokenizer_;
-    LLaMaEmbedSelector embed_selector_;
     static std::atomic<unsigned int> next_port_;
     std::atomic_bool tokenizer_server_flage_;
     unsigned int port_;
@@ -61,14 +59,14 @@ public:
     std::string response_format_;
     std::vector<std::string> inputs_;
     std::string prompt_;
-    task_callback_t out_callback_;
-    std::vector<unsigned short> prompt_data_;
-    std::string last_reply_;
-    std::string kvcache_path_;
-    std::vector<std::vector<unsigned short>> k_caches_, v_caches_;
-    std::vector<int> token_ids_;
+    std::string last_reply;
+    std::vector<unsigned short> prompt_data;
+    std::vector<int> tokens_ids, tokens_diff;
+    std::vector<std::vector<unsigned short>> k_caches, v_caches;
     int precompute_len = 0;
+    std::vector<int> _token_ids;
     static int ax_init_flage_;
+    task_callback_t out_callback_;
     bool enoutput_;
     bool enstream_;
 
@@ -132,7 +130,7 @@ public:
             std::string base_model = base_model_path_ + model_ + "/";
             SLOGI("base_model %s", base_model.c_str());
 
-            CONFIG_AUTO_SET(file_body["mode_param"], system_prompt);   
+            CONFIG_AUTO_SET(file_body["mode_param"], system_prompt);
             CONFIG_AUTO_SET(file_body["mode_param"], tokenizer_type);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokenizer_model);
             CONFIG_AUTO_SET(file_body["mode_param"], url_tokenizer_model);
@@ -192,7 +190,7 @@ public:
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
                           (base_model + std::string("tokenizer")).c_str(), prompt_.c_str());
 
-                    std::this_thread::sleep_for(std::chrono::seconds(15));
+                    std::this_thread::sleep_for(std::chrono::seconds(3));
                 };
 
                 auto process_field = [&](std::string &field, const char *name_for_log) -> bool {
@@ -226,22 +224,23 @@ public:
                 lLaMa_.reset();
                 return -2;
             }
-            if (!kvcache_path_.empty() && kvcache_path_ != "") {
-                if (lLaMa_->load_kvcache(kvcache_path_, mode_config_.axmodel_num, k_caches_, v_caches_,
-                                 mode_config_.system_prompt, precompute_len)) {
-                    ALOGI("load kvcache from path: %s success,precompute_len: %d", kvcache_path_.c_str(),
+            std::string kvcache_path = "/tmp/.llm/";
+            if (!kvcache_path.empty() && kvcache_path != "") {
+                if (lLaMa_->load_kvcache(kvcache_path, mode_config_.axmodel_num, k_caches, v_caches,
+                                         mode_config_.system_prompt, precompute_len)) {
+                    ALOGI("load kvcache from path: %s success,precompute_len: %d", kvcache_path.c_str(),
                           precompute_len);
                 } else {
-                    ALOGW("load kvcache from path: %s failed,generate kvcache", kvcache_path_.c_str());
-                    lLaMa_->GenerateKVCachePrefill(token_ids_, k_caches_, v_caches_, precompute_len);
-                    if (!lLaMa_->save_kvcache(kvcache_path_, mode_config_.system_prompt, precompute_len, k_caches_,
-                                      v_caches_)) {
+                    ALOGW("load kvcache from path: %s failed,generate kvcache", kvcache_path.c_str());
+                    lLaMa_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                    if (!lLaMa_->save_kvcache(kvcache_path, mode_config_.system_prompt, precompute_len, k_caches,
+                                              v_caches)) {
                         ALOGE("save kvcache failed");
                     }
-                    ALOGI("generate kvcache to path: %s", kvcache_path_.c_str());
+                    ALOGI("generate kvcache to path: %s", kvcache_path.c_str());
                 }
             } else {
-                lLaMa_->GenerateKVCachePrefill(token_ids_, k_caches_, v_caches_, precompute_len);
+                lLaMa_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
             }
             SLOGI("precompute_len: %d", precompute_len);
             SLOGI("system_prompt: %s", mode_config_.system_prompt.c_str());
@@ -308,15 +307,25 @@ public:
 #if 1
         try {
             std::vector<int> tokens_ids, tokens_diff;
-            lLaMa_->Encode(prompt_data_, prompt_complete(msg), last_reply_, tokens_ids, tokens_diff);
-            if (auto ret = lLaMa_->SetKVCache(k_caches_, v_caches_, precompute_len, tokens_diff.size()); ret != 0) {
-                ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
+
+            if (msg == "reset") {
+                lLaMa_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                lLaMa_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                last_reply.clear();
+                if (out_callback_) out_callback_("Context has been reset.", true);
                 return;
             }
-            last_reply_ = lLaMa_->Run(prompt_data_);
-            lLaMa_->GetKVCache(k_caches_, v_caches_, precompute_len);
-            std::string out = lLaMa_->Run(prompt_data_);
-            if (out_callback_) out_callback_(out, true);
+
+            lLaMa_->Encode(prompt_data, prompt_complete(msg), last_reply, tokens_ids, tokens_diff);
+            if (auto ret = lLaMa_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size()); ret != 0) {
+                ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
+                lLaMa_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                lLaMa_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                lLaMa_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
+            }
+            last_reply = lLaMa_->Run(prompt_data);
+            lLaMa_->GetKVCache(k_caches, v_caches, precompute_len);
+            if (out_callback_) out_callback_(last_reply, true);
         } catch (...) {
             SLOGW("lLaMa_->Run have error!");
         }

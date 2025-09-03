@@ -33,11 +33,11 @@ struct LLMAttrType {
 
     std::string filename_post_axmodel = "tinyllama-int8/tinyllama_post.axmodel";
 
-    TokenizerType tokenizer_type      = TKT_LLaMa;
+    TokenizerType tokenizer_type = TKT_LLaMa;
     std::string filename_tokenizer_model;
     bool b_bos = false, b_eos = false;
     std::string url_tokenizer_model;
-    std::vector<int> dev_ids = {0, 1, 2, 3};
+    std::vector<int> dev_ids = {0};
 
     std::string filename_tokens_embed = "tinyllama.model.embed_tokens.weight.bfloat16.bin";
     int tokens_embed_num              = 32000;
@@ -88,10 +88,9 @@ private:
 
     std::vector<LLMLayer> llama_layers;
     ax_runner_ax650 llama_post;
-    // ax_runner_ax650 image_encoder;
 
-    // int prefill_grpid = 1;
-    int decode_grpid = 0;
+    int prefill_grpid = 1;
+    int decode_grpid  = 0;
 
     bool b_stop = false;
 
@@ -145,17 +144,6 @@ public:
         std::vector<int> _token_ids;
         tokenizer->Reset(attr.system_prompt, _token_ids);
         update_cqdm(&cqdm, 0, "count", "tokenizer init ok");
-        // test code
-        // {
-        //     std::vector<int> output;
-        //     tokenizer.Encode("Today is National", output);
-        //     // print output
-        //     for (size_t i = 0; i < output.size(); i++)
-        //     {
-        //         printf("%d ", output[i]);
-        //     }
-        //     printf("\n");
-        // }
 
         if (!embed_selector.Init(attr.filename_tokens_embed, attr.tokens_embed_num, attr.tokens_embed_size,
                                  attr.b_use_mmap_load_embed)) {
@@ -165,17 +153,7 @@ public:
         }
         update_cqdm(&cqdm, 1, "count", "embed_selector init ok");
         printf("\n");
-        // test code
-        // {
-        //     std::vector<unsigned short> embed = embed_selector.getByIndex(123);
-        //     printf("embed size: %d\n", embed.size());
-        //     for (int i = 0; i < embed.size(); i++)
-        //     {
-        //         bfloat16 bf16 = bfloat16(embed[i]);
-        //         float val = bf16;
-        //         printf("%d %0.22f\n", embed[i], val);
-        //     }
-        // }
+
         for (auto &devid : _attr.dev_ids) {
             if (axcl_Init(devid) != 0) {
                 ALOGE("axcl_Init(%d) failed", devid);
@@ -197,11 +175,7 @@ public:
 
             int ret = llama_layers[i].layer.init(llama_layers[i].filename.c_str(), _attr.dev_ids[dev_assignments[i]]);
             rets[i] = ret;
-            // if (ret != 0)
-            // {
-            //     ALOGE("init axmodel(%s) failed", llama_layers[i].filename.c_str());
-            //     return false;
-            // }
+
             int remain_cmm = axcl_GetCMMRemain(_attr.dev_ids[dev_assignments[i]]);
             sprintf(axmodel_path, "init %d axmodel ok,devid(%d) remain_cmm(%d MB)", i,
                     _attr.dev_ids[dev_assignments[i]], remain_cmm);

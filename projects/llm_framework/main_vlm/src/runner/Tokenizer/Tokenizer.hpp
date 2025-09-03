@@ -22,9 +22,14 @@ struct ImageInfo
 class BaseTokenizer
 {
 public:
-    virtual bool Init(std::string model_path, bool b_bos = true, bool b_eos = false) = 0;
+    virtual bool Init(std::string model_path) = 0;
+    virtual bool Init(std::string model_path, bool b_bos, bool b_eos) = 0;
+    virtual bool Init_new(std::string model_path, bool b_bos, bool b_eos) = 0;
+    virtual bool Reset(std::string system_prompt, std::vector<int> &tokens) = 0;
+    virtual bool Encode(std::string input, std::string last_reply, std::vector<int> &tokens, std::vector<int> &tokens_diff, ImageInfo img_info) = 0;
     virtual bool Encode(std::string input, std::vector<int> &output, ImageInfo img_info) = 0;
     virtual std::vector<int> Encode(std::string input, ImageInfo img_info) = 0;
+    virtual std::vector<int> Encode_ctx(std::string input, ImageInfo img_info, std::vector<int> &tokens_ids, std::vector<int> &tokens_diff) = 0;
     virtual std::string Decode(const std::vector<int> input) = 0;
     virtual int GetBosID() = 0;
     virtual int GetEosID() = 0;

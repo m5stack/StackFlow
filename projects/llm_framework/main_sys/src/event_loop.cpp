@@ -17,6 +17,7 @@
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include <regex>
 #include <thread>
 #include <fstream>
 
@@ -286,6 +287,83 @@ int sys_cmminfo(int com_id, const nlohmann::json &json_obj)
 {
     int out = 0;
     std::thread t(_sys_cmminfo, com_id, json_obj);
+    t.detach();
+    return out;
+}
+
+void get_axcl_mem_cmm_info(unsigned long *total_size, unsigned long *used, unsigned long *remain, int devid = 0)
+{
+    if (!total_size || !used || !remain) return;
+
+    *total_size = *used = *remain = 0;
+
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "/usr/bin/axcl/axcl-smi -d %d info --cmm", devid);
+
+    FILE *pipe = popen(cmd, "r");
+    if (!pipe) {
+        perror("popen failed");
+        return;
+    }
+
+    std::regex re_total(R"(CMM\s+Total\s*:\s*(\d+)\s*Ki?B)", std::regex::icase);
+    std::regex re_used(R"(CMM\s+Used\s*:\s*(\d+)\s*Ki?B)", std::regex::icase);
+    std::regex re_rem(R"(CMM\s+Remain\s*:\s*(\d+)\s*Ki?B)", std::regex::icase);
+
+    char buffer[256];
+    std::string line;
+    std::smatch match;
+
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+        line = buffer;
+
+        if (std::regex_search(line, match, re_total)) {
+            *total_size = std::stoul(match[1]);
+        } else if (std::regex_search(line, match, re_used)) {
+            *used = std::stoul(match[1]);
+        } else if (std::regex_search(line, match, re_rem)) {
+            *remain = std::stoul(match[1]);
+        }
+    }
+
+    pclose(pipe);
+}
+
+void _sys_axcl_cmminfo(int com_id, const nlohmann::json &json_obj, int devid = 0)
+{
+    unsigned long total_size = 0, used = 0, remain = 0;
+
+    get_axcl_mem_cmm_info(&total_size, &used, &remain, devid);
+
+    nlohmann::json out_body;
+    nlohmann::json data_body;
+
+    out_body["request_id"] = json_obj.value("request_id", "");
+    out_body["work_id"]    = "sys";
+    out_body["created"]    = time(NULL);
+    out_body["error"]      = {{"code", 0}, {"message", ""}};
+    out_body["object"]     = "sys.axcl_cmminfo";
+
+    data_body["total"]  = total_size;
+    data_body["used"]   = used;
+    data_body["remain"] = remain;
+    data_body["devid"]  = devid;
+
+    out_body["data"] = data_body;
+
+    std::string out = out_body.dump();
+    zmq_com_send(com_id, out);
+}
+
+int sys_axcl_cmminfo(int com_id, const nlohmann::json &json_obj)
+{
+    int devid = 0;
+    if (json_obj.contains("devid") && json_obj["devid"].is_number_integer()) {
+        devid = json_obj["devid"];
+    }
+
+    int out = 0;
+    std::thread t(_sys_axcl_cmminfo, com_id, json_obj, devid);
     t.detach();
     return out;
 }
@@ -742,23 +820,24 @@ int sys_reboot(int com_id, const nlohmann::json &json_obj)
 
 void server_work()
 {
-    key_sql["sys.ping"]      = sys_ping;
-    key_sql["sys.lsmode"]    = sys_lsmode;
-    key_sql["sys.lstask"]    = sys_lstask;
-    key_sql["sys.push"]      = sys_push;
-    key_sql["sys.pull"]      = sys_pull;
-    key_sql["sys.update"]    = sys_update;
-    key_sql["sys.upgrade"]   = sys_upgrade;
-    key_sql["sys.bashexec"]  = sys_bashexec;
-    key_sql["sys.hwinfo"]    = sys_hwinfo;
-    key_sql["sys.uartsetup"] = sys_uartsetup;
-    key_sql["sys.reset"]     = sys_reset;
-    key_sql["sys.reboot"]    = sys_reboot;
-    key_sql["sys.version"]   = sys_version;
-    key_sql["sys.rmmode"]    = sys_rmmode;
-    key_sql["sys.unit_call"] = sys_unit_call;
-    key_sql["sys.cmminfo"]   = sys_cmminfo;
-    key_sql["sys.version2"]  = sys_version2;
+    key_sql["sys.ping"]         = sys_ping;
+    key_sql["sys.lsmode"]       = sys_lsmode;
+    key_sql["sys.lstask"]       = sys_lstask;
+    key_sql["sys.push"]         = sys_push;
+    key_sql["sys.pull"]         = sys_pull;
+    key_sql["sys.update"]       = sys_update;
+    key_sql["sys.upgrade"]      = sys_upgrade;
+    key_sql["sys.bashexec"]     = sys_bashexec;
+    key_sql["sys.hwinfo"]       = sys_hwinfo;
+    key_sql["sys.uartsetup"]    = sys_uartsetup;
+    key_sql["sys.reset"]        = sys_reset;
+    key_sql["sys.reboot"]       = sys_reboot;
+    key_sql["sys.version"]      = sys_version;
+    key_sql["sys.rmmode"]       = sys_rmmode;
+    key_sql["sys.unit_call"]    = sys_unit_call;
+    key_sql["sys.cmminfo"]      = sys_cmminfo;
+    key_sql["sys.axcl_cmminfo"] = sys_axcl_cmminfo;
+    key_sql["sys.version2"]     = sys_version2;
 }
 
 void server_stop_work()

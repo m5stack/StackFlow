@@ -56,9 +56,16 @@ public:
     std::string response_format_;
     std::vector<std::string> inputs_;
     std::vector<unsigned short> prompt_data_;
-    std::vector<unsigned char> image_data_;
+    // std::vector<unsigned char> image_data_;
+    std::vector<std::vector<unsigned char>> images_data;
+    std::vector<cv::Mat> mats;
     std::vector<unsigned short> img_embed;
     std::string prompt_;
+    std::string last_reply;
+    std::vector<int> tokens_ids, tokens_diff;
+    std::vector<std::vector<unsigned short>> k_caches, v_caches;
+    int precompute_len = 0;
+    std::vector<int> _token_ids;
     task_callback_t out_callback_;
     static int ax_init_flage_;
     bool enoutput_;
@@ -123,66 +130,92 @@ public:
             std::string base_model = base_model_path_ + model_ + "/";
             SLOGI("base_model %s", base_model.c_str());
 
+            CONFIG_AUTO_SET(file_body["mode_param"], system_prompt);
             CONFIG_AUTO_SET(file_body["mode_param"], tokenizer_type);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokenizer_model);
+            CONFIG_AUTO_SET(file_body["mode_param"], url_tokenizer_model);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokens_embed);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_post_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_image_encoder_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
+            CONFIG_AUTO_SET(file_body["mode_param"], b_use_topk);
+            CONFIG_AUTO_SET(file_body["mode_param"], b_vpm_two_stage);
             CONFIG_AUTO_SET(file_body["mode_param"], b_bos);
             CONFIG_AUTO_SET(file_body["mode_param"], b_eos);
             CONFIG_AUTO_SET(file_body["mode_param"], axmodel_num);
             CONFIG_AUTO_SET(file_body["mode_param"], tokens_embed_num);
+            CONFIG_AUTO_SET(file_body["mode_param"], img_token_id);
             CONFIG_AUTO_SET(file_body["mode_param"], tokens_embed_size);
             CONFIG_AUTO_SET(file_body["mode_param"], b_use_mmap_load_embed);
+            CONFIG_AUTO_SET(file_body["mode_param"], b_dynamic_load_axmodel_layer);
             CONFIG_AUTO_SET(file_body["mode_param"], max_token_len);
-            if (config_body.contains("dev_ids")) {
-                mode_config_.dev_ids.clear();
-                for (auto &id : config_body["dev_ids"]) {
-                    mode_config_.dev_ids.push_back(id.get<int>());
-                }
-            } else if (file_body["mode_param"].contains("dev_ids")) {
-                mode_config_.dev_ids.clear();
-                for (auto &id : file_body["mode_param"]["dev_ids"]) {
-                    mode_config_.dev_ids.push_back(id.get<int>());
-                }
-            }
+            CONFIG_AUTO_SET(file_body["mode_param"], enable_temperature);
+            CONFIG_AUTO_SET(file_body["mode_param"], temperature);
+            CONFIG_AUTO_SET(file_body["mode_param"], enable_top_p_sampling);
+            CONFIG_AUTO_SET(file_body["mode_param"], top_p);
+            CONFIG_AUTO_SET(file_body["mode_param"], enable_top_k_sampling);
+            CONFIG_AUTO_SET(file_body["mode_param"], top_k);
+            CONFIG_AUTO_SET(file_body["mode_param"], enable_repetition_penalty);
+            CONFIG_AUTO_SET(file_body["mode_param"], repetition_penalty);
+            CONFIG_AUTO_SET(file_body["mode_param"], penalty_window);
+            CONFIG_AUTO_SET(file_body["mode_param"], vpm_width);
+            CONFIG_AUTO_SET(file_body["mode_param"], vpm_height);
+            CONFIG_AUTO_SET(file_body["mode_param"], precompute_len);
 
-            if (mode_config_.filename_tokenizer_model.find("http:") != std::string::npos) {
-                mode_config_.filename_tokenizer_model = "http://localhost:" + std::to_string(port_);
-                std::string tokenizer_file;
-                if (file_exists(std::string("/opt/m5stack/scripts/") + model_ + std::string("_tokenizer.py"))) {
-                    tokenizer_file = std::string("/opt/m5stack/scripts/") + model_ + std::string("_tokenizer.py");
-                } else if (file_exists(std::string("/opt/m5stack/scripts/") + std::string("tokenizer_") + model_ +
-                                       std::string(".py"))) {
-                    tokenizer_file =
-                        std::string("/opt/m5stack/scripts/") + std::string("tokenizer_") + model_ + std::string(".py");
-                } else {
-                    std::string __log = model_ + std::string("_tokenizer.py");
-                    __log += " or ";
-                    __log += std::string("tokenizer_") + model_ + std::string(".py");
-                    __log += " not found!";
-                    SLOGE("%s", __log.c_str());
-                }
-                if (!tokenizer_server_flage_.load()) {
+            {
+                auto has_http = [](const std::string &s) { return s.find("http") != std::string::npos; };
+
+                auto find_tokenizer_file = [this]() -> std::string {
+                    const std::string base = "/opt/m5stack/scripts/";
+                    const std::string a    = base + model_ + "_tokenizer.py";
+                    if (file_exists(a)) return a;
+                    const std::string b = base + "tokenizer_" + model_ + ".py";
+                    if (file_exists(b)) return b;
+                    SLOGE("%s or %s not found!", a.c_str(), b.c_str());
+                    return {};
+                };
+
+                auto start_tokenizer_server = [&](const std::string &tokenizer_file) {
+                    if (tokenizer_file.empty()) return;
+                    if (tokenizer_server_flage_.load()) return;
+
                     tokenizer_pid_ = fork();
                     if (tokenizer_pid_ == 0) {
-                        setenv("PYTHONPATH", "/opt/m5stack/lib/vlm/site-packages", 1);
+                        setenv("PYTHONPATH", "/opt/m5stack/lib/llm/site-packages", 1);
+                        const std::string port_str = std::to_string(port_);
+                        const std::string model_id = base_model + "tokenizer";
+
                         execl("/usr/bin/python3", "python3", tokenizer_file.c_str(), "--host", "localhost", "--port",
-                              std::to_string(port_).c_str(), "--model_id", (base_model + "tokenizer").c_str(),
-                              "--content", ("'" + prompt_ + "'").c_str(), nullptr);
+                              port_str.c_str(), "--model_id", model_id.c_str(), "--content", prompt_.c_str(),
+                              (char *)nullptr);
+
                         perror("execl failed");
-                        exit(1);
+                        _exit(1);
                     }
+
                     tokenizer_server_flage_.store(true);
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
-                          (base_model + "tokenizer").c_str(), ("'" + prompt_ + "'").c_str());
-                    std::this_thread::sleep_for(std::chrono::seconds(5));
+                          (base_model + std::string("tokenizer")).c_str(), prompt_.c_str());
+
+                    std::this_thread::sleep_for(std::chrono::seconds(3));
+                };
+
+                auto process_field = [&](std::string &field, const char *name_for_log) -> bool {
+                    if (!has_http(field)) return false;
+
+                    field                            = "http://localhost:" + std::to_string(port_);
+                    const std::string tokenizer_file = find_tokenizer_file();
+                    start_tokenizer_server(tokenizer_file);
+                    SLOGI("%s: %s", name_for_log, field.c_str());
+                    return true;
+                };
+
+                if (!process_field(mode_config_.filename_tokenizer_model, "filename_tokenizer_model") &&
+                    !process_field(mode_config_.url_tokenizer_model, "url_tokenizer_model")) {
+                    mode_config_.filename_tokenizer_model = base_model + mode_config_.filename_tokenizer_model;
+                    SLOGE("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
                 }
-            } else {
-                mode_config_.filename_tokenizer_model = base_model + mode_config_.filename_tokenizer_model;
             }
-            SLOGI("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
             mode_config_.filename_tokens_embed          = base_model + mode_config_.filename_tokens_embed;
             mode_config_.filename_post_axmodel          = base_model + mode_config_.filename_post_axmodel;
             mode_config_.filename_image_encoder_axmodel = base_model + mode_config_.filename_image_encoder_axmodel;
@@ -201,6 +234,29 @@ public:
                 return -2;
             }
 
+            if (lLaMa_) {
+                lLaMa_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                std::string kvcache_path = "/tmp/.vlm/";
+                if (!kvcache_path.empty() && kvcache_path != "") {
+                    if (lLaMa_->load_kvcache(kvcache_path, mode_config_.axmodel_num, k_caches, v_caches,
+                                             mode_config_.system_prompt, precompute_len)) {
+                        ALOGI("load kvcache from path: %s success,precompute_len: %d", kvcache_path.c_str(),
+                              precompute_len);
+                    } else {
+                        ALOGW("load kvcache from path: %s failed,generate kvcache", kvcache_path.c_str());
+                        lLaMa_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                        if (!lLaMa_->save_kvcache(kvcache_path, mode_config_.system_prompt, precompute_len, k_caches,
+                                                  v_caches)) {
+                            ALOGE("save kvcache failed");
+                        }
+                        ALOGI("generate kvcache to path: %s", kvcache_path.c_str());
+                    }
+                } else {
+                    lLaMa_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                }
+                ALOGI("precompute_len: %d", precompute_len);
+                ALOGI("system_prompt: %s", mode_config_.system_prompt.c_str());
+            }
         } catch (...) {
             SLOGE("config false");
             return -3;
@@ -212,16 +268,6 @@ public:
     {
         std::ostringstream oss_prompt;
         switch (mode_config_.tokenizer_type) {
-            case TKT_LLaMa:
-                oss_prompt << "<|user|>\n" << input << "</s><|assistant|>\n";
-                break;
-            case TKT_Phi3:
-                oss_prompt << input << " ";
-                break;
-            case TKT_Qwen:
-                oss_prompt << "<|im_start|>system\n" << prompt_ << ".<|im_end|>";
-                oss_prompt << "\n<|im_start|>user\n" << input << "<|im_end|>\n<|im_start|>assistant\n";
-                break;
             case TKT_HTTP:
             default:
                 oss_prompt << input;
@@ -256,32 +302,66 @@ public:
     void inference(const std::string &msg)
     {
         try {
-            if (encamera_) {
-                inference_async_par par;
-                async_list_.get();  // discard buffered frames
-                par = async_list_.get();
-                if (par.inference_src.empty()) return;
-                if (par.inference_bgr2rgb) {
-                    cv::Mat rgb;
-                    cv::cvtColor(par.inference_src, rgb, cv::COLOR_BGR2RGB);
-                    par.inference_src = rgb;
+            if (lLaMa_) {
+                if (msg == "reset") {
+                    lLaMa_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                    lLaMa_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                    last_reply.clear();
+                    mats.clear();
+                    if (out_callback_) out_callback_("Context has been reset.", true);
+                    return;
                 }
-                lLaMa_->Encode(par.inference_src, img_embed);
-                lLaMa_->Encode(img_embed, prompt_data_, prompt_complete(msg));
-                std::string out = lLaMa_->Run(prompt_data_);
-                if (out_callback_) out_callback_(out, true);
-            } else if (image_data_.empty()) {
-                lLaMa_->Encode(prompt_data_, prompt_complete(msg));
-                std::string out = lLaMa_->Run(prompt_data_);
-                if (out_callback_) out_callback_(out, true);
-            } else {
-                cv::Mat src = cv::imdecode(image_data_, cv::IMREAD_COLOR);
-                if (src.empty()) return;
-                image_data_.clear();
-                lLaMa_->Encode(src, img_embed);
-                lLaMa_->Encode(img_embed, prompt_data_, prompt_complete(msg));
-                std::string out = lLaMa_->Run(prompt_data_);
-                if (out_callback_) out_callback_(out, true);
+
+                if (images_data.empty()) {
+                    lLaMa_->Encode(prompt_data_, prompt_complete(msg), last_reply, tokens_ids, tokens_diff);
+                    if (auto ret = lLaMa_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
+                        ret != 0) {
+                        ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
+                        // return;
+                        lLaMa_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                        lLaMa_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                        lLaMa_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
+                    }
+                    last_reply = lLaMa_->Run(prompt_data_);
+                    lLaMa_->GetKVCache(k_caches, v_caches, precompute_len);
+                    if (out_callback_) out_callback_(last_reply, true);
+                } else {
+                    for (const auto &img_buf : images_data) {
+                        cv::Mat src = cv::imdecode(img_buf, cv::IMREAD_COLOR);
+                        if (src.empty()) {
+                            std::cerr << "Decode failed!" << std::endl;
+                            continue;
+                        }
+                        mats.push_back(src);
+                    }
+                    if (mats.empty()) return;
+                    images_data.clear();
+                    lLaMa_->ClearImgsEmbed();
+                    std::vector<std::vector<unsigned short>> all_embeds;
+                    if (auto ret = lLaMa_->Encode(mats, all_embeds); ret != 0) {
+                        ALOGE("lLaMaCtx.Encode failed");
+                        return;
+                    }
+                    mats.clear();
+                    if (auto ret =
+                            lLaMa_->Encode(all_embeds, prompt_data_, prompt_complete(msg), tokens_ids, tokens_diff);
+                        ret != 0) {
+                        ALOGE("lLaMaCtx.Encode failed");
+                        return;
+                    }
+                    if (auto ret = lLaMa_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
+                        ret != 0) {
+                        ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
+                        // return;
+                        lLaMa_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                        lLaMa_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                        lLaMa_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
+                        lLaMa_->ClearImgsEmbed();
+                    }
+                    last_reply = lLaMa_->Run(prompt_data_);
+                    lLaMa_->GetKVCache(k_caches, v_caches, precompute_len);
+                    if (out_callback_) out_callback_(last_reply, true);
+                }
             }
         } catch (...) {
             SLOGW("lLaMa_->Run have error!");
@@ -478,7 +558,8 @@ public:
             next_data = &tmp_msg2;
         }
         if (object.find("jpeg") != std::string::npos) {
-            llm_task_obj->image_data_.assign(next_data->begin(), next_data->end());
+            // llm_task_obj->image_data_.assign(next_data->begin(), next_data->end());
+            llm_task_obj->images_data.emplace_back(next_data->begin(), next_data->end());
             return;
         }
         llm_task_obj->inference((*next_data));
