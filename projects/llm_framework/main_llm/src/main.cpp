@@ -29,7 +29,7 @@ using namespace StackFlows;
 int main_exit_flage = 0;
 static void __sigint(int iSigNo)
 {
-    SLOGW("llm_sys will be exit!");
+    SLOGW("llm_llm will be exit!");
     main_exit_flage = 1;
 }
 
@@ -130,7 +130,7 @@ public:
             std::string base_model = base_model_path_ + model_ + "/";
             SLOGI("base_model %s", base_model.c_str());
 
-            CONFIG_AUTO_SET(file_body["mode_param"], system_prompt);   
+            CONFIG_AUTO_SET(file_body["mode_param"], system_prompt);
             CONFIG_AUTO_SET(file_body["mode_param"], tokenizer_type);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokenizer_model);
             CONFIG_AUTO_SET(file_body["mode_param"], url_tokenizer_model);
@@ -325,6 +325,14 @@ public:
             }
 
             if (lLaMa_ctx_) {
+                if (msg == "reset") {
+                    lLaMa_ctx_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                    lLaMa_ctx_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                    last_reply.clear();
+                    if (out_callback_) out_callback_("Context has been reset.", true);
+                    return;
+                }
+
                 lLaMa_ctx_->Encode(prompt_data, prompt_complete(msg), last_reply, tokens_ids, tokens_diff);
                 if (auto ret = lLaMa_ctx_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
                     ret != 0) {

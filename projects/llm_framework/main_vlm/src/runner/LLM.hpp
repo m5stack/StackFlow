@@ -23,10 +23,10 @@ struct LLMAttrType {
     std::string template_filename_axmodel = "tinyllama-int8/tinyllama_l%d.axmodel";
     int axmodel_num                       = 22;
 
-    std::string filename_post_axmodel           = "tinyllama-int8/tinyllama_post.axmodel";
-    std::string filename_image_encoder_axmodedl = "minicpmv/vpm_resampler_version0_fp16.axmodel";
-    std::string filename_vpm_encoder_axmodedl   = "minicpmv/vpm_resampler_version0_fp16.axmodel";
-    std::string filename_vpm_resampler_axmodedl = "minicpmv/vpm_resampler_version0_fp16.axmodel";
+    std::string filename_post_axmodel          = "tinyllama-int8/tinyllama_post.axmodel";
+    std::string filename_image_encoder_axmodel = "minicpmv/vpm_resampler_version0_fp16.axmodel";
+    std::string filename_vpm_encoder_axmodel   = "minicpmv/vpm_resampler_version0_fp16.axmodel";
+    std::string filename_vpm_resampler_axmodel = "minicpmv/vpm_resampler_version0_fp16.axmodel";
 
     int image_encoder_width  = 448;
     int image_encoder_height = 448;
@@ -184,24 +184,24 @@ public:
         update_cqdm(&cqdm, attr.axmodel_num + 2, "count", axmodel_path);
 
         if (_attr.b_vpm_two_stage) {
-            ret = vpm_encoder.init(attr.filename_vpm_encoder_axmodedl.c_str(), false);
+            ret = vpm_encoder.init(attr.filename_vpm_encoder_axmodel.c_str(), false);
             if (ret != 0) {
-                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_encoder_axmodedl.c_str());
+                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_encoder_axmodel.c_str());
                 return false;
             }
 
-            ret = vpm_resampler.init(attr.filename_vpm_resampler_axmodedl.c_str(), false);
+            ret = vpm_resampler.init(attr.filename_vpm_resampler_axmodel.c_str(), false);
             if (ret != 0) {
-                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_resampler_axmodedl.c_str());
+                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_resampler_axmodel.c_str());
                 return false;
             }
 
             _attr.vpm_height = vpm_encoder.get_input(0).vShape[1];
             _attr.vpm_width  = vpm_encoder.get_input(0).vShape[2];
         } else {
-            ret = vpm_resampler.init(attr.filename_vpm_resampler_axmodedl.c_str(), false);
+            ret = vpm_resampler.init(attr.filename_vpm_resampler_axmodel.c_str(), false);
             if (ret != 0) {
-                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_resampler_axmodedl.c_str());
+                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_resampler_axmodel.c_str());
                 return false;
             }
             _attr.vpm_height = vpm_resampler.get_input(0).vShape[1];
@@ -637,6 +637,7 @@ class LLM_CTX {
 private:
     std::shared_ptr<BaseTokenizer> tokenizer;
     LLaMaEmbedSelector embed_selector;
+    std::vector<std::vector<unsigned short>> imgs_embed_;
 
     LLMAttrType _attr;
 
@@ -718,9 +719,9 @@ public:
         sprintf(axmodel_path, "init post axmodel ok,remain_cmm(%d MB)", remain_cmm);
         update_cqdm(&cqdm, attr.axmodel_num + 2, "count", axmodel_path);
 
-        ret = image_encoder.init(attr.filename_image_encoder_axmodedl.c_str());
+        ret = image_encoder.init(attr.filename_image_encoder_axmodel.c_str());
         if (ret != 0) {
-            ALOGE("init vpm axmodel(%s) failed", attr.filename_image_encoder_axmodedl.c_str());
+            ALOGE("init vpm axmodel(%s) failed", attr.filename_image_encoder_axmodel.c_str());
             return false;
         }
 
@@ -1424,8 +1425,9 @@ public:
     int Encode(std::vector<unsigned short> &img_embed, std::vector<unsigned short> &out_embed, std::string prompt,
                std::vector<int> &tokens_ids, std::vector<int> &tokens_diff)
     {
-        std::vector<std::vector<unsigned short>> imgs_embed = {img_embed};
-        return Encode(imgs_embed, out_embed, prompt, tokens_ids, tokens_diff);
+        // std::vector<std::vector<unsigned short>> imgs_embed = {img_embed};
+        imgs_embed_.push_back(img_embed);
+        return Encode(imgs_embed_, out_embed, prompt, tokens_ids, tokens_diff);
     }
 
     int Encode(std::vector<unsigned short> &out_embed, std::string prompt, std::string last_reply,
@@ -1447,7 +1449,12 @@ public:
         return 0;
     }
 
-    std::string Run(std::vector<unsigned short> test_embed)
+    void ClearImgsEmbed()
+    {
+        imgs_embed_.clear();
+    }
+
+    std::string Run(std::vector<unsigned short> &test_embed)
     {
         b_stop = false;
         std::string final_out;

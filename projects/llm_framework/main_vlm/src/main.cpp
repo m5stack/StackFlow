@@ -58,6 +58,8 @@ public:
     std::vector<std::string> inputs_;
     std::vector<unsigned short> prompt_data_;
     std::vector<unsigned char> image_data_;
+    std::vector<std::vector<unsigned char>> images_data;
+    std::vector<cv::Mat> mats;
     std::vector<unsigned short> img_embed;
     std::string prompt_;
     std::string last_reply;
@@ -134,8 +136,8 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], url_tokenizer_model);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokens_embed);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_post_axmodel);
-            CONFIG_AUTO_SET(file_body["mode_param"], filename_vpm_resampler_axmodedl);
-            CONFIG_AUTO_SET(file_body["mode_param"], filename_image_encoder_axmodedl);
+            CONFIG_AUTO_SET(file_body["mode_param"], filename_vpm_resampler_axmodel);
+            CONFIG_AUTO_SET(file_body["mode_param"], filename_image_encoder_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], b_use_topk);
             CONFIG_AUTO_SET(file_body["mode_param"], b_vpm_two_stage);
@@ -215,11 +217,11 @@ public:
                     SLOGE("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
                 }
             }
-            mode_config_.filename_tokens_embed           = base_model + mode_config_.filename_tokens_embed;
-            mode_config_.filename_post_axmodel           = base_model + mode_config_.filename_post_axmodel;
-            mode_config_.template_filename_axmodel       = base_model + mode_config_.template_filename_axmodel;
-            mode_config_.filename_vpm_resampler_axmodedl = base_model + mode_config_.filename_vpm_resampler_axmodedl;
-            mode_config_.filename_image_encoder_axmodedl = base_model + mode_config_.filename_image_encoder_axmodedl;
+            mode_config_.filename_tokens_embed          = base_model + mode_config_.filename_tokens_embed;
+            mode_config_.filename_post_axmodel          = base_model + mode_config_.filename_post_axmodel;
+            mode_config_.template_filename_axmodel      = base_model + mode_config_.template_filename_axmodel;
+            mode_config_.filename_vpm_resampler_axmodel = base_model + mode_config_.filename_vpm_resampler_axmodel;
+            mode_config_.filename_image_encoder_axmodel = base_model + mode_config_.filename_image_encoder_axmodel;
             mode_config_.runing_callback = [this](int *p_token, int n_token, const char *p_str, float token_per_sec,
                                                   void *reserve) {
                 if (this->out_callback_) {
@@ -342,17 +344,38 @@ public:
             }
 
             if (lLaMa_ctx_) {
+                if (msg == "reset") {
+                    lLaMa_ctx_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                    lLaMa_ctx_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                    last_reply.clear();
+                    mats.clear();
+                    if (out_callback_) out_callback_("Context has been reset.", true);
+                    return;
+                }
+
                 if (image_data_.empty()) {
                     lLaMa_ctx_->Encode(prompt_data_, prompt_complete(msg), last_reply, tokens_ids, tokens_diff);
                     if (auto ret = lLaMa_ctx_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
                         ret != 0) {
-                        ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
-                        return;
+                        ALOGW("The context full,Reset context");
+                        lLaMa_ctx_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                        lLaMa_ctx_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                        lLaMa_ctx_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
                     }
                     last_reply = lLaMa_ctx_->Run(prompt_data_);
                     lLaMa_ctx_->GetKVCache(k_caches, v_caches, precompute_len);
                     if (out_callback_) out_callback_(last_reply, true);
                 } else {
+                    for (const auto &img_buf : images_data) {
+                        cv::Mat src = cv::imdecode(img_buf, cv::IMREAD_COLOR);
+                        if (src.empty()) {
+                            std::cerr << "Decode failed!" << std::endl;
+                            continue;
+                        }
+                        mats.push_back(src);
+                    }
+                    if (mats.empty()) return;
+                    images_data.clear();
                     cv::Mat src = cv::imdecode(image_data_, cv::IMREAD_COLOR);
                     if (src.empty()) return;
                     image_data_.clear();
@@ -361,6 +384,7 @@ public:
                         ALOGE("lLaMaCtx.Encode failed");
                         return;
                     }
+                    mats.clear();
                     if (auto ret =
                             lLaMa_ctx_->Encode(img_embed, prompt_data_, prompt_complete(msg), tokens_ids, tokens_diff);
                         ret != 0) {
@@ -369,8 +393,11 @@ public:
                     }
                     if (auto ret = lLaMa_ctx_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
                         ret != 0) {
-                        ALOGE("SetKVCache failed: %d,the context may be full,input \"reset\" to reset context", ret);
-                        return;
+                        ALOGW("The context full,Reset context");
+                        lLaMa_ctx_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
+                        lLaMa_ctx_->GenerateKVCachePrefill(_token_ids, k_caches, v_caches, precompute_len);
+                        lLaMa_ctx_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());
+                        lLaMa_ctx_->ClearImgsEmbed();
                     }
                     last_reply = lLaMa_ctx_->Run(prompt_data_);
                     lLaMa_ctx_->GetKVCache(k_caches, v_caches, precompute_len);
@@ -549,6 +576,7 @@ public:
         }
         if (object.find("jpeg") != std::string::npos) {
             llm_task_obj->image_data_.assign(next_data->begin(), next_data->end());
+            llm_task_obj->images_data.emplace_back(next_data->begin(), next_data->end());
             return;
         }
         llm_task_obj->inference((*next_data));
