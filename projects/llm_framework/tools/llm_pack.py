@@ -453,8 +453,11 @@ if __name__ == "__main__":
         'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],
         'llm-model-openbuddy-llama3.2-1B-ax630c':[create_data_deb,'llm-model-openbuddy-llama3.2-1B-ax630c', data_version, src_folder, revision],
         # InternVL model
+        ## AX630C
         'llm-model-internvl2.5-1B-ax630c':[create_data_deb,'llm-model-internvl2.5-1B-ax630c', '0.4', src_folder, revision],
         'llm-model-internvl2.5-1B-364-ax630c':[create_data_deb,'llm-model-internvl2.5-1B-364-ax630c', '0.4', src_folder, revision],
+        'llm-model-internvl3-1B-448-ax630c':[create_data_deb,'llm-model-internvl3-1B-448-ax630c', '0.6', src_folder, revision],
+        ## AX650
         'llm-model-internvl3-1B-448-ax650':[create_data_deb,'llm-model-internvl3-1B-448-ax650', '0.6', src_folder, revision],
         # DeepSeek model
         ## AX630C

@@ -1,8 +1,8 @@
 {
-    "mode": "qwen2.5-HA-0.5B-ctx-ax630c",
+    "mode": "qwen2.5-HA-0.5B-ctx-ax650",
     "type": "llm",
     "homepage": "https://huggingface.co/yunyu1258/qwen2.5-0.5b-ha",
-    "compile_flage": "pulsar2 llm_build --input_path Qwen/qwen2.5-0.5b-ha --output_path Qwen/qwen2.5-0.5B-p1024-ha-ax630c --hidden_state_type bf16 --prefill_len 128 --kv_cache_len 1280 --last_kv_cache_len 128 --last_kv_cache_len 512 --last_kv_cache_len 1024 --chip AX620E --parallel 24",
+    "compile_flage": "pulsar2 llm_build --input_path Qwen/qwen2.5-0.5b-ha --output_path Qwen/qwen2.5-0.5B-p1024-ha-ax650 --hidden_state_type bf16 --prefill_len 128 --kv_cache_len 1280 --last_kv_cache_len 128 --last_kv_cache_len 512 --last_kv_cache_len 1024 --chip AX650 --parallel 24",
     "pulsar_version": "4.1-patch1-c37957c7",
     "capabilities": [
         "text_generation",
@@ -38,9 +38,9 @@
         "tokens_embed_size": 896,
         "b_use_mmap_load_embed": true,
         "precompute_len": 1024,
-        "cmm_size": 1840108,
+        "cmm_size": 730656,
         "ext_scripts": [
-            "tokenizer_qwen2.5-HA-0.5B-ctx-ax630c.py"
+            "tokenizer_qwen2.5-HA-0.5B-ctx-ax650.py"
         ]
     }
 }

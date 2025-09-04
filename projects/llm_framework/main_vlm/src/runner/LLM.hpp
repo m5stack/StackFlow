@@ -26,7 +26,7 @@ struct LLMAttrType {
     std::string filename_post_axmodel          = "tinyllama-int8/tinyllama_post.axmodel";
     std::string filename_image_encoder_axmodel = "minicpmv/vpm_resampler_version0_fp16.axmodel";
     std::string filename_vpm_encoder_axmodel   = "minicpmv/vpm_resampler_version0_fp16.axmodel";
-    std::string filename_vpm_resampler_axmodel = "minicpmv/vpm_resampler_version0_fp16.axmodel";
+    std::string filename_vpm_resampler_axmodedl = "minicpmv/vpm_resampler_version0_fp16.axmodel";
 
     int image_encoder_width  = 448;
     int image_encoder_height = 448;
@@ -190,18 +190,18 @@ public:
                 return false;
             }
 
-            ret = vpm_resampler.init(attr.filename_vpm_resampler_axmodel.c_str(), false);
+            ret = vpm_resampler.init(attr.filename_vpm_resampler_axmodedl.c_str(), false);
             if (ret != 0) {
-                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_resampler_axmodel.c_str());
+                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_resampler_axmodedl.c_str());
                 return false;
             }
 
             _attr.vpm_height = vpm_encoder.get_input(0).vShape[1];
             _attr.vpm_width  = vpm_encoder.get_input(0).vShape[2];
         } else {
-            ret = vpm_resampler.init(attr.filename_vpm_resampler_axmodel.c_str(), false);
+            ret = vpm_resampler.init(attr.filename_vpm_resampler_axmodedl.c_str(), false);
             if (ret != 0) {
-                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_resampler_axmodel.c_str());
+                ALOGE("init vpm axmodel(%s) failed", attr.filename_vpm_resampler_axmodedl.c_str());
                 return false;
             }
             _attr.vpm_height = vpm_resampler.get_input(0).vShape[1];

@@ -154,7 +154,7 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], url_tokenizer_model);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokens_embed);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_post_axmodel);
-            CONFIG_AUTO_SET(file_body["mode_param"], filename_vpm_resampler_axmodel);
+            CONFIG_AUTO_SET(file_body["mode_param"], filename_vpm_resampler_axmodedl);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_image_encoder_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], b_use_topk);
@@ -238,7 +238,7 @@ public:
             mode_config_.filename_tokens_embed          = base_model + mode_config_.filename_tokens_embed;
             mode_config_.filename_post_axmodel          = base_model + mode_config_.filename_post_axmodel;
             mode_config_.template_filename_axmodel      = base_model + mode_config_.template_filename_axmodel;
-            mode_config_.filename_vpm_resampler_axmodel = base_model + mode_config_.filename_vpm_resampler_axmodel;
+            mode_config_.filename_vpm_resampler_axmodedl = base_model + mode_config_.filename_vpm_resampler_axmodedl;
             mode_config_.filename_image_encoder_axmodel = base_model + mode_config_.filename_image_encoder_axmodel;
             mode_config_.runing_callback = [this](int *p_token, int n_token, const char *p_str, float token_per_sec,
                                                   void *reserve) {
