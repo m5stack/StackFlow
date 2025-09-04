@@ -64,6 +64,7 @@ public:
     std::vector<unsigned short> prompt_data;
     std::vector<int> tokens_ids, tokens_diff;
     std::vector<std::vector<unsigned short>> k_caches, v_caches;
+    std::string kvcache_path;
     int precompute_len = 0;
     std::vector<int> _token_ids;
     task_callback_t out_callback_;
@@ -101,6 +102,23 @@ public:
         }
         enstream_ = (response_format_.find("stream") != std::string::npos);
         return false;
+    }
+
+    void prepare_kvcache_folder(const std::string &kvcache_path)
+    {
+        try {
+            if (!std::filesystem::exists(kvcache_path)) {
+                std::filesystem::create_directories(kvcache_path);
+            }
+
+            if (std::filesystem::exists(kvcache_path) && std::filesystem::is_directory(kvcache_path)) {
+                for (const auto &entry : std::filesystem::directory_iterator(kvcache_path)) {
+                    std::filesystem::remove_all(entry.path());
+                }
+            }
+        } catch (const std::exception &e) {
+            ALOGI("prepare_kvcache_folder: skip clear/create due to error: %s", e.what());
+        }
     }
 
     int load_model(const nlohmann::json &config_body)
@@ -237,7 +255,9 @@ public:
 
             if (lLaMa_ctx_) {
                 lLaMa_ctx_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
-                std::string kvcache_path = "/tmp/.llm/";
+                if (!kvcache_path.empty()) {
+                    prepare_kvcache_folder(kvcache_path);
+                }
                 if (!kvcache_path.empty() && kvcache_path != "") {
                     if (lLaMa_ctx_->load_kvcache(kvcache_path, mode_config_.axmodel_num, k_caches, v_caches,
                                                  mode_config_.system_prompt, precompute_len)) {

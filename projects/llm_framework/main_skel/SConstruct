@@ -26,7 +26,7 @@ REQUIREMENTS += ['ax_engine', 'ax_interpreter', 'ax_sys']
 if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
     REQUIREMENTS += ['ax_skel', 'ax_engine', 'ax_venc', 'ax_vdec', 'ax_ivps', 'ax_proton']
 
-INCLUDE += [ADir('../include'), ADir('src/runner'), ADir('../include/opencv4')]
+INCLUDE += [ADir('../static_lib/include'), ADir('src/runner'), ADir('../static_lib/include/opencv4')]
 
 static_file = Glob('../static_lib/module-llm/libabsl_*')
 static_file = Glob('../static_lib/libopencv-4.6-aarch64-none/lib/lib*')

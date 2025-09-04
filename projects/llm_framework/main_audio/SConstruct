@@ -20,7 +20,6 @@ STATIC_FILES = []
 
 DEFINITIONS += ['-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
-# INCLUDE += [ADir('../include'), ADir('../include/cppzmq'), ADir('../include/libzmq')]
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 REQUIREMENTS += ['ax_sys', 'ax_audio', 'ax_audio_3a', 'tinyalsa', 'fdk-aac', 'opus', 'samplerate']
 if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:

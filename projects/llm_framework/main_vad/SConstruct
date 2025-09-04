@@ -20,7 +20,7 @@ DEFINITIONS += ['-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 
-INCLUDE += [ADir('../include/sherpa')]
+INCLUDE += [ADir('../static_lib/include/sherpa')]
 
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
 LDFLAGS += ['-l:libsherpa-onnx-core.a']
