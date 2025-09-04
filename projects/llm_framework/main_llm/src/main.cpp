@@ -224,7 +224,7 @@ public:
                 if (!process_field(mode_config_.filename_tokenizer_model, "filename_tokenizer_model") &&
                     !process_field(mode_config_.url_tokenizer_model, "url_tokenizer_model")) {
                     mode_config_.filename_tokenizer_model = base_model + mode_config_.filename_tokenizer_model;
-                    SLOGE("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
+                    SLOGI("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
                 }
             }
             mode_config_.filename_tokens_embed     = base_model + mode_config_.filename_tokens_embed;

@@ -33,7 +33,7 @@ LDFLAGS += ['-l:libopencc.a', '-l:libmarisa.a']
 
 STATIC_FILES += Glob('models/mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_whisper-1.7',
+env['COMPONENTS'].append({'target':'llm_whisper-1.8',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

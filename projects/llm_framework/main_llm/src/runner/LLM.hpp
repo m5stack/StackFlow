@@ -55,8 +55,8 @@ struct LLMAttrType {
     bool enable_top_p_sampling = false;
     float top_p                = 0.7f;
 
-    bool enable_top_k_sampling = false;
-    int top_k                  = 50;
+    bool enable_top_k_sampling = true;
+    int top_k                  = 10;
 
     bool enable_repetition_penalty = false;
     float repetition_penalty       = 1.2f;

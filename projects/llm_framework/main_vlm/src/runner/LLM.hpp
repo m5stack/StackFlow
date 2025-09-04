@@ -20,39 +20,47 @@ typedef std::function<void(int *, int, const char *, float, void *)> LLMRuningCa
 
 struct LLMAttrType {
     std::string system_prompt;
+
     std::string template_filename_axmodel = "tinyllama-int8/tinyllama_l%d.axmodel";
+    std::string post_config_path          = "post_config.json";
     int axmodel_num                       = 22;
 
-    std::string filename_post_axmodel          = "tinyllama-int8/tinyllama_post.axmodel";
-    std::string filename_image_encoder_axmodel = "minicpmv/vpm_resampler_version0_fp16.axmodel";
-    std::string filename_vpm_encoder_axmodel   = "minicpmv/vpm_resampler_version0_fp16.axmodel";
+    std::string filename_image_encoder_axmodel  = "minicpmv/vpm_resampler_version0_fp16.axmodel";
+    std::string filename_vpm_encoder_axmodel    = "minicpmv/vpm_resampler_version0_fp16.axmodel";
     std::string filename_vpm_resampler_axmodedl = "minicpmv/vpm_resampler_version0_fp16.axmodel";
 
-    int image_encoder_width  = 448;
-    int image_encoder_height = 448;
-    int vpm_width            = 280;
-    int vpm_height           = 280;
-    bool b_vpm_two_stage     = false;
+    int image_encoder_width       = 448;
+    int image_encoder_height      = 448;
+    int vpm_width                 = 280;
+    int vpm_height                = 280;
+    bool b_vpm_two_stage          = false;
+    int IMAGE_CONTEXT_TOKEN       = 151667;
+    int IMAGE_START_TOKEN         = 151665;
+    int IMAGE_ENCODER_INPUT_NCHW  = -1;
+    int IMAGE_ENCODER_OUTPUT_BF16 = -1;
 
     int prefill_token_num     = 96;
     int prefill_max_token_num = 512;
-    std::vector<int> prefill_max_kv_cache_num_grp;
-    int precompute_len = 0;
-    int prefill_grpid  = -1;
+
+    std::string filename_post_axmodel = "tinyllama-int8/tinyllama_post.axmodel";
 
     TokenizerType tokenizer_type         = TKT_LLaMa;
     std::string filename_tokenizer_model = "tokenizer.model";
     std::string url_tokenizer_model;
-    bool b_bos = true, b_eos = false;
+    bool b_bos                        = true;
+    bool b_eos                        = false;
     std::string filename_tokens_embed = "tinyllama.model.embed_tokens.weight.bfloat16.bin";
     int tokens_embed_num              = 32000;
     int img_token_id                  = 151667;
     int tokens_embed_size             = 2048;
 
     int max_token_len = 127;
-
     int kv_cache_num  = 1024;
     int kv_cache_size = 256;
+
+    int precompute_len = 0;
+    std::vector<int> prefill_max_kv_cache_num_grp;
+    int prefill_grpid = -1;
 
     bool enable_temperature = false;
     float temperature       = 0.7f;
@@ -60,8 +68,8 @@ struct LLMAttrType {
     bool enable_top_p_sampling = false;
     float top_p                = 0.7f;
 
-    bool enable_top_k_sampling = false;
-    int top_k                  = 50;
+    bool enable_top_k_sampling = true;
+    int top_k                  = 10;
 
     bool enable_repetition_penalty = false;
     float repetition_penalty       = 1.2f;
@@ -69,20 +77,10 @@ struct LLMAttrType {
 
     bool b_use_mmap_load_embed        = false;
     bool b_dynamic_load_axmodel_layer = false;
+    bool b_use_mmap_load_layer        = true;
 
-    bool b_use_mmap_load_layer = true;
-
-    bool b_use_topk              = false;
-    std::string post_config_path = "post_config.json";
-
-    // bool b_live_print = true;
     LLMRuningCallback runing_callback = nullptr;
     void *reserve                     = nullptr;
-
-    int IMAGE_CONTEXT_TOKEN       = 151667;
-    int IMAGE_START_TOKEN         = 151665;
-    int IMAGE_ENCODER_INPUT_NCHW  = -1;
-    int IMAGE_ENCODER_OUTPUT_BF16 = -1;
 };
 
 class LLM {
@@ -142,7 +140,6 @@ public:
             return false;
         }
         update_cqdm(&cqdm, 1, "count", "embed_selector init ok");
-
         llama_layers.resize(attr.axmodel_num);
 
         char axmodel_path[1024];
@@ -241,12 +238,33 @@ public:
 
             _attr.prefill_token_num = llama_layers[0].layer.get_input(prefill_grpid, "indices").vShape[1];
             ALOGI("prefill_token_num : %d", _attr.prefill_token_num);
-
             ALOGI("vpm_height : %d,vpm_width : %d", _attr.vpm_height, _attr.vpm_width);
         }
         if (attr.b_dynamic_load_axmodel_layer) {
             auto &layer = llama_layers[0];
             layer.layer.deinit();
+        }
+        nlohmann::json dynamic_config;
+
+        dynamic_config["enable_temperature"] = _attr.enable_temperature;
+        dynamic_config["temperature"]        = _attr.temperature;
+
+        dynamic_config["enable_repetition_penalty"] = _attr.enable_repetition_penalty;
+        dynamic_config["repetition_penalty"]        = _attr.repetition_penalty;
+        dynamic_config["penalty_window"]            = _attr.penalty_window;
+
+        dynamic_config["enable_top_p_sampling"] = _attr.enable_top_p_sampling;
+        dynamic_config["top_p"]                 = _attr.top_p;
+
+        dynamic_config["enable_top_k_sampling"] = _attr.enable_top_k_sampling;
+        dynamic_config["top_k"]                 = _attr.top_k;
+
+        if (!postprocess.load_config(attr.post_config_path)) {
+            ALOGW("load postprocess config(%s) failed", attr.post_config_path.c_str());
+        }
+
+        if (!postprocess.load_config(dynamic_config)) {
+            ALOGW("load postprocess config(%s) failed", dynamic_config.dump(4).c_str());
         }
 
         // Reset();
@@ -483,19 +501,15 @@ public:
             auto &input = llama_post.get_input("input");
             memcpy(input.pVirAddr, embed.data(), embed.size() * sizeof(unsigned short));
             llama_post.inference();
+
             int max_index;
-            if (_attr.b_use_topk) {
-                AX_SYS_MinvalidateCache(llama_post.get_output("indices").phyAddr,
-                                        llama_post.get_output("indices").pVirAddr,
-                                        llama_post.get_output("indices").nSize);
-                max_index = *(int *)llama_post.get_output("indices").pVirAddr;
-            } else {
-                auto &output_post = llama_post.get_output("output");
-                AX_SYS_MinvalidateCache(output_post.phyAddr, output_post.pVirAddr, output_post.nSize);
-                unsigned short *post_out = (unsigned short *)output_post.pVirAddr;
-                float max_val            = -MAXFLOAT;
-                max_index = post_process(postprocess, post_out, _attr.tokens_embed_num, token_ids, &max_val);
-            }
+
+            auto &output_post = llama_post.get_output("output");
+            AX_SYS_MinvalidateCache(output_post.phyAddr, output_post.pVirAddr, output_post.nSize);
+            unsigned short *post_out = (unsigned short *)output_post.pVirAddr;
+            float max_val            = -MAXFLOAT;
+            max_index                = post_process(postprocess, post_out, _attr.tokens_embed_num, token_ids, &max_val);
+
             next_token = max_index;
 
             token_ids.push_back(max_index);
@@ -574,18 +588,13 @@ public:
                 memcpy(input.pVirAddr, embed.data(), embed.size() * sizeof(unsigned short));
                 llama_post.inference();
                 int max_index;
-                if (_attr.b_use_topk) {
-                    AX_SYS_MinvalidateCache(llama_post.get_output("indices").phyAddr,
-                                            llama_post.get_output("indices").pVirAddr,
-                                            llama_post.get_output("indices").nSize);
-                    max_index = *(int *)llama_post.get_output("indices").pVirAddr;
-                } else {
-                    auto &output_post = llama_post.get_output("output");
-                    AX_SYS_MinvalidateCache(output_post.phyAddr, output_post.pVirAddr, output_post.nSize);
-                    unsigned short *post_out = (unsigned short *)output_post.pVirAddr;
-                    float max_val            = -MAXFLOAT;
-                    max_index = post_process(postprocess, post_out, _attr.tokens_embed_num, token_ids, &max_val);
-                }
+
+                auto &output_post = llama_post.get_output("output");
+                AX_SYS_MinvalidateCache(output_post.phyAddr, output_post.pVirAddr, output_post.nSize);
+                unsigned short *post_out = (unsigned short *)output_post.pVirAddr;
+                float max_val            = -MAXFLOAT;
+                max_index = post_process(postprocess, post_out, _attr.tokens_embed_num, token_ids, &max_val);
+
                 next_token = max_index;
 
                 if (tokenizer->isEnd(max_index)) {

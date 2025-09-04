@@ -157,7 +157,6 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], filename_vpm_resampler_axmodedl);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_image_encoder_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
-            CONFIG_AUTO_SET(file_body["mode_param"], b_use_topk);
             CONFIG_AUTO_SET(file_body["mode_param"], b_vpm_two_stage);
             CONFIG_AUTO_SET(file_body["mode_param"], b_bos);
             CONFIG_AUTO_SET(file_body["mode_param"], b_eos);
@@ -232,7 +231,7 @@ public:
                 if (!process_field(mode_config_.filename_tokenizer_model, "filename_tokenizer_model") &&
                     !process_field(mode_config_.url_tokenizer_model, "url_tokenizer_model")) {
                     mode_config_.filename_tokenizer_model = base_model + mode_config_.filename_tokenizer_model;
-                    SLOGE("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
+                    SLOGI("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
                 }
             }
             mode_config_.filename_tokens_embed          = base_model + mode_config_.filename_tokens_embed;
