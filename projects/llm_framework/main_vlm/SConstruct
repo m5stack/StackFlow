@@ -27,9 +27,9 @@ LINK_SEARCH_PATH += [ADir('../static_lib')]
 
 
 INCLUDE += [ADir('src/runner'), ADir('src/runner/utils'), ADir('src/runner/ax_model_runner')]
-INCLUDE += [ADir('../include/abseil-cpp'),
-            ADir('../include/opencv4'),
-            ADir('../include/re2')]
+INCLUDE += [ADir('../static_lib/include/abseil-cpp'),
+            ADir('../static_lib/include/opencv4'),
+            ADir('../static_lib/include/re2')]
 
 static_file = Glob('../static_lib/module-llm/libabsl_*')
 static_file += [AFile('../static_lib/module-llm/libre2.a'), AFile('../static_lib/module-llm/libsentencepiece.a'), AFile('../static_lib/module-llm/libsentencepiece_train.a')]

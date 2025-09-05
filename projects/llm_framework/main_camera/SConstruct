@@ -47,7 +47,7 @@ if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
     REQUIREMENTS += ['ax_audio_3a','samplerate', 'ax_fdk', 'fdk-aac', 'ax_awb', 'ax_af', 'ax_nt_stream', 'ax_nt_ctrl']
     REQUIREMENTS += ['liveMedia', 'UsageEnvironment', 'groupsock', 'BasicUsageEnvironment']
 
-INCLUDE += [ADir('../include/opencv4')]
+INCLUDE += [ADir('../static_lib/include/opencv4')]
 static_file = []
 static_file += [AFile('../static_lib/libopencv-4.6-aarch64-none/lib/libopencv_core.a')]
 static_file += [AFile('../static_lib/libopencv-4.6-aarch64-none/lib/libittnotify.a')]

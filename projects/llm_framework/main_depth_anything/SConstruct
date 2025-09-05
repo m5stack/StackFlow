@@ -21,7 +21,7 @@ LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 REQUIREMENTS += ['axcl_rt', 'axcl_pkg', 'axcl_comm', 'spdlog', 'axcl_token', 'axcl_pcie_msg', 'axcl_pcie_dma']
 
-INCLUDE += [ADir('../include'), ADir('../include/opencv4')]
+INCLUDE += [ADir('../static_lib/include'), ADir('../static_lib/include/opencv4')]
 INCLUDE += [ADir('src/runner')]
 
 static_file = Glob('../static_lib/module-llm/libabsl_*')

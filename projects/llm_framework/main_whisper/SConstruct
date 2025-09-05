@@ -23,8 +23,8 @@ LINK_SEARCH_PATH += [ADir('../static_lib')]
 REQUIREMENTS += ['axcl_rt', 'axcl_pkg', 'axcl_comm', 'spdlog', 'axcl_token', 'axcl_pcie_msg', 'axcl_pcie_dma']
 # REQUIREMENTS += ['onnxruntime', 'samplerate']
 
-INCLUDE += [ADir('../include')]
-INCLUDE += [ADir('src/runner'), ADir('../include/onnxruntime/core/session')]
+INCLUDE += [ADir('../static_lib/include')]
+INCLUDE += [ADir('src/runner'), ADir('../static_lib/include/onnxruntime/core/session')]
 INCLUDE += [ADir('src/runner/opencc/include/opencc')]
 INCLUDE += [ADir('src/runner/middleware')]
 
