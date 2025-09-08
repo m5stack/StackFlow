@@ -17,15 +17,11 @@ LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
-python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-llm-python-venv_v1.7.tar.gz", 'm5stack_llm-llm-python-venv_v1.7.tar.gz')
+if "CONFIG_AXCL_ENABLED" in os.environ:
+    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-llm-python-axcl-rsp-venv_v1.8.tar.gz", 'm5stack_llm-llm-python-axcl-rsp-venv_v1.8.tar.gz')
+else:
+    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-llm-python-venv_v1.7.tar.gz", 'm5stack_llm-llm-python-venv_v1.7.tar.gz')
 
-# REQUIREMENTS += ['Backward_cpp']
-# DYNAMIC_LIB += [ AFile('../static_lib/libdw.so.1'),
-#                 AFile('../static_lib/libelf.so.1'),
-#                 AFile('../static_lib/libz.so.1'),
-#                 AFile('../static_lib/liblzma.so.5'),
-#                 AFile('../static_lib/libbz2.so.1.0')]
-# DEFINITIONS += ["-DENABLE_BACKWARD"]
 DEFINITIONS += ['-O2']
 DEFINITIONS += ['-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']

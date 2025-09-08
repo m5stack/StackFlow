@@ -105,7 +105,12 @@ private:
 
     void _cap_stop()
     {
+#if (defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)) && !defined(CONFIG_AXCL_ENABLED)
         ax_close_cap();
+
+#else
+        alsa_close_cap();
+#endif
         if (audio_cap_thread_) {
             audio_cap_thread_->join();
             audio_cap_thread_.reset();

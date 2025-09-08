@@ -19,7 +19,11 @@ STATIC_FILES = []
 
 
 ModuleLLMOpenAIPluginPath = wget_github_commit('https://github.com/m5stack/ModuleLLM-OpenAI-Plugin.git', '9612b20800eb1708e648744e3cb333c4f743811c', True)
-python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-openai-api-python-venv_v1.6.tar.gz", 'm5stack_llm-openai-api-python-venv_v1.6.tar.gz')
+
+if "CONFIG_AXCL_ENABLED" in os.environ:
+    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-openai-api-python-axcl-rsp-venv_v1.7.tar.gz", 'm5stack_llm-openai-api-python-axcl-rsp-venv_v1.7.tar.gz')
+else:
+    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-openai-api-python-venv_v1.6.tar.gz", 'm5stack_llm-openai-api-python-venv_v1.6.tar.gz')
 
 
 DEFINITIONS += ['-O3', '-fopenmp', '-std=c++17']

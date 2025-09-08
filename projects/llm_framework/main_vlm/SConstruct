@@ -17,7 +17,10 @@ LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
-python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-vlm-python-venv_v1.6.tar.gz", 'm5stack_llm-vlm-python-venv_v1.6.tar.gz')
+if "CONFIG_AXCL_ENABLED" in os.environ:
+    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-vlm-python-axcl-rsp-venv_v1.8.tar.gz", 'm5stack_llm-vlm-python-axcl-rsp-venv_v1.8.tar.gz')
+else:
+    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-vlm-python-venv_v1.6.tar.gz", 'm5stack_llm-vlm-python-venv_v1.6.tar.gz')
 
 DEFINITIONS += ['-O2']
 DEFINITIONS += ['-std=c++17']

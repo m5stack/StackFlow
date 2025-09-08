@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <iostream>
+#include <global_config.h>
 
 #include "all.h"
 #include "event_loop.h"
@@ -139,7 +140,9 @@ void all_work()
     remote_server_work();
     remote_action_work();
     zmq_bus_work();
+#ifndef CONFIG_AXCL_ENABLED
     serial_work();
+#endif
     int enable_tcp = 0;
     SAFE_READING(enable_tcp, int, "config_enable_tcp");
     if (enable_tcp) tcp_work();
@@ -151,7 +154,9 @@ void all_stop_work()
     SAFE_READING(enable_tcp, int, "config_enable_tcp");
 
     if (enable_tcp) tcp_stop_work();
+#ifndef CONFIG_AXCL_ENABLED
     serial_stop_work();
+#endif
     remote_server_stop_work();
     remote_action_stop_work();
     zmq_bus_stop_work();
@@ -172,7 +177,9 @@ int main(int argc, char *argv[])
     }
     SLOGD("llm_sys start");
     get_run_config();
+#ifndef CONFIG_AXCL_ENABLED
     uart_reset_check();
+#endif
     all_work();
     SLOGD("llm_sys work");
     while (main_exit_flage == 0) {
