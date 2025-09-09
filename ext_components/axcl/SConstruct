@@ -9,14 +9,9 @@ with open(env["PROJECT_TOOL_S"]) as f:
 _SDK_PATH = os.path.normpath(
     os.environ.get("SDK_PATH", str(Path(os.getcwd()) / ".." / ".."))
 )
-env["GIT_REPO_LISTS"]["axcl"] = {
-    # "url": "https://github.com/AXERA-TECH/ax-samples.git",
-    # "commit": "146154ca03929a0e119ca53650e3b05fa40c3e7a",
-    "path": str(Path(_SDK_PATH) / "github_source" / "axcl"),
-}
 
 if "CONFIG_AXCL_ENABLED" in os.environ:
-    check_component("axcl")
+    axcl = os.environ.get('EXT_AXCL_PATH', check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_axcl_msp_v3_6_2.tar.gz", 'm5stack_axcl_msp_v3_6_2.tar.gz'))
     SRCS = []
     INCLUDE = []
     PRIVATE_INCLUDE = []
@@ -30,12 +25,9 @@ if "CONFIG_AXCL_ENABLED" in os.environ:
 
     SRCS += Glob('middleware/*.cc')
     INCLUDE.append(ADir("."))
-    INCLUDE += [
-        # os.path.join(env["GIT_REPO_LISTS"]["axcl"]["path"], "include/external"),
-        os.path.join(env["GIT_REPO_LISTS"]["axcl"]["path"], "out/axcl_linux_ax650/include")
-    ]
+    INCLUDE += [os.path.join(axcl, "axcl_linux_ax650/include")]
 
-    LINK_SEARCH_PATH += [os.path.join(env["GIT_REPO_LISTS"]["axcl"]["path"], 'out/axcl_linux_arm64/lib')]
+    LINK_SEARCH_PATH += [os.path.join(axcl, "axcl_linux_arm64/lib")]
 
     env["COMPONENTS"].append(
         {

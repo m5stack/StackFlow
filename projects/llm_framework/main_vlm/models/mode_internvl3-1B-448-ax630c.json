@@ -1,5 +1,5 @@
 {
-    "mode": "internvl3-1B-448-ax650",
+    "mode": "internvl3-1B-448-ax630c",
     "type": "vlm",
     "homepage": "https://huggingface.co/AXERA-TECH/InternVL3-1B",
     "capabilities": [
@@ -35,10 +35,10 @@
         "img_token_id": 151667,
         "tokens_embed_size": 896,
         "b_use_mmap_load_embed": true,
-        "precompute_len": 2048,
-        "cmm_size": 1919044,
+        "precompute_len": 1024,
+        "cmm_size": 1674992,
         "ext_scripts": [
-            "tokenizer_internvl3-1B-448-ax650.py"
+            "tokenizer_internvl3-1B-448-ax630c.py"
         ]
     }
 }

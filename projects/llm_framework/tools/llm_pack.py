@@ -69,23 +69,23 @@ def create_lib_deb(package_name, version, src_folder, revision = 'm5stack1'):
     # if os.path.exists(zip_file_extrpath):
     #     shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'opt/m5stack/scripts'))
 
-    zip_file = 'm5stack_dist-packages.tar.gz'
-    down_url = 'https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_dist-packages.tar.gz'
-    zip_file_extrpath = 'm5stack_dist-packages'
-    if not os.path.exists(zip_file_extrpath):
-        # Downloading via HTTP (more common)
-        if not os.path.exists(zip_file):
-            response = requests.get(down_url)
-            if response.status_code == 200:
-                with open(zip_file, 'wb') as file:
-                    file.write(response.content)
-            else:
-                print("{} down failed".format(down_url))
-        with tarfile.open(zip_file, 'r:gz') as tar:
-            tar.extractall(path=zip_file_extrpath)
-        print("The {} download successful.".format(down_url))
-    if os.path.exists(zip_file_extrpath):
-        shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'usr/local/lib/python3.10/dist-packages'))
+    # zip_file = 'm5stack_dist-packages.tar.gz'
+    # down_url = 'https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_dist-packages.tar.gz'
+    # zip_file_extrpath = 'm5stack_dist-packages'
+    # if not os.path.exists(zip_file_extrpath):
+    #     # Downloading via HTTP (more common)
+    #     if not os.path.exists(zip_file):
+    #         response = requests.get(down_url)
+    #         if response.status_code == 200:
+    #             with open(zip_file, 'wb') as file:
+    #                 file.write(response.content)
+    #         else:
+    #             print("{} down failed".format(down_url))
+    #     with tarfile.open(zip_file, 'r:gz') as tar:
+    #         tar.extractall(path=zip_file_extrpath)
+    #     print("The {} download successful.".format(down_url))
+    # if os.path.exists(zip_file_extrpath):
+    #     shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'usr/local/lib/python3.10/dist-packages'))
 
     os.makedirs(os.path.join(deb_folder, 'DEBIAN'), exist_ok = True)
     with open(os.path.join(deb_folder, 'DEBIAN/control'),'w') as f:
@@ -401,6 +401,15 @@ if __name__ == "__main__":
         'llm-model-melotts-en-us-ax650':[create_data_deb,'llm-model-melotts-en-us-ax650', '0.6', src_folder, revision],
         'llm-model-melotts-ja-jp-ax650':[create_data_deb,'llm-model-melotts-ja-jp-ax650', '0.6', src_folder, revision],
         'llm-model-melotts-es-es-ax650':[create_data_deb,'llm-model-melotts-es-es-ax650', '0.5', src_folder, revision],
+        ## AXCL
+        'llm-model-melotts-zh-cn-axcl':[create_data_deb,'llm-model-melotts-zh-cn-axcl', '0.6', src_folder, revision],
+        'llm-model-melotts-en-au-axcl':[create_data_deb,'llm-model-melotts-en-au-axcl', '0.6', src_folder, revision],
+        'llm-model-melotts-en-br-axcl':[create_data_deb,'llm-model-melotts-en-br-axcl', '0.6', src_folder, revision],
+        'llm-model-melotts-en-default-axcl':[create_data_deb,'llm-model-melotts-en-default-axcl', '0.6', src_folder, revision],
+        'llm-model-melotts-en-india-axcl':[create_data_deb,'llm-model-melotts-en-india-axcl', '0.6', src_folder, revision],
+        'llm-model-melotts-en-us-axcl':[create_data_deb,'llm-model-melotts-en-us-axcl', '0.6', src_folder, revision],
+        'llm-model-melotts-ja-jp-axcl':[create_data_deb,'llm-model-melotts-ja-jp-axcl', '0.6', src_folder, revision],
+        'llm-model-melotts-es-es-axcl':[create_data_deb,'llm-model-melotts-es-es-axcl', '0.5', src_folder, revision],
         # Yolo model
         ## AX630C
         'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
@@ -416,6 +425,11 @@ if __name__ == "__main__":
         'llm-model-yolo11n-pose-ax650':[create_data_deb,'llm-model-yolo11n-pose-ax650', '0.4', src_folder, revision],
         'llm-model-yolo11n-hand-pose-ax650':[create_data_deb,'llm-model-yolo11n-hand-pose-ax650', '0.4', src_folder, revision],
         'llm-model-yolo11n-seg-ax650':[create_data_deb,'llm-model-yolo11n-seg-ax650', '0.4', src_folder, revision],
+        ## AXCL
+        'llm-model-yolo11n-axcl':[create_data_deb,'llm-model-yolo11n-axcl', '0.4', src_folder, revision],
+        'llm-model-yolo11n-pose-axcl':[create_data_deb,'llm-model-yolo11n-pose-axcl', '0.4', src_folder, revision],
+        'llm-model-yolo11n-hand-pose-axcl':[create_data_deb,'llm-model-yolo11n-hand-pose-axcl', '0.4', src_folder, revision],
+        'llm-model-yolo11n-seg-axcl':[create_data_deb,'llm-model-yolo11n-seg-axcl', '0.4', src_folder, revision],
         # DepthAnything model
         ## AX630C
         'llm-model-depth-anything-ax630c':[create_data_deb,'llm-model-depth-anything-ax630c', '0.4', src_folder, revision],
@@ -431,6 +445,10 @@ if __name__ == "__main__":
         'llm-model-whisper-tiny-ax650':[create_data_deb,'llm-model-whisper-tiny-ax650', '0.4', src_folder, revision],
         'llm-model-whisper-base-ax650':[create_data_deb,'llm-model-whisper-base-ax650', '0.4', src_folder, revision],
         'llm-model-whisper-small-ax650':[create_data_deb,'llm-model-whisper-small-ax650', '0.4', src_folder, revision],
+        ## AXCL
+        'llm-model-whisper-tiny-axcl':[create_data_deb,'llm-model-whisper-tiny-axcl', '0.4', src_folder, revision],
+        'llm-model-whisper-base-axcl':[create_data_deb,'llm-model-whisper-base-axcl', '0.4', src_folder, revision],
+        'llm-model-whisper-small-axcl':[create_data_deb,'llm-model-whisper-small-axcl', '0.4', src_folder, revision],
         # Qwen model
         ## AX630C
         'llm-model-qwen2.5-0.5B-prefill-20e':[create_data_deb,'llm-model-qwen2.5-0.5B-prefill-20e', data_version, src_folder, revision],
@@ -448,21 +466,28 @@ if __name__ == "__main__":
         'llm-model-qwen2.5-1.5B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-1.5B-Int4-ax650', '0.4', src_folder, revision],
         'llm-model-qwen2.5-3B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-3B-Int4-ax650', '0.4', src_folder, revision],
         'llm-model-qwen2.5-7B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-7B-Int4-ax650', '0.4', src_folder, revision],
+        ## AXCL
+        'llm-model-qwen2.5-HA-0.5B-ctx-axcl':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-axcl', '0.5', src_folder, revision],
         # Llama model
         'llm-model-llama3.2-1B-prefill-ax630c':[create_data_deb,'llm-model-llama3.2-1B-prefill-ax630c', data_version, src_folder, revision],
         'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],
         'llm-model-openbuddy-llama3.2-1B-ax630c':[create_data_deb,'llm-model-openbuddy-llama3.2-1B-ax630c', data_version, src_folder, revision],
         # InternVL model
+        ## AX630C
         'llm-model-internvl2.5-1B-ax630c':[create_data_deb,'llm-model-internvl2.5-1B-ax630c', '0.4', src_folder, revision],
         'llm-model-internvl2.5-1B-364-ax630c':[create_data_deb,'llm-model-internvl2.5-1B-364-ax630c', '0.4', src_folder, revision],
+        ## AX650
         'llm-model-internvl3-1B-448-ax650':[create_data_deb,'llm-model-internvl3-1B-448-ax650', '0.6', src_folder, revision],
+        ## AXCL
+        'llm-model-internvl3-1B-448-axcl':[create_data_deb,'llm-model-internvl3-1B-448-axcl', '0.6', src_folder, revision],
         # DeepSeek model
         ## AX630C
         'llm-model-deepseek-r1-1.5B-ax630c':[create_data_deb,'llm-model-deepseek-r1-1.5B-ax630c', '0.3', src_folder, revision],
         'llm-model-deepseek-r1-1.5B-p256-ax630c':[create_data_deb,'llm-model-deepseek-r1-1.5B-p256-ax630c', '0.4', src_folder, revision],
         ## AX650
-        'llm-model-deepseek-r1-1.5B-Int4-ax650':[create_data_deb,'llm-model-deepseek-r1-1.5B-Int4-ax650', '0.4', src_folder, revision],#
-        'llm-model-deepseek-r1-7B-Int4-ax650':[create_data_deb,'llm-model-deepseek-r1-7B-Int4-ax650', '0.4', src_folder, revision],#
+        'llm-model-deepseek-r1-1.5B-Int4-ax650':[create_data_deb,'llm-model-deepseek-r1-1.5B-Int4-ax650', '0.4', src_folder, revision],
+        'llm-model-deepseek-r1-7B-Int4-ax650':[create_data_deb,'llm-model-deepseek-r1-7B-Int4-ax650', '0.4', src_folder, revision],
+        ## AXCL
         # Smolvlm model
         ## AX630C
         'llm-model-smolvlm-256M-ax630c':[create_data_deb,'llm-model-smolvlm-256M-ax630c', '0.4', src_folder, revision],
