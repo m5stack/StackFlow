@@ -283,7 +283,7 @@ public:
 
             int zp_size         = decoder_->getInputSize(0) / sizeof(float);
             int dec_len         = zp_size / zp_shape[1];
-            int audio_slice_len = decoder_->getInputSize(0) / sizeof(float);
+            int audio_slice_len = decoder_->getOutputSize(0) / sizeof(float);
 
             const int overlap_size = 1024;
             const int fade_size    = 512;
