@@ -233,7 +233,7 @@ public:
             cv::Mat img_mat(mode_config_.img_h, mode_config_.img_w, CV_8UC3, image.data());
 
             axclrtMemcpy(yolo_->getInputPointer(0), img_mat.data, img_mat.total() * img_mat.elemSize(),
-                          AXCL_MEMCPY_HOST_TO_DEVICE);
+                         AXCL_MEMCPY_HOST_TO_DEVICE);
 
             if (!yolo_->run(false)) {
                 SLOGE("Run yolo model failed!\n");

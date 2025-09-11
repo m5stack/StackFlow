@@ -120,7 +120,8 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], npu_type);
             mode_config_.depth_anything_model = base_model + mode_config_.depth_anything_model;
             depth_anything_                   = std::make_unique<AxclWrapper>();
-            if (!depth_anything_->initialize(CONFIG_FILE_DEFAULT, 0, 0, mode_config_.depth_anything_model, true, true, 0, 0)) {
+            if (!depth_anything_->initialize(CONFIG_FILE_DEFAULT, 0, 0, mode_config_.depth_anything_model, true, true,
+                                             0, 0)) {
                 SLOGE("Init depth_anything_model model failed!\n");
                 return -5;
             }
@@ -211,14 +212,14 @@ public:
             depth_anything_->set();
             std::vector<uint8_t> image(mode_config_.img_w * mode_config_.img_h * 3, 0);
             common::get_input_data_no_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, true);
-            axclrtMemcpy(depth_anything_->getInputPointer(0), image.data(), image.size(),
-                          AXCL_MEMCPY_HOST_TO_DEVICE);
+            axclrtMemcpy(depth_anything_->getInputPointer(0), image.data(), image.size(), AXCL_MEMCPY_HOST_TO_DEVICE);
             if (!depth_anything_->run(false)) {
                 SLOGE("Run depth_anything model failed!\n");
                 throw std::string("depth_anything_ RunSync error");
             }
             std::string depth_anything_output;
-            depth_anything_->post_process(src, mode_config_.img_h, mode_config_.img_w, mode_config_.model_type, depth_anything_output);
+            depth_anything_->post_process(src, mode_config_.img_h, mode_config_.img_w, mode_config_.model_type,
+                                          depth_anything_output);
             if (out_callback_) out_callback_(depth_anything_output, true);
         } catch (...) {
             SLOGW("depth_anything_->Run have error!");

@@ -436,6 +436,8 @@ if __name__ == "__main__":
         'llm-model-depth-anything-npu1-ax630c':[create_data_deb,'llm-model-depth-anything-npu1-ax630c', '0.4', src_folder, revision],
         ## AX650
         'llm-model-depth-anything-ax650':[create_data_deb,'llm-model-depth-anything-ax650', '0.4', src_folder, revision],
+        ## AXCL
+        'llm-model-depth-anything-axcl':[create_data_deb,'llm-model-depth-anything-axcl', '0.4', src_folder, revision],
         # Whisper model
         ## AX630C
         'llm-model-whisper-tiny':[create_data_deb,'llm-model-whisper-tiny', '0.4', src_folder, revision],
