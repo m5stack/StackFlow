@@ -20,45 +20,50 @@
 
 #define ALIGN_DOWN(x, a) ((x) & ~((a) - 1))
 
-int IMAGE_ENCODER_INPUT_NCHW  = -1;
-int IMAGE_ENCODER_OUTPUT_BF16 = -1;
-
 // typedef void (*LLMRuningCallback)(int *p_token, int n_token, const char *p_str, float token_per_sec, void *reserve);
 typedef std::function<void(int *, int, const char *, float, void *)> LLMRuningCallback;
 
 struct LLMAttrType {
     std::string system_prompt;
+
     std::string template_filename_axmodel = "tinyllama-int8/tinyllama_l%d.axmodel";
+    std::string post_config_path          = "post_config.json";
     int axmodel_num                       = 22;
+
+    int prefill_token_num         = 96;
+    int prefill_max_token_num     = 512;
+    int image_encoder_width       = 448;
+    int image_encoder_height      = 448;
+    int vpm_width                 = 280;
+    int vpm_height                = 280;
+    bool b_vpm_two_stage          = false;
+    int IMAGE_CONTEXT_TOKEN       = 151667;
+    int IMAGE_START_TOKEN         = 151665;
+    int IMAGE_ENCODER_INPUT_NCHW  = -1;
+    int IMAGE_ENCODER_OUTPUT_BF16 = -1;
 
     std::string filename_post_axmodel          = "tinyllama-int8/tinyllama_post.axmodel";
     std::string filename_image_encoder_axmodel = "tinyllama-int8/internvl3_1b_vit.axmodel";
 
-    int image_encoder_width  = 448;
-    int image_encoder_height = 448;
-    int vpm_width            = 280;
-    int vpm_height           = 280;
-    bool b_vpm_two_stage     = false;
-
-    int prefill_token_num     = 96;
-    int prefill_max_token_num = 512;
-    std::vector<int> prefill_max_kv_cache_num_grp;
-    int precompute_len = 0;
-    int prefill_grpid  = -1;
-
     TokenizerType tokenizer_type = TKT_HTTP;
     std::string filename_tokenizer_model;
     std::string url_tokenizer_model;
-    bool b_bos = false, b_eos = false;
+    bool b_bos               = false;
+    bool b_eos               = false;
+    std::vector<int> dev_ids = {0};
+
     std::string filename_tokens_embed = "tinyllama.model.embed_tokens.weight.bfloat16.bin";
     int tokens_embed_num              = 32000;
     int img_token_id                  = 151667;
     int tokens_embed_size             = 2048;
 
     int max_token_len = 127;
-
     int kv_cache_num  = 1024;
     int kv_cache_size = 256;
+
+    int precompute_len = 0;
+    std::vector<int> prefill_max_kv_cache_num_grp;
+    int prefill_grpid = -1;
 
     bool enable_temperature = false;
     float temperature       = 0.7f;
@@ -66,8 +71,8 @@ struct LLMAttrType {
     bool enable_top_p_sampling = false;
     float top_p                = 0.7f;
 
-    bool enable_top_k_sampling = false;
-    int top_k                  = 50;
+    bool enable_top_k_sampling = true;
+    int top_k                  = 10;
 
     bool enable_repetition_penalty = false;
     float repetition_penalty       = 1.2f;
@@ -75,22 +80,10 @@ struct LLMAttrType {
 
     bool b_use_mmap_load_embed        = false;
     bool b_dynamic_load_axmodel_layer = false;
+    bool b_use_mmap_load_layer        = true;
 
-    bool b_use_mmap_load_layer = true;
-
-    bool b_use_topk              = false;
-    std::string post_config_path = "post_config.json";
-
-    std::vector<int> dev_ids = {0};
-
-    // bool b_live_print = true;
     LLMRuningCallback runing_callback = nullptr;
     void *reserve                     = nullptr;
-
-    int IMAGE_CONTEXT_TOKEN       = 151667;
-    int IMAGE_START_TOKEN         = 151665;
-    int IMAGE_ENCODER_INPUT_NCHW  = -1;
-    int IMAGE_ENCODER_OUTPUT_BF16 = -1;
 };
 
 class LLM {
@@ -238,22 +231,22 @@ public:
 
         ALOGI("IMAGE_CONTEXT_TOKEN: %d, IMAGE_START_TOKEN: %d", _attr.IMAGE_CONTEXT_TOKEN, _attr.IMAGE_START_TOKEN);
 
-        IMAGE_ENCODER_INPUT_NCHW = -1;
+        _attr.IMAGE_ENCODER_INPUT_NCHW = -1;
         for (size_t i = 1; i < image_encoder.get_input(0).vShape.size(); i++) {
             if (image_encoder.get_input(0).vShape[i] == 3) {
                 if (i == 1) {
-                    IMAGE_ENCODER_INPUT_NCHW = 1;
+                    _attr.IMAGE_ENCODER_INPUT_NCHW = 1;
                 } else if (i == 3) {
-                    IMAGE_ENCODER_INPUT_NCHW = 0;
+                    _attr.IMAGE_ENCODER_INPUT_NCHW = 0;
                 }
             }
         }
-        if (IMAGE_ENCODER_INPUT_NCHW == -1) {
+        if (_attr.IMAGE_ENCODER_INPUT_NCHW == -1) {
             ALOGE("image encoder input nchw or nhwc not found");
             return false;
         }
 
-        if (IMAGE_ENCODER_INPUT_NCHW) {
+        if (_attr.IMAGE_ENCODER_INPUT_NCHW) {
             ALOGI("image encoder input nchw@float32");
             _attr.image_encoder_height = image_encoder.get_input(0).vShape[2];
             _attr.image_encoder_width  = image_encoder.get_input(0).vShape[3];
@@ -273,10 +266,10 @@ public:
         }
 
         if (output_elem_size * 2 == image_encoder.get_output(0).nSize) {
-            IMAGE_ENCODER_OUTPUT_BF16 = 1;
+            _attr.IMAGE_ENCODER_OUTPUT_BF16 = 1;
             ALOGI("image encoder output bf16");
         } else if (output_elem_size * 4 == image_encoder.get_output(0).nSize) {
-            IMAGE_ENCODER_OUTPUT_BF16 = 0;
+            _attr.IMAGE_ENCODER_OUTPUT_BF16 = 0;
             ALOGI("image encoder output float32");
         } else {
             ALOGE("image encoder output not support");
@@ -909,7 +902,7 @@ public:
     {
         timer t;
         t.start();
-        if (IMAGE_ENCODER_INPUT_NCHW) {
+        if (_attr.IMAGE_ENCODER_INPUT_NCHW) {
             std::vector<float> mean  = {0.485, 0.456, 0.406};
             std::vector<float> scale = {0.229, 0.224, 0.225};
 
@@ -951,7 +944,7 @@ public:
         ALOGE("image encoder output size : %d", size);
         out_embed.resize(size);
 
-        if (IMAGE_ENCODER_OUTPUT_BF16)
+        if (_attr.IMAGE_ENCODER_OUTPUT_BF16)
             memcpy(out_embed.data(), image_encoder.get_output(0).pVirAddr, image_encoder.get_output(0).nSize);
         else {
             float *out_data = (float *)image_encoder.get_output(0).pVirAddr;

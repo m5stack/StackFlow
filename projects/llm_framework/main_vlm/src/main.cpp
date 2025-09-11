@@ -64,6 +64,7 @@ public:
     std::string last_reply;
     std::vector<int> tokens_ids, tokens_diff;
     std::vector<std::vector<unsigned short>> k_caches, v_caches;
+    std::string kvcache_path;
     int precompute_len = 0;
     std::vector<int> _token_ids;
     task_callback_t out_callback_;
@@ -103,6 +104,23 @@ public:
         return false;
     }
 
+    void prepare_kvcache_folder(const std::string &kvcache_path)
+    {
+        try {
+            if (!std::filesystem::exists(kvcache_path)) {
+                std::filesystem::create_directories(kvcache_path);
+            }
+
+            if (std::filesystem::exists(kvcache_path) && std::filesystem::is_directory(kvcache_path)) {
+                for (const auto &entry : std::filesystem::directory_iterator(kvcache_path)) {
+                    std::filesystem::remove_all(entry.path());
+                }
+            }
+        } catch (const std::exception &e) {
+            ALOGI("prepare_kvcache_folder: skip clear/create due to error: %s", e.what());
+        }
+    }
+
     int load_model(const nlohmann::json &config_body)
     {
         if (parse_config(config_body)) {
@@ -138,7 +156,6 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], filename_post_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_image_encoder_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
-            CONFIG_AUTO_SET(file_body["mode_param"], b_use_topk);
             CONFIG_AUTO_SET(file_body["mode_param"], b_vpm_two_stage);
             CONFIG_AUTO_SET(file_body["mode_param"], b_bos);
             CONFIG_AUTO_SET(file_body["mode_param"], b_eos);
@@ -213,7 +230,7 @@ public:
                 if (!process_field(mode_config_.filename_tokenizer_model, "filename_tokenizer_model") &&
                     !process_field(mode_config_.url_tokenizer_model, "url_tokenizer_model")) {
                     mode_config_.filename_tokenizer_model = base_model + mode_config_.filename_tokenizer_model;
-                    SLOGE("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
+                    SLOGI("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
                 }
             }
             mode_config_.filename_tokens_embed          = base_model + mode_config_.filename_tokens_embed;
@@ -236,7 +253,9 @@ public:
 
             if (lLaMa_) {
                 lLaMa_->SetSystemPrompt(mode_config_.system_prompt, _token_ids);
-                std::string kvcache_path = "/tmp/.vlm/";
+                if (!kvcache_path.empty()) {
+                    prepare_kvcache_folder(kvcache_path);
+                }
                 if (!kvcache_path.empty() && kvcache_path != "") {
                     if (lLaMa_->load_kvcache(kvcache_path, mode_config_.axmodel_num, k_caches, v_caches,
                                              mode_config_.system_prompt, precompute_len)) {
