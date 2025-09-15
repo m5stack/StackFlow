@@ -62,7 +62,7 @@ ignore['ignore'] = list(set(ignore['ignore']))
 with open('../dist/fileignore', 'w') as f:
     json.dump(ignore, f, indent=4)
 
-env['COMPONENTS'].append({'target':'llm_llm-1.8',
+env['COMPONENTS'].append({'target':'llm_llm-1.9',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
