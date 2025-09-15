@@ -102,7 +102,6 @@ public:
             model_           = config_body.at("model");
             response_format_ = config_body.at("response_format");
             enoutput_        = config_body.at("enoutput");
-            prompt_          = config_body.at("prompt");
 
             if (config_body.contains("input")) {
                 if (config_body["input"].is_string()) {
@@ -327,7 +326,6 @@ public:
                             g_llm_finished);
             };
 
-            // Start the LLM in a separate thread
             std::thread llm_thread(llm_thread_func);
 
             int token_offset     = 0;
@@ -336,8 +334,7 @@ public:
                 SLOGE("Error, prompt speech token len %d < 75", prompt_token_len);
                 return -1;
             }
-            // int prompt_token_align_len = int(prompt_token_len / lToken2Wav.token_hop_len) * lToken2Wav.token_hop_len;
-            int prompt_token_align_len = 75;  // only support 75 now
+            int prompt_token_align_len = 75;
 
             std::vector<float> prompt_speech_embeds_flow1;
             prompt_speech_embeds_flow1.insert(prompt_speech_embeds_flow1.begin(), prompt_speech_embeds_flow.begin(),
@@ -381,28 +378,31 @@ public:
                     token_offset += this_token_hop_len;
                     output.insert(output.end(), speech.begin(), speech.end());
                     std::string path = "output_" + std::to_string(i) + ".wav";
+                    std::vector<int16_t> wav_pcm_data;
+                    wav_pcm_data.resize(speech.size());
+                    for (size_t k = 0; k < speech.size(); ++k) {
+                        float sample = speech[k];
+                        if (sample > 1.0f) sample = 1.0f;
+                        if (sample < -1.0f) sample = -1.0f;
+                        wav_pcm_data[k] = static_cast<int16_t>(sample * 32767.0f);
+                    }
+                    if (out_callback_) {
+                        out_callback_(std::string(reinterpret_cast<char *>(wav_pcm_data.data()),
+                                                  wav_pcm_data.size() * sizeof(int16_t)),
+                                      false);
+                    }
 
                     saveVectorAsWavFloat(speech, path, 24000, 1);
                     i += 1;
-
-                }
-
-                else if (g_llm_finished.load()) {
+                } else if (g_llm_finished.load()) {
                     std::cout << "[Main/Token2Wav Thread] Buffer is empty and LLM finished. Exiting.\n";
                     lock.unlock();
                     break;
-                }
-                // Check exit condition: Buffer is empty and LLM is done
-                else {
-                    // This else branch is technically not needed because the wait condition
-                    // ensures we only get here if one of the conditions is true.
-                    // But it's good practice to structure logic clearly.
-                    // In this specific loop, we will always process if we wake up.
-                    lock.unlock();  // Make sure to unlock if not processing
+                } else {
+                    lock.unlock();
                 }
             }
 
-            // Wait for the LLM thread to finish
             if (llm_thread.joinable()) {
                 llm_thread.join();
             }
@@ -419,11 +419,23 @@ public:
             token.insert(token.end(), g_token_buffer.begin() + start, g_token_buffer.end());
             auto speech = lToken2Wav.infer(token, prompt_speech_embeds_flow1, prompt_feat1, spk_embeds,
                                            token_offset - start, true);
-            // TODO: 另起一个线程处理生成的音频
             output.insert(output.end(), speech.begin(), speech.end());
             std::string path = "output_" + std::to_string(i) + ".wav";
             saveVectorAsWavFloat(speech, path, 24000, 1);
             saveVectorAsWavFloat(output, "output.wav", 24000, 1);
+            std::vector<int16_t> wav_pcm_data;
+            wav_pcm_data.resize(speech.size());
+            for (size_t k = 0; k < speech.size(); ++k) {
+                float sample = speech[k];
+                if (sample > 1.0f) sample = 1.0f;
+                if (sample < -1.0f) sample = -1.0f;
+                wav_pcm_data[k] = static_cast<int16_t>(sample * 32767.0f);
+            }
+            if (out_callback_) {
+                out_callback_(
+                    std::string(reinterpret_cast<char *>(wav_pcm_data.data()), wav_pcm_data.size() * sizeof(int16_t)),
+                    true);
+            }
 
             SLOGI("tts total use time: %.3f s", time_total.cost() / 1000);
             reset();
@@ -560,23 +572,26 @@ public:
         if (!(llm_task_obj && llm_channel)) {
             return;
         }
-        SLOGI("send:%s", data.c_str());
+        std::string base64_data;
+        if (!data.empty()) {
+            int len = encode_base64(data, base64_data);
+        }
         if (llm_channel->enstream_) {
             static int count = 0;
             nlohmann::json data_body;
             data_body["index"] = count++;
-            data_body["delta"] = data;
-            if (!finish)
-                data_body["delta"] = data;
+            if (!data.empty())
+                data_body["delta"] = base64_data;
             else
-                data_body["delta"] = std::string("");
+                data_body["delta"] = "";
             data_body["finish"] = finish;
             if (finish) count = 0;
-            SLOGI("send stream");
             llm_channel->send(llm_task_obj->response_format_, data_body, LLM_NO_ERROR);
         } else if (finish) {
-            SLOGI("send utf-8");
-            llm_channel->send(llm_task_obj->response_format_, data, LLM_NO_ERROR);
+            llm_channel->send(llm_task_obj->response_format_, base64_data, LLM_NO_ERROR);
+        }
+        if (llm_task_obj->response_format_.find("sys") != std::string::npos) {
+            unit_call("audio", "queue_play", data);
         }
     }
 
@@ -652,24 +667,6 @@ public:
         llm_task_obj->inference_async(sample_unescapeString(*next_data));
     }
 
-    void task_asr_data(const std::weak_ptr<llm_task> llm_task_obj_weak,
-                       const std::weak_ptr<llm_channel_obj> llm_channel_weak, const std::string &object,
-                       const std::string &data)
-    {
-        auto llm_task_obj = llm_task_obj_weak.lock();
-        auto llm_channel  = llm_channel_weak.lock();
-        if (!(llm_task_obj && llm_channel)) {
-            return;
-        }
-        if (object.find("stream") != std::string::npos) {
-            if (sample_json_str_get(data, "finish") == "true") {
-                llm_task_obj->inference_async(sample_json_str_get(data, "delta"));
-            }
-        } else {
-            llm_task_obj->inference_async(data);
-        }
-    }
-
     void kws_awake(const std::weak_ptr<llm_task> llm_task_obj_weak,
                    const std::weak_ptr<llm_channel_obj> llm_channel_weak, const std::string &object,
                    const std::string &data)
@@ -716,14 +713,14 @@ public:
                           std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
 
             for (const auto input : llm_task_obj->inputs_) {
-                if (input.find("llm") != std::string::npos) {
+                if (input.find("tts") != std::string::npos) {
                     llm_channel->subscriber_work_id(
                         "", std::bind(&llm_cosy_voice::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                                       std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
                                       std::placeholders::_2));
-                } else if ((input.find("asr") != std::string::npos) || (input.find("whisper") != std::string::npos)) {
+                } else if ((input.find("llm") != std::string::npos) || (input.find("vlm") != std::string::npos)) {
                     llm_channel->subscriber_work_id(
-                        input, std::bind(&llm_cosy_voice::task_asr_data, this, std::weak_ptr<llm_task>(llm_task_obj),
+                        input, std::bind(&llm_cosy_voice::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                                          std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
                                          std::placeholders::_2));
                 } else if (input.find("kws") != std::string::npos) {
@@ -760,10 +757,10 @@ public:
         }
         auto llm_channel  = get_channel(work_id);
         auto llm_task_obj = llm_task_[work_id_num];
-        if (data.find("asr") != std::string::npos) {
+        if (data.find("llm") != std::string::npos) {
             ret = llm_channel->subscriber_work_id(
                 data,
-                std::bind(&llm_cosy_voice::task_asr_data, this, std::weak_ptr<llm_task>(llm_task_obj),
+                std::bind(&llm_cosy_voice::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
                           std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
             llm_task_obj->inputs_.push_back(data);
         } else if (data.find("kws") != std::string::npos) {
