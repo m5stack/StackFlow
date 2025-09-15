@@ -1,0 +1,44 @@
+{
+    "mode": "CosyVoice2-0.5B-ax650",
+    "type": "tts",
+    "homepage": "https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B",
+    "capabilities": [
+        "tts",
+        "clone_voice"
+    ],
+    "input_type": [
+        "tts.utf-8"
+    ],
+    "output_type": [
+        "tts.wav",
+        "sys.play.0_1"
+    ],
+    "mode_param": {
+        "tokenizer_type": 2,
+        "filename_tokenizer_model": "http://localhost:8080",
+        "filename_tokens_embed": "model.embed_tokens.weight.bfloat16.bin",
+        "filename_llm_embed": "llm.llm_embedding.float16.bin",
+        "filename_speech_embed": "llm.speech_embedding.float16.bin",
+        "filename_post_axmodel": "qwen2_post.axmodel",
+        "filename_decoder_axmodel": "llm_decoder.axmodel",
+        "template_filename_axmodel": "qwen2_p128_l%d_together.axmodel",
+        "token2wav_axmodel_dir": "",
+        "prompt_files": "zh_man1",
+        "b_use_topk": false,
+        "b_bos": false,
+        "b_eos": false,
+        "axmodel_num": 24,
+        "tokens_embed_num": 151936,
+        "tokens_embed_size": 896,
+        "llm_embed_num": 2,
+        "llm_embed_size": 896,
+        "speech_embed_num": 6564,
+        "speech_embed_size": 896,
+        "n_timesteps": 10,
+        "b_use_mmap_load_embed": true,
+        "b_dynamic_load_axmodel_layer": false,
+        "ext_scripts": [
+            "tokenizer_cosyvoice2-0.5B-ax650.py"
+        ]
+    }
+}
