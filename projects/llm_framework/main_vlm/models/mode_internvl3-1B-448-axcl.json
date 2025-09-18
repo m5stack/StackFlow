@@ -1,5 +1,5 @@
 {
-    "mode": "internvl3-1B-448-ax650",
+    "mode": "internvl3-1B-448-axcl",
     "type": "vlm",
     "homepage": "https://huggingface.co/AXERA-TECH/InternVL3-1B",
     "capabilities": [
