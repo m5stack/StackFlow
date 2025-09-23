@@ -203,7 +203,7 @@ public:
 
                     tokenizer_pid_ = fork();
                     if (tokenizer_pid_ == 0) {
-                        setenv("PYTHONPATH", "/opt/m5stack/lib/cosy_voice/site-packages", 1);
+                        setenv("PYTHONPATH", "/opt/m5stack/lib/cosy-voice/site-packages", 1);
                         const std::string port_str = std::to_string(port_);
                         const std::string model_id = base_model + "tokenizer";
 
@@ -266,11 +266,8 @@ public:
             if (!lToken2Wav.Init(mode_config_.token2wav_axmodel_dir, mode_config_.n_timesteps)) {
                 return -1;
             }
-            SLOGE();
             lLaMa_->TextToken2Embeds(prompt_text_token, prompt_text_embeds);
-            SLOGE();
             lLaMa_->SpeechToken2Embeds(prompt_speech_token, prompt_speech_embeds);
-            SLOGE();
             lToken2Wav.SpeechToken2Embeds(prompt_speech_token, prompt_speech_embeds_flow);
 
         } catch (...) {

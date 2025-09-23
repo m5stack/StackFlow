@@ -185,10 +185,16 @@ def create_data_deb(package_name, version, src_folder, revision = 'm5stack1', de
             with open(mode_config_file, 'r', encoding='utf-8') as file:
                 data = json.load(file)
             for scripts_file in data['mode_param']['ext_scripts']:
-                tokenizer_py_file = os.path.join(src_folder, scripts_file)
-                if os.path.exists(tokenizer_py_file):
-                    os.makedirs(os.path.join(deb_folder, 'opt/m5stack/scripts'), exist_ok = True)
-                    shutil.copy2(tokenizer_py_file, os.path.join(deb_folder, 'opt/m5stack/scripts', scripts_file))
+                src_path = os.path.join(src_folder, scripts_file)
+                dst_path = os.path.join(deb_folder, 'opt/m5stack/scripts', scripts_file)
+                if os.path.exists(src_path):
+                    if os.path.isdir(src_path):
+                        # 拷贝整个文件夹
+                        shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+                    else:
+                        # 确保目标目录存在
+                        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                        shutil.copy2(src_path, dst_path)
         except:
             pass
     else:
@@ -263,7 +269,11 @@ def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', dep
         vlm_dir = os.path.join(src_folder, 'vlm')
         if os.path.exists(vlm_dir):
             shutil.copytree(vlm_dir, os.path.join(deb_folder, 'opt/m5stack/lib/vlm'))
-    
+    if package_name == 'llm-cosy-voice':
+        cosy_voice_dir = os.path.join(src_folder, 'cosy-voice')
+        if os.path.exists(cosy_voice_dir):
+            shutil.copytree(cosy_voice_dir, os.path.join(deb_folder, 'opt/m5stack/lib/cosy-voice'))
+
     bin_file_name = package_name.replace("-", "_")
     if version_info != 0.0:
         bin_file_name = package_name.replace("-", "_") + f'-{version}'
@@ -369,6 +379,7 @@ if __name__ == "__main__":
         'llm-vad':[create_bin_deb,'llm-vad', '1.8', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.8', src_folder, revision],
         'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.7', src_folder, revision],
+        'llm-cosy-voice':[create_bin_deb,'llm-cosy-voice', '1.8', src_folder, revision],
         # keyword spotting Audio file
         'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
         'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', data_version, src_folder, revision],
@@ -380,6 +391,7 @@ if __name__ == "__main__":
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
+        'llm-model-CosyVoice2-0.5B-ax650':[create_data_deb,'llm-model-CosyVoice2-0.5B-ax650', '0.6', src_folder, revision],
         # VAD model
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.4', src_folder, revision],
         # MeloTTS model

@@ -38,7 +38,8 @@
         "b_use_mmap_load_embed": true,
         "b_dynamic_load_axmodel_layer": false,
         "ext_scripts": [
-            "tokenizer_cosyvoice2-0.5B-ax650.py"
+            "tokenizer_CosyVoice2-0.5B-ax650.py",
+            "tokenizer"
         ]
     }
 }

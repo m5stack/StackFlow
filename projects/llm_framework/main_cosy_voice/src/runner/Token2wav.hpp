@@ -20,6 +20,9 @@
 #include "timer.hpp"
 // #include "opencv2/opencv.hpp"
 #include "ax_sys_api.h"
+#include "MNN/MNNDefine.h"
+#include "MNN/MNNForwardType.h"
+#include "MNN/Interpreter.hpp"
 
 class Token2Wav
 {
@@ -44,8 +47,15 @@ private:
     ax_runner_ax650 flow_estimator_250;
     ax_runner_ax650 flow_estimator_300;
 
-    ax_runner_ax650 hift_50_first;
-    ax_runner_ax650 hift_58;
+    ax_runner_ax650 hift_p2_50_first;
+    ax_runner_ax650 hift_p2_58;
+
+    std::shared_ptr<MNN::Interpreter> hift_p1_50_first = nullptr;
+    std::shared_ptr<MNN::Interpreter> hift_p1_58 = nullptr;
+
+    MNN::Session * sess_hift_p1_50_first = nullptr;
+    MNN::Session * sess_hift_p1_58 = nullptr;
+
 
     std::vector<float> rand_noise;
     std::vector<float> t_span;
@@ -161,19 +171,43 @@ public:
             return false;
         }
 
-        ret = hift_50_first.init((model_dir+"/hift_50_first.axmodel").c_str(), false);
+        ret = hift_p2_50_first.init((model_dir+"/hift_p2_50_first.axmodel").c_str(), false);
         if (ret != 0)
         {
-            ALOGE("init axmodel(%s) failed", (model_dir+"/hift_50_first.axmodel").c_str());
+            ALOGE("init axmodel(%s) failed", (model_dir+"/hift_p2_50_first.axmodel").c_str());
             return false;
         }
 
-        ret = hift_58.init((model_dir+"/hift_58.axmodel").c_str(), false);
+        ret = hift_p2_58.init((model_dir+"/hift_p2_58.axmodel").c_str(), false);
         if (ret != 0)
         {
-            ALOGE("init axmodel(%s) failed", (model_dir+"/hift_58.axmodel").c_str());
+            ALOGE("init axmodel(%s) failed", (model_dir+"/hift_p2_58.axmodel").c_str());
             return false;
         }
+
+        MNN::ScheduleConfig config;
+        config.numThread = 2;
+        config.type      = static_cast<MNNForwardType>(MNN_FORWARD_CPU);
+        MNN::BackendConfig backendConfig;
+        backendConfig.precision = (MNN::BackendConfig::PrecisionMode)1;
+        config.backendConfig = &backendConfig;
+
+        hift_p1_50_first = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile( (model_dir+"/hift_p1_50_first.mnn").c_str() ));
+        if(nullptr == hift_p1_50_first)
+        {
+            ALOGE("init mnn model(%s) failed", (model_dir+"/hift_p1_50_first.mnn").c_str());
+            return false;
+        }
+        sess_hift_p1_50_first = hift_p1_50_first->createSession(config);
+
+        hift_p1_58 = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile( (model_dir+"/hift_p1_58.mnn").c_str() ));
+        if(nullptr == hift_p1_58)
+        {
+            ALOGE("init mnn model(%s) failed", (model_dir+"/hift_p1_58.mnn").c_str() );
+            return false;
+        }
+
+        sess_hift_p1_58 = hift_p1_58->createSession(config);
 
         ALOGI("Token2Wav init ok");
         return true;
@@ -188,8 +222,8 @@ public:
         flow_estimator_200.release();
         flow_estimator_250.release();
         flow_estimator_300.release();
-        hift_50_first.release();
-        hift_58.release();
+        hift_p2_50_first.release();
+        hift_p2_58.release();
         flow_embed_selector.Deinit();
     }
 
@@ -318,39 +352,66 @@ public:
     int infer_hift(std::vector<float> &mel, std::vector<float> &cache_source, 
                     std::vector<float> & tts_speech, std::vector<float> & tts_source)
     {
-        ax_runner_ax650 * model;
+        std::shared_ptr<MNN::Interpreter> model_p1;
+        MNN::Session * sess_p1;
+        ax_runner_ax650 * model_p2;
         int len = mel.size()/(80);
         
         if(len == 50 && cache_source.empty())
         { 
-            model = &hift_50_first;
+            model_p1 = hift_p1_50_first;
+            sess_p1 = sess_hift_p1_50_first;
+            model_p2 = &hift_p2_50_first;
         }else if(len == 58 && !cache_source.empty())
         {
-            model = &hift_58;
+            model_p1 = hift_p1_58;
+            sess_p1 = sess_hift_p1_58;
+            model_p2 = &hift_p2_58;
         }else
         {
             ALOGE("invalid size: %d", len);
             return -1;
         }
 
-        void * p = model->get_input("mel").pVirAddr;
+        std::vector<int> dims{1, 80, len};
+        auto tensor = MNN::Tensor::create<float>(dims, NULL, MNN::Tensor::CAFFE);
+        auto p_tensor   = tensor->host<float>();
+        auto size   = tensor->size();
+        std::memcpy(p_tensor, mel.data(), size);
+        
+        auto inputTensor = model_p1->getSessionInput(sess_p1, nullptr);
+        inputTensor->copyFromHostTensor(tensor);
+        
+        model_p1->runSession(sess_p1);
+        
+        MNN::Tensor *p_out  = model_p1->getSessionOutput(sess_p1, "s");
+        MNN::Tensor out_host(p_out, p_out->getDimensionType());
+        p_out->copyToHostTensor(&out_host);
+        
+        auto p_s = out_host.host<float>();
+
+        void * p = model_p2->get_input("s").pVirAddr;
+        memcpy(p, p_s, len * 480 * sizeof(float));
+        
+        p = model_p2->get_input("mel").pVirAddr;
         memcpy(p, mel.data(), mel.size() * sizeof(float));
+        
         if(!cache_source.empty())
         {
-            p = model->get_input("hift_cache_source").pVirAddr;
+            p = model_p2->get_input("hift_cache_source").pVirAddr;
             memcpy(p, cache_source.data(), cache_source.size() * sizeof(float));
         }
-
-        model->inference();
-
-        auto &output_speech = model->get_output("audio");
+        
+        model_p2->inference();
+        
+        auto &output_speech = model_p2->get_output("audio");
         if(tts_speech.empty() || tts_speech.size() != output_speech.nSize / sizeof(float))
         {
             tts_speech.resize(output_speech.nSize / sizeof(float));
         }
         memcpy(tts_speech.data(), output_speech.pVirAddr, output_speech.nSize);
 
-        auto &output_source = model->get_output("x");
+        auto &output_source = model_p2->get_output(1);
         if(tts_source.empty() || tts_source.size() != output_source.nSize / sizeof(float))
         {
             tts_source.resize(output_source.nSize / sizeof(float));
