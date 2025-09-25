@@ -23,11 +23,8 @@ LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 
 INCLUDE += [
-    # ADir('../static_lib/include/sherpa'),
-            # ADir('../static_lib/include/sherpa/sherpa-onnx'),
+            ADir('../static_lib/include/sherpa/'),
             ADir('../static_lib/include/sherpa/sherpa-onnx/onnxruntime-src'),
-            ADir('src/runner'),
-            # ADir('../static_lib/include/sherpa/sherpa-onnx/openfst-src')
             ]
 
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/fbank')]

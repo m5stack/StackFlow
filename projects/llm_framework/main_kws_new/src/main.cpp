@@ -22,9 +22,7 @@
 
 #include <onnxruntime_cxx_api.h>
 
-// #include <kaldi-native-fbank/csrc/feature-fbank.h>
 #include "kaldi-native-fbank/csrc/online-feature.h"
-// #include <kaldi-native-fbank/csrc/feature-window.h>
 
 using namespace StackFlows;
 
@@ -214,29 +212,6 @@ public:
         return triggered;
     }
 
-    std::vector<std::vector<float>> compute_fbank_kaldi1(const std::vector<float> &waveform, int sample_rate,
-                                                         int num_mel_bins)
-    {
-        fbank_.reset();
-        fbank_ = std::make_unique<knf::OnlineFbank>(opts_);
-
-        fbank_->AcceptWaveform(sample_rate, waveform.data(), waveform.size());
-
-        int num_frames = fbank_->NumFramesReady();
-
-        std::vector<std::vector<float>> features;
-        SLOGE("num_frames %d", num_frames);
-        features.reserve(num_frames);
-
-        for (int i = 0; i < num_frames; ++i) {
-            const float *frame_data = fbank_->GetFrame(i);
-            std::vector<float> frame(frame_data, frame_data + num_mel_bins);
-            features.push_back(std::move(frame));
-        }
-
-        return features;
-    }
-
     std::vector<std::vector<float>> compute_fbank_kaldi(const std::vector<float> &waveform, int sample_rate,
                                                         int num_mel_bins)
     {
@@ -244,8 +219,9 @@ public:
         fbank_ = std::make_unique<knf::OnlineFbank>(opts_);
         fbank_->AcceptWaveform(sample_rate, waveform.data(), waveform.size());
         int num_frames = fbank_->NumFramesReady();
+
         std::vector<std::vector<float>> features;
-        SLOGE("num_frames %d", num_frames);
+
         features.reserve(num_frames);
         for (int i = 0; i < num_frames; ++i) {
             const float *frame_data = fbank_->GetFrame(i);
@@ -253,169 +229,13 @@ public:
             features.push_back(std::move(frame));
         }
 
-        // 生成文件名序号（三位数，补零）
-        // std::stringstream ss;
-        // ss << std::setfill('0') << std::setw(3) << file_counter;
-        // std::string file_suffix = ss.str();
-
-        // 保存 waveform 为二进制
-        // std::string waveform_filename = "waveform_" + file_suffix + ".bin";
-        // std::ofstream waveform_bin(waveform_filename, std::ios::binary);
-        // if (waveform_bin.is_open()) {
-        //     size_t size = waveform.size();
-        //     waveform_bin.write(reinterpret_cast<const char *>(&size), sizeof(size));
-        //     waveform_bin.write(reinterpret_cast<const char *>(waveform.data()), sizeof(float) * waveform.size());
-        //     waveform_bin.close();
-        //     SLOGE("Waveform saved to %s", waveform_filename.c_str());
-        // }
-
-        // 保存 features 为二进制
-        // std::string features_filename = "features_" + file_suffix + ".bin";
-        // std::ofstream features_bin(features_filename, std::ios::binary);
-        // if (features_bin.is_open()) {
-        //     size_t rows = features.size();
-        //     size_t cols = (rows > 0) ? features[0].size() : 0;
-        //     features_bin.write(reinterpret_cast<const char *>(&rows), sizeof(rows));
-        //     features_bin.write(reinterpret_cast<const char *>(&cols), sizeof(cols));
-        //     for (const auto &row : features) {
-        //         features_bin.write(reinterpret_cast<const char *>(row.data()), sizeof(float) * row.size());
-        //     }
-        //     features_bin.close();
-        //     SLOGE("Features saved to %s", features_filename.c_str());
-        // }
-
-        // 递增计数器
-        // file_counter++;
-
         return features;
-    }
-
-    std::vector<std::vector<float>> read_mat_from_bin(int index)
-    {
-        std::stringstream ss;
-        ss << "mat_" << std::setfill('0') << std::setw(3) << index << ".bin";
-        std::string filename = ss.str();
-
-        std::ifstream file(filename, std::ios::binary);
-        if (!file.is_open()) {
-            SLOGE("无法打开文件: %s", filename.c_str());
-            return {};
-        }
-
-        // 读取维度信息
-        int64_t rows, cols;
-        file.read(reinterpret_cast<char *>(&rows), sizeof(int64_t));
-        file.read(reinterpret_cast<char *>(&cols), sizeof(int64_t));
-
-        SLOGE("读取mat文件 %s, shape: (%ld, %ld)", filename.c_str(), rows, cols);
-
-        // 读取数据
-        std::vector<float> data(rows * cols);
-        file.read(reinterpret_cast<char *>(data.data()), sizeof(float) * data.size());
-        file.close();
-
-        // 转换为二维向量
-        std::vector<std::vector<float>> result;
-        result.reserve(rows);
-
-        for (int i = 0; i < rows; ++i) {
-            std::vector<float> row;
-            row.reserve(cols);
-            for (int j = 0; j < cols; ++j) {
-                row.push_back(data[i * cols + j]);
-            }
-            result.push_back(std::move(row));
-        }
-
-        return result;
-    }
-
-    std::vector<float> run_inference1(const std::vector<float> &audio_chunk_16k)
-    {
-        auto fbank_feats = compute_fbank_kaldi(audio_chunk_16k, RESAMPLE_RATE, FEAT_DIM);
-        SLOGE("=== FBank Features ===");
-        for (int i = 0; i < fbank_feats.size(); ++i) {
-            SLOGE("Frame %d:", i);
-            std::string frame_str = "";
-            for (int j = 0; j < fbank_feats[i].size(); ++j) {
-                frame_str += std::to_string(fbank_feats[i][j]) + " ";
-            }
-            SLOGE("%s", frame_str.c_str());
-        }
-        SLOGE("fbank_feats.size()=%d", (int)fbank_feats.size());
-        SLOGE("=======================");
-
-        if (fbank_feats.empty()) {
-            return {};
-        }
-
-        int T = fbank_feats.size();
-        std::vector<float> mat_flattened;
-        for (const auto &feat : fbank_feats) {
-            mat_flattened.insert(mat_flattened.end(), feat.begin(), feat.end());
-        }
-
-        std::vector<int64_t> input_shape = {1, static_cast<int64_t>(T), FEAT_DIM};
-        std::vector<int64_t> cache_shape = {1, 32, 88};
-
-        Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
-
-        Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-            memory_info, mat_flattened.data(), mat_flattened.size(), input_shape.data(), input_shape.size());
-
-        Ort::Value cache_tensor = Ort::Value::CreateTensor<float>(memory_info, cache.data(), cache.size(),
-                                                                  cache_shape.data(), cache_shape.size());
-
-        const char *input_names[]  = {"input", "cache"};
-        const char *output_names[] = {"output", "r_cache"};
-
-        std::vector<Ort::Value> inputs;
-        inputs.push_back(std::move(input_tensor));
-        inputs.push_back(std::move(cache_tensor));
-
-        auto output_tensors = session->Run(Ort::RunOptions{nullptr}, input_names, inputs.data(), 2, output_names, 2);
-
-        float *out_data       = output_tensors[0].GetTensorMutableData<float>();
-        float *cache_out_data = output_tensors[1].GetTensorMutableData<float>();
-
-        std::vector<int64_t> out_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
-        size_t out_size                = 1;
-        for (auto dim : out_shape) out_size *= dim;
-
-        std::vector<float> out_chunk(out_data, out_data + out_size);
-
-        std::copy(cache_out_data, cache_out_data + cache.size(), cache.begin());
-
-        return out_chunk;
     }
 
     std::vector<float> run_inference(const std::vector<float> &audio_chunk_16k)
     {
         std::vector<std::vector<float>> fbank_feats;
-        static int file_index = -1;
-        // file_index++;
-        if (file_index >= 0) {
-            // 从文件读取
-            fbank_feats = read_mat_from_bin(file_index);
-            SLOGE("=== 从文件读取的 FBank Features ===");
-        } else {
-            // 原来的计算方式
-            fbank_feats = compute_fbank_kaldi(audio_chunk_16k, RESAMPLE_RATE, FEAT_DIM);
-            SLOGE("=== 计算的 FBank Features ===");
-        }
-        if (file_index == 6) file_index = 0;
-
-        // 打印特征用于对比
-        // for (int i = 0; i < fbank_feats.size(); ++i) {
-        //     SLOGE("Frame %d:", i);
-        //     std::string frame_str = "";
-        //     for (int j = 0; j < fbank_feats[i].size(); ++j) {
-        //         frame_str += std::to_string(fbank_feats[i][j]) + " ";
-        //     }
-        //     SLOGE("%s", frame_str.c_str());
-        // }
-        // SLOGE("fbank_feats.size()=%d", (int)fbank_feats.size());
-        // SLOGE("=======================");
+        fbank_feats = compute_fbank_kaldi(audio_chunk_16k, RESAMPLE_RATE, FEAT_DIM);
 
         if (fbank_feats.empty()) {
             return {};
@@ -461,9 +281,6 @@ public:
     void sys_pcm_on_data(const std::string &raw)
     {
         static int count = 0;
-        static std::ofstream ffout("audio_float.raw", std::ios::binary | std::ios::app);
-        static std::ofstream fout("audio_int16.raw", std::ios::binary | std::ios::app);
-
         if (count < delay_audio_frame_) {
             buffer_write_char(pcmdata, raw.data(), raw.length());
             count++;
@@ -487,18 +304,9 @@ public:
         buffer_resize(pcmdata, 0);
         count = 0;
 
-        if (!floatSamples.empty()) {
-            ffout.write(reinterpret_cast<const char *>(floatSamples.data()), floatSamples.size() * sizeof(float));
-        }
-
-        if (!int16Samples.empty()) {
-            fout.write(reinterpret_cast<const char *>(int16Samples.data()), int16Samples.size() * sizeof(int16_t));
-        }
-
         auto scores = run_inference(floatSamples);
         if (detect_wakeup(scores)) {
             if (enwake_audio_ && (!wake_wav_file_.empty()) && play_awake_wav) {
-                SLOGE("\n\n\n\n\n");
                 play_awake_wav(wake_wav_file_);
             }
             if (out_callback_) out_callback_("", true);
