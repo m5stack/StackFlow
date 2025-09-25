@@ -6,7 +6,10 @@
 #include <errno.h>
 #include <string.h>
 
-static int gcapLoopExit = 0;
+static struct pcm *g_play_pcm = NULL;
+static int gplayLoopExit      = 0;
+static int gcapLoopExit       = 0;
+AlsaConfig cap_config;
 
 void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int channel, int rate, int bit,
                     AUDIOCallback callback)
@@ -133,4 +136,47 @@ void alsa_close_cap()
 int alsa_cap_status()
 {
     return gcapLoopExit;
+}
+AlsaConfig play_config;
+void alsa_play(unsigned int card, unsigned int device, float Volume, int channel, int rate, int bit, const void *data,
+               int size)
+{
+    struct pcm_config config;
+    memset(&config, 0, sizeof(config));
+    config.channels          = channel;
+    config.rate              = rate;
+    config.period_size       = 1024;
+    config.period_count      = 2;
+    config.format            = PCM_FORMAT_S16_LE;
+    config.silence_threshold = config.period_size * config.period_count;
+    config.stop_threshold    = config.period_size * config.period_count;
+    config.start_threshold   = config.period_size;
+
+    unsigned int pcm_open_flags = PCM_OUT;
+
+    if (!g_play_pcm) {
+        g_play_pcm = pcm_open(card, device, pcm_open_flags, &config);
+        if (!g_play_pcm || !pcm_is_ready(g_play_pcm)) {
+            fprintf(stderr, "Unable to open PCM playback device (%s)\n", pcm_get_error(g_play_pcm));
+            if (g_play_pcm) {
+                pcm_close(g_play_pcm);
+                g_play_pcm = NULL;
+            }
+            return;
+        }
+    }
+
+    int written_frames = pcm_writei(g_play_pcm, data, pcm_bytes_to_frames(g_play_pcm, size));
+    if (written_frames < 0) {
+        fprintf(stderr, "PCM playback error %s\n", pcm_get_error(g_play_pcm));
+    }
+}
+
+void alsa_close_play()
+{
+    gplayLoopExit = 1;
+    if (g_play_pcm) {
+        pcm_close(g_play_pcm);
+        g_play_pcm = NULL;
+    }
 }
