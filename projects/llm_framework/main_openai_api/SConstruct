@@ -18,7 +18,7 @@ LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
 
-ModuleLLMOpenAIPluginPath = wget_github_commit('https://github.com/m5stack/ModuleLLM-OpenAI-Plugin.git', '9612b20800eb1708e648744e3cb333c4f743811c', True)
+ModuleLLMOpenAIPluginPath = wget_github_commit('https://github.com/m5stack/ModuleLLM-OpenAI-Plugin.git', '748ec04e6dde31e6283921e9635204b4b8f8ede2', True)
 python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-openai-api-python-venv_v1.6.tar.gz", 'm5stack_llm-openai-api-python-venv_v1.6.tar.gz')
 
 
