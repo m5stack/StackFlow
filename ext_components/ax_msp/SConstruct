@@ -55,9 +55,9 @@ if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
                             'REGISTER':'static'
                             })
 
-if 'CONFIG_AX_650N_MSP_ENABLED' in os.environ:
+if 'CONFIG_AX_650C_MSP_ENABLED' in os.environ:
     MSP_PATH = ''
-    if 'CONFIG_MSP_V3_0_0_ENABLED' in os.environ:
+    if 'CONFIG_MSP_V3_6_2_ENABLED' in os.environ:
         MSP_PATH = os.environ.get('EXT_MSP_PATH', check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_ax650n_msp.tar.gz", 'm5stack_ax650n_msp.tar.gz'))
     
     SRCS=[]

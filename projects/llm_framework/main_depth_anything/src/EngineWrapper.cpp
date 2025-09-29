@@ -14,7 +14,7 @@
 
 #include <global_config.h>
 
-#if defined(CONFIG_AX_650N_MSP_ENABLED)
+#if defined(CONFIG_AX_650C_MSP_ENABLED)
 static const char *strAlgoModelType[AX_ENGINE_MODEL_TYPE_BUTT] = {"3.6T", "7.2T", "18T"};
 #endif
 
@@ -32,7 +32,7 @@ typedef enum axNPU_TYPE_E {
     AX_BL_VNPU_2   = (1 << 4)  /* running under BIG-LITTLE VNPU2 */
 } AX_NPU_TYPE_E;
 
-#if defined(CONFIG_AX_650N_MSP_ENABLED)
+#if defined(CONFIG_AX_650C_MSP_ENABLED)
 static AX_S32 CheckModelVNpu(const std::string &strModel, const AX_ENGINE_MODEL_TYPE_T &eModelType,
                              const AX_S32 &nNpuType, AX_U32 &nNpuSet)
 {
