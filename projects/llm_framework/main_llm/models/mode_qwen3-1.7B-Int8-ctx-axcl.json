@@ -1,0 +1,46 @@
+{
+    "mode": "qwen3-1.7B-Int8-ctx-axcl",
+    "type": "llm",
+    "homepage": "https://huggingface.co/M5Stack/Qwen3-1.7B-GPTQ-Int8-axmodel",
+    "compile_flage": "pulsar2 llm_build   --input_path Qwen/Qwen3-1.7B-GPTQ-Int8/   --output_path Qwen/Qwen3-1.7B-Instruct-ctx-ax650/   --hidden_state_type bf16   --kv_cache_len 1023   --prefill_len 128   --last_kv_cache_len 128   --last_kv_cache_len 256   --last_kv_cache_len 384   --last_kv_cache_len 512   --last_kv_cache_len 640   --last_kv_cache_len 768   --last_kv_cache_len 896   --last_kv_cache_len 1024   --last_kv_cache_len 1152   --last_kv_cache_len 1280   --last_kv_cache_len 1408   --last_kv_cache_len 1536   --last_kv_cache_len 1664   --last_kv_cache_len 1792   --last_kv_cache_len 1920   --last_kv_cache_len 2048   --chip AX650   -c 1   --parallel 28",
+    "pulsar_version": "4.2-40ca6580",
+    "capabilities": [
+        "text_generation",
+        "chat"
+    ],
+    "input_type": [
+        "llm.utf-8",
+        "llm.utf-8.stream",
+        "llm.chat_completion",
+        "llm.chat_completion.stream"
+    ],
+    "output_type": [
+        "llm.utf-8",
+        "llm.utf-8.stream"
+    ],
+    "mode_param": {
+        "tokenizer_type": 2,
+        "url_tokenizer_model": "http://localhost:8080",
+        "filename_tokens_embed": "model.embed_tokens.weight.bfloat16.bin",
+        "filename_post_axmodel": "qwen3_post.axmodel",
+        "template_filename_axmodel": "qwen3_p128_l%d_together.axmodel",
+        "enable_temperature": true,
+        "temperature": 0.7,
+        "enable_top_p_sampling": false,
+        "top_p": 0.9,
+        "enable_top_k_sampling": true,
+        "top_k": 40,
+        "enable_repetition_penalty": false,
+        "repetition_penalty": 1.1,
+        "penalty_window": 50,
+        "axmodel_num": 28,
+        "tokens_embed_num": 151936,
+        "tokens_embed_size": 2048,
+        "b_use_mmap_load_embed": true,
+        "precompute_len": 2048,
+        "cmm_size":  5877248 ,
+        "ext_scripts": [
+            "tokenizer_qwen3-1.7B-Int8-ctx-axcl.py"
+        ]
+    }
+}

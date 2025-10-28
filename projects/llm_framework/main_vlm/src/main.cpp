@@ -195,10 +195,23 @@ public:
                 auto start_tokenizer_server = [&](const std::string &tokenizer_file) {
                     if (tokenizer_file.empty()) return;
                     if (tokenizer_server_flage_.load()) return;
-
                     tokenizer_pid_ = fork();
                     if (tokenizer_pid_ == 0) {
-                        setenv("PYTHONPATH", "/opt/m5stack/lib/llm/site-packages", 1);
+                        FILE *fp  = popen("python3 -V 2>&1", "r");
+                        int major = 3, minor = 11;
+                        if (fp) {
+                            char buf[64] = {0};
+                            if (fgets(buf, sizeof(buf), fp)) {
+                                sscanf(buf, "Python %d.%d", &major, &minor);
+                            }
+                            pclose(fp);
+                        }
+
+                        std::string python_path = "/opt/m5stack/lib/llm/python" + std::to_string(major) + "." +
+                                                  std::to_string(minor) + "/site-packages";
+
+                        setenv("PYTHONPATH", python_path.c_str(), 1);
+
                         const std::string port_str = std::to_string(port_);
                         const std::string model_id = base_model + "tokenizer";
 
@@ -213,7 +226,6 @@ public:
                     tokenizer_server_flage_.store(true);
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
                           (base_model + std::string("tokenizer")).c_str(), prompt_.c_str());
-
                     std::this_thread::sleep_for(std::chrono::seconds(3));
                 };
 

@@ -227,14 +227,13 @@ def create_data_deb(package_name, version, src_folder, revision = 'm5stack1', de
 
 def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.8)'):
     bin_files = glob.glob(os.path.join(src_folder, package_name.replace("-", "_") + "-*"))
-    version_info = 0.0
-    print(os.path.join(src_folder, package_name + "-*"))
+    version_info = "0"
     if bin_files:
         for bin_file in bin_files:
-            version_info = float(bin_file.split('-')[-1])
-            if float(bin_file.split('-')[-1]) > version_info:
-                version_info = float(bin_file.split('-')[-1])
-        version = str(version_info)
+            ver = bin_file.split('-')[-1]
+            if ver > version_info:
+                version_info = ver
+        version = version_info
 
     deb_file = f"{package_name}_{version}-{revision}_arm64.deb"
     deb_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debian-{}'.format(package_name))
@@ -354,21 +353,21 @@ if __name__ == "__main__":
     Tasks = {
         # Unit
         'lib-llm':[create_lib_deb,'lib-llm', '1.8', src_folder, revision],
-        'llm-sys':[create_bin_deb,'llm-sys', '1.6', src_folder, revision],
+        'llm-sys':[create_bin_deb,'llm-sys', '1.7', src_folder, revision],
         'llm-audio':[create_bin_deb,'llm-audio', '1.6', src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', '1.9', src_folder, revision],
         'llm-asr':[create_bin_deb,'llm-asr', '1.7', src_folder, revision],
-        'llm-llm':[create_bin_deb,'llm-llm', '1.9', src_folder, revision],
+        'llm-llm':[create_bin_deb,'llm-llm', '1.10', src_folder, revision],
         'llm-tts':[create_bin_deb,'llm-tts', '1.6', src_folder, revision],
         'llm-melotts':[create_bin_deb,'llm-melotts', '1.9', src_folder, revision],
         'llm-camera':[create_bin_deb,'llm-camera', '1.9', src_folder, revision, 'lib-llm'],
-        'llm-vlm':[create_bin_deb,'llm-vlm', '1.9', src_folder, revision],
+        'llm-vlm':[create_bin_deb,'llm-vlm', '1.10', src_folder, revision],
         'llm-yolo':[create_bin_deb,'llm-yolo', '1.9', src_folder, revision],
         'llm-skel':[create_bin_deb,'llm-skel', version, src_folder, revision],
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', '1.7', src_folder, revision],
         'llm-vad':[create_bin_deb,'llm-vad', '1.8', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.8', src_folder, revision],
-        'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.7', src_folder, revision],
+        'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.8', src_folder, revision],
         # keyword spotting Audio file
         'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
         'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', data_version, src_folder, revision],
@@ -470,6 +469,7 @@ if __name__ == "__main__":
         'llm-model-qwen2.5-7B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-7B-Int4-ax650', '0.4', src_folder, revision],
         ## AXCL
         'llm-model-qwen2.5-HA-0.5B-ctx-axcl':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-axcl', '0.5', src_folder, revision],
+        'llm-model-qwen3-1.7B-Int8-ctx-axcl':[create_data_deb,'llm-model-qwen3-1.7B-Int8-ctx-axcl', '0.5', src_folder, revision],
         # Llama model
         'llm-model-llama3.2-1B-prefill-ax630c':[create_data_deb,'llm-model-llama3.2-1B-prefill-ax630c', data_version, src_folder, revision],
         'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],

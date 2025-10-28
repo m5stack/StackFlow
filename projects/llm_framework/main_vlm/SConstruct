@@ -18,7 +18,7 @@ LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
 if "CONFIG_AXCL_ENABLED" in os.environ:
-    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-vlm-python-axcl-rsp-venv_v1.8.tar.gz", 'm5stack_llm-vlm-python-axcl-rsp-venv_v1.8.tar.gz')
+    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-vlm-python-axcl-rsp-venv_v1.9.tar.gz", 'm5stack_llm-vlm-python-axcl-rsp-venv_v1.9.tar.gz')
 else:
     python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-vlm-python-venv_v1.6.tar.gz", 'm5stack_llm-vlm-python-venv_v1.6.tar.gz')
 
@@ -74,7 +74,7 @@ ignore['ignore'] = list(set(ignore['ignore']))
 with open('../dist/fileignore', 'w') as f:
     json.dump(ignore, f, indent=4)
 
-env['COMPONENTS'].append({'target':'llm_vlm-1.9',
+env['COMPONENTS'].append({'target':'llm_vlm-1.10',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
