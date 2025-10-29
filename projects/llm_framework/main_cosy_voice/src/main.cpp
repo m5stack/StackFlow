@@ -215,7 +215,7 @@ public:
                             pclose(fp);
                         }
 
-                        std::string python_path = "/opt/m5stack/lib/llm/cosy-voice" + std::to_string(major) + "." +
+                        std::string python_path = "/opt/m5stack/lib/cosy-voice/python" + std::to_string(major) + "." +
                                                   std::to_string(minor) + "/site-packages";
 
                         setenv("PYTHONPATH", python_path.c_str(), 1);
@@ -532,7 +532,6 @@ public:
             if (0 != ret) {
                 fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
             }
-            SLOGE("init~~~~~~~~~~%d~~~~", ret);
         }
         ax_init_flage_++;
     }
