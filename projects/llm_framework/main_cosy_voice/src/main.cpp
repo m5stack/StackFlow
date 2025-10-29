@@ -15,6 +15,7 @@
 #include <base64.h>
 #include <fstream>
 #include <stdexcept>
+#include <samplerate.h>
 #include <semaphore.h>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
 #include "thread_safe_list.h"
@@ -84,6 +85,7 @@ public:
     std::string kvcache_path;
     int precompute_len = 0;
     std::vector<int> _token_ids;
+    static int ax_init_flage_;
     task_callback_t out_callback_;
     bool enoutput_;
     bool enstream_;
@@ -163,7 +165,8 @@ public:
             }
             std::string base_model = base_model_path_ + model_ + "/";
             SLOGI("base_model %s", base_model.c_str());
-
+            CONFIG_AUTO_SET(file_body["mode_param"], mode_rate);
+            CONFIG_AUTO_SET(file_body["mode_param"], audio_rate);
             CONFIG_AUTO_SET(file_body["mode_param"], tokenizer_type);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokenizer_model);
             CONFIG_AUTO_SET(file_body["mode_param"], url_tokenizer_model);
@@ -200,10 +203,23 @@ public:
                 auto start_tokenizer_server = [&](const std::string &tokenizer_file) {
                     if (tokenizer_file.empty()) return;
                     if (tokenizer_server_flage_.load()) return;
-
                     tokenizer_pid_ = fork();
                     if (tokenizer_pid_ == 0) {
-                        setenv("PYTHONPATH", "/opt/m5stack/lib/cosy-voice/site-packages", 1);
+                        FILE *fp  = popen("python3 -V 2>&1", "r");
+                        int major = 3, minor = 11;
+                        if (fp) {
+                            char buf[64] = {0};
+                            if (fgets(buf, sizeof(buf), fp)) {
+                                sscanf(buf, "Python %d.%d", &major, &minor);
+                            }
+                            pclose(fp);
+                        }
+
+                        std::string python_path = "/opt/m5stack/lib/llm/cosy-voice" + std::to_string(major) + "." +
+                                                  std::to_string(minor) + "/site-packages";
+
+                        setenv("PYTHONPATH", python_path.c_str(), 1);
+
                         const std::string port_str = std::to_string(port_);
                         const std::string model_id = base_model + "tokenizer";
 
@@ -218,7 +234,7 @@ public:
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
                           (base_model + std::string("tokenizer")).c_str(), prompt_.c_str());
 
-                    std::this_thread::sleep_for(std::chrono::seconds(15));
+                    std::this_thread::sleep_for(std::chrono::seconds(3));
                 };
 
                 auto process_field = [&](std::string &field, const char *name_for_log) -> bool {
@@ -284,9 +300,6 @@ public:
             case TKT_LLaMa:
                 oss_prompt << "<|user|>\n" << input << "</s><|assistant|>\n";
                 break;
-            // case TKT_MINICPM:
-            //     oss_prompt << "<用户>" << input << "<AI>";
-            //     break;
             case TKT_Phi3:
                 oss_prompt << input << " ";
                 break;
@@ -308,6 +321,33 @@ public:
         g_llm_finished = false;
         g_token_buffer.erase(g_token_buffer.begin(), g_token_buffer.end());
         lToken2Wav.reset();
+    }
+
+    void resample_audio(float *input_buffer, int input_length, float *output_buffer, int *output_length,
+                        double src_ratio)
+    {
+        SRC_STATE *src_state;
+        int error;
+        src_state = src_new(SRC_SINC_FASTEST, 1, &error);
+        if (!src_state) {
+            fprintf(stderr, "Error : src_new() failed: %s\n", src_strerror(error));
+            throw std::string("src_new() failed");
+        }
+        SRC_DATA src_data;
+        src_data.data_in       = input_buffer;
+        src_data.input_frames  = input_length;
+        src_data.src_ratio     = src_ratio;
+        int max_output_length  = (int)(input_length * src_ratio + 1);
+        src_data.data_out      = output_buffer;
+        src_data.output_frames = max_output_length;
+        error                  = src_process(src_state, &src_data);
+        if (error) {
+            fprintf(stderr, "Error : src_process() failed: %s\n", src_strerror(error));
+            src_delete(src_state);
+            throw std::string("src_process() failed");
+        }
+        *output_length = src_data.output_frames_gen;
+        src_delete(src_state);
     }
 
     int tts(const std::string &text, std::vector<unsigned short> &prompt_text_embeds,
@@ -369,30 +409,31 @@ public:
                     token.insert(token.end(), g_token_buffer.begin() + start, g_token_buffer.begin() + end);
 
                     lock.unlock();
-                    std::cout << "[Main/Token2Wav Thread] Processing batch of " << token.size() << " tokens...\n";
                     auto speech = lToken2Wav.infer(token, prompt_speech_embeds_flow1, prompt_feat1, spk_embeds,
                                                    token_offset, false);
                     token_offset += this_token_hop_len;
                     output.insert(output.end(), speech.begin(), speech.end());
-                    std::string path = "output_" + std::to_string(i) + ".wav";
+                    double src_ratio =
+                        static_cast<double>(mode_config_.audio_rate) / static_cast<double>(mode_config_.mode_rate);
+                    std::vector<float> resampled_pcm(static_cast<size_t>(speech.size() * src_ratio + 1));
+                    int resampled_len = 0;
+                    resample_audio(speech.data(), speech.size(), resampled_pcm.data(), &resampled_len, src_ratio);
                     std::vector<int16_t> wav_pcm_data;
-                    wav_pcm_data.resize(speech.size());
-                    for (size_t k = 0; k < speech.size(); ++k) {
-                        float sample = speech[k];
-                        if (sample > 1.0f) sample = 1.0f;
-                        if (sample < -1.0f) sample = -1.0f;
-                        wav_pcm_data[k] = static_cast<int16_t>(sample * 32767.0f);
+                    wav_pcm_data.reserve(resampled_len);
+                    for (int i = 0; i < resampled_len; i++) {
+                        float val = resampled_pcm[i];
+                        if (val > 1.0f) val = 1.0f;
+                        if (val < -1.0f) val = -1.0f;
+                        wav_pcm_data.push_back(static_cast<int16_t>(val * 32767.0f));
                     }
+
                     if (out_callback_) {
                         out_callback_(std::string(reinterpret_cast<char *>(wav_pcm_data.data()),
                                                   wav_pcm_data.size() * sizeof(int16_t)),
                                       false);
                     }
-
-                    saveVectorAsWavFloat(speech, path, 24000, 1);
-                    i += 1;
+                    ++i;
                 } else if (g_llm_finished.load()) {
-                    std::cout << "[Main/Token2Wav Thread] Buffer is empty and LLM finished. Exiting.\n";
                     lock.unlock();
                     break;
                 } else {
@@ -416,17 +457,19 @@ public:
             token.insert(token.end(), g_token_buffer.begin() + start, g_token_buffer.end());
             auto speech = lToken2Wav.infer(token, prompt_speech_embeds_flow1, prompt_feat1, spk_embeds,
                                            token_offset - start, true);
-            output.insert(output.end(), speech.begin(), speech.end());
-            std::string path = "output_" + std::to_string(i) + ".wav";
-            saveVectorAsWavFloat(speech, path, 24000, 1);
-            saveVectorAsWavFloat(output, "output.wav", 24000, 1);
+            double src_ratio =
+                static_cast<double>(mode_config_.audio_rate) / static_cast<double>(mode_config_.mode_rate);
+            std::vector<float> resampled_pcm(static_cast<size_t>(speech.size() * src_ratio + 1));
+            int resampled_len = 0;
+            resample_audio(speech.data(), speech.size(), resampled_pcm.data(), &resampled_len, src_ratio);
+
             std::vector<int16_t> wav_pcm_data;
-            wav_pcm_data.resize(speech.size());
-            for (size_t k = 0; k < speech.size(); ++k) {
-                float sample = speech[k];
-                if (sample > 1.0f) sample = 1.0f;
-                if (sample < -1.0f) sample = -1.0f;
-                wav_pcm_data[k] = static_cast<int16_t>(sample * 32767.0f);
+            wav_pcm_data.reserve(resampled_len);
+            for (int i = 0; i < resampled_len; i++) {
+                float val = resampled_pcm[i];
+                if (val > 1.0f) val = 1.0f;
+                if (val < -1.0f) val = -1.0f;
+                wav_pcm_data.push_back(static_cast<int16_t>(val * 32767.0f));
             }
             if (out_callback_) {
                 out_callback_(
@@ -436,8 +479,6 @@ public:
 
             SLOGI("tts total use time: %.3f s", time_total.cost() / 1000);
             reset();
-            std::cout << "\nVoice generation pipeline completed.\n";
-
         } catch (const std::exception &e) {
             std::cerr << "Error in pipeline: " << e.what() << std::endl;
             return 1;
@@ -484,6 +525,28 @@ public:
         }
     }
 
+    void _ax_init()
+    {
+        if (!ax_init_flage_) {
+            int ret = axclInit(nullptr);
+            if (0 != ret) {
+                fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
+            }
+            SLOGE("init~~~~~~~~~~%d~~~~", ret);
+        }
+        ax_init_flage_++;
+    }
+
+    void _ax_deinit()
+    {
+        if (ax_init_flage_ > 0) {
+            --ax_init_flage_;
+            if (!ax_init_flage_) {
+                axclFinalize();
+            }
+        }
+    }
+
     bool pause()
     {
         if (lLaMa_) lLaMa_->Stop();
@@ -505,15 +568,16 @@ public:
     static unsigned int getNextPort()
     {
         unsigned int port = next_port_++;
-        if (port > 8089) {
-            next_port_ = 8080;
-            port       = 8080;
+        if (port > 8079) {
+            next_port_ = 8070;
+            port       = 8070;
         }
         return port;
     }
 
     llm_task(const std::string &workid) : tokenizer_server_flage_(false), port_(getNextPort())
     {
+        _ax_init();
         inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
     }
 
@@ -545,10 +609,12 @@ public:
         if (lLaMa_) {
             lLaMa_->Deinit();
         }
+        _ax_deinit();
     }
 };
+int llm_task::ax_init_flage_ = 0;
 
-std::atomic<unsigned int> llm_task::next_port_{8080};
+std::atomic<unsigned int> llm_task::next_port_{8070};
 
 #undef CONFIG_AUTO_SET
 
