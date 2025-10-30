@@ -70,7 +70,7 @@ struct LLMAttrType {
     int n_timesteps;
 
     int mode_rate  = 24000;
-    int audio_rate = 16000;
+    int audio_rate = 48000;
 
     bool b_use_mmap_load_embed        = false;
     bool b_dynamic_load_axmodel_layer = false;

@@ -48,22 +48,51 @@ private:
         self->pub_ctx_->send_data((const char *)data, size);
     }
 
+    static std::string mono_to_stereo_s16le(const std::string &mono_data)
+    {
+        if (mono_data.empty()) return mono_data;
+
+        size_t sample_count = mono_data.size() / 2;
+        std::string stereo_data;
+        stereo_data.reserve(mono_data.size() * 2);
+
+        const char *src = mono_data.data();
+        for (size_t i = 0; i < sample_count; ++i) {
+            stereo_data.append(src + i * 2, 2);
+            stereo_data.append(src + i * 2, 2);
+        }
+        return stereo_data;
+    }
+
     void hw_queue_play(const std::shared_ptr<void> &arg)
     {
         if (audio_clear_flage_) {
             return;
         }
+
         std::shared_ptr<pzmq_data> originalPtr = std::static_pointer_cast<pzmq_data>(arg);
+        std::string audio_data(static_cast<const char *>(originalPtr->data()), originalPtr->size());
+
+        std::string final_data = audio_data;
+        if (play_config.channel == 2) {
+            final_data = mono_to_stereo_s16le(audio_data);
+        }
+
         std::lock_guard<std::mutex> guard(ax_play_mtx);
         alsa_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
-                play_config.bit, originalPtr->data(), originalPtr->size());
+                  play_config.bit, final_data.c_str(), final_data.length());
     }
 
     void hw_play(const std::string &audio_data)
     {
+        std::string final_data = audio_data;
+
+        if (play_config.channel == 2) {
+            final_data = mono_to_stereo_s16le(audio_data);
+        }
         std::lock_guard<std::mutex> guard(ax_play_mtx);
         alsa_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
-                play_config.bit, audio_data.c_str(), audio_data.length());
+                  play_config.bit, audio_data.c_str(), audio_data.length());
     }
 
     void hw_cap()
