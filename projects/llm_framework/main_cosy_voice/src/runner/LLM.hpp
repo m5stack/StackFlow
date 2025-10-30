@@ -319,8 +319,7 @@ public:
         embed_selector.Deinit();
         llm_embed_selector.Deinit();
         speech_embed_selector.Deinit();
-        // for (auto &devid : _attr.dev_ids)
-        //     axcl_Exit(devid);
+        for (auto &devid : _attr.dev_ids) axcl_Exit(devid);
     }
 
     void Stop()

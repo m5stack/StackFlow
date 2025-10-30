@@ -1,5 +1,5 @@
 {
-    "mode": "CosyVoice2-0.5B-ax650",
+    "mode": "CosyVoice2-0.5B-axcl",
     "type": "tts",
     "homepage": "https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B",
     "capabilities": [

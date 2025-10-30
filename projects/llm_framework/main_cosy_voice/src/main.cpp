@@ -26,8 +26,6 @@ using namespace StackFlows;
 #include "backward.h"
 #endif
 
-#include "runner/utils/wav.hpp"
-
 #define MAX_TASK_NUM 2
 
 int main_exit_flage = 0;
@@ -233,7 +231,6 @@ public:
                     tokenizer_server_flage_.store(true);
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
                           (base_model + std::string("tokenizer")).c_str(), prompt_.c_str());
-
                     std::this_thread::sleep_for(std::chrono::seconds(3));
                 };
 
@@ -670,7 +667,7 @@ public:
 
     void pause(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_asr::work:%s", data.c_str());
+        SLOGI("llm_cosy_voice::work:%s", data.c_str());
 
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
@@ -807,7 +804,7 @@ public:
 
     void link(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_llm::link:%s", data.c_str());
+        SLOGI("llm_cosy_voice::link:%s", data.c_str());
         int ret = 1;
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
@@ -844,7 +841,7 @@ public:
 
     void unlink(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_llm::unlink:%s", data.c_str());
+        SLOGI("llm_cosy_voice::unlink:%s", data.c_str());
         int ret = 0;
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
@@ -869,7 +866,7 @@ public:
 
     void taskinfo(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_llm::taskinfo:%s", data.c_str());
+        SLOGI("llm_cosy_voice::taskinfo:%s", data.c_str());
         // int ret = 0;
         nlohmann::json req_body;
         int work_id_num = sample_get_work_id_num(work_id);
@@ -891,13 +888,13 @@ public:
             req_body["response_format"] = llm_task_obj->response_format_;
             req_body["enoutput"]        = llm_task_obj->enoutput_;
             req_body["inputs"]          = llm_task_obj->inputs_;
-            send("llm.taskinfo", req_body, LLM_NO_ERROR, work_id);
+            send("cosy_voice.taskinfo", req_body, LLM_NO_ERROR, work_id);
         }
     }
 
     int exit(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_llm::exit:%s", data.c_str());
+        SLOGI("llm_cosy_voice::exit:%s", data.c_str());
 
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
