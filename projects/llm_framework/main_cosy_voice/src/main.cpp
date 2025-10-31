@@ -317,10 +317,10 @@ public:
                 }
             };
 
-            readtxt(infer_mode_config_.prompt_text, prompt_text_token);
-            readtxt(infer_mode_config_.llm_prompt_speech_token, prompt_speech_token);
-            readtxt(infer_mode_config_.prompt_speech_feat, prompt_feat);
-            readtxt<float>(infer_mode_config_.flow_embedding, spk_embeds);
+            if (readtxt(infer_mode_config_.prompt_text, prompt_text_token)) return -3;
+            if (readtxt(infer_mode_config_.llm_prompt_speech_token, prompt_speech_token)) return -3;
+            if (readtxt(infer_mode_config_.prompt_speech_feat, prompt_feat)) return -3;
+            if (readtxt<float>(infer_mode_config_.flow_embedding, spk_embeds)) return -3;
 
             lLaMa_ = std::make_unique<LLM>();
             if (!lLaMa_->Init(mode_config_)) {
@@ -432,6 +432,7 @@ public:
             int prompt_token_len = prompt_speech_embeds_flow.size() / lToken2Wav._attr.flow_embed_size;
             if (prompt_token_len < 75) {
                 SLOGE("Error, prompt speech token len %d < 75", prompt_token_len);
+                if (llm_thread.joinable()) llm_thread.join();
                 return -1;
             }
             int prompt_token_align_len = 75;
