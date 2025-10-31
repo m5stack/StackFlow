@@ -36,6 +36,7 @@ struct LLMAttrType {
     std::string filename_tokenizer_model  = "http://127.0.0.1:12345";
     std::string filename_decoder_axmodel;
     std::string token2wav_axmodel_dir;
+    std::string output_path;
 
     int prefill_token_num     = 96;  // auto calc
     int prefill_max_token_num = 512;

@@ -6,6 +6,7 @@
 #include "StackFlow.h"
 #include "runner/LLM.hpp"
 #include "runner/Token2wav.hpp"
+#include "runner/utils/wav.hpp"
 
 #include <signal.h>
 #include <sys/stat.h>
@@ -46,6 +47,12 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
     else if (obj.contains(#key))              \
         mode_config_.key = obj[#key];
 
+#define INFER_CONFIG_AUTO_SET(obj, key)             \
+    if (config_body.contains(#key))                 \
+        infer_mode_config_.key = config_body[#key]; \
+    else if (obj.contains(#key))                    \
+        infer_mode_config_.key = obj[#key];
+
 class llm_task {
 private:
     static std::atomic<unsigned int> next_port_;
@@ -71,6 +78,7 @@ private:
 public:
     enum inference_status { INFERENCE_NONE = 0, INFERENCE_RUNNING };
     LLMAttrType mode_config_;
+    Token2WavAttr infer_mode_config_;
     std::unique_ptr<LLM> lLaMa_;
     std::string model_;
     std::string response_format_;
@@ -185,6 +193,26 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], b_use_mmap_load_embed);
             CONFIG_AUTO_SET(file_body["mode_param"], b_dynamic_load_axmodel_layer);
             CONFIG_AUTO_SET(file_body["mode_param"], max_token_len);
+            CONFIG_AUTO_SET(file_body["mode_param"], output_path);
+
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], flow_input_embedding);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], rand_noise);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], speech_window);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], flow_encoder_28);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], flow_encoder_53);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], flow_encoder_78);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], flow_encoder_50_final);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], flow_estimator_200);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], flow_estimator_250);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], flow_estimator_300);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], hift_p2_50_first);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], hift_p2_58);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], hift_p1_50_first);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], hift_p1_58);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], prompt_dir);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], prompt_dir);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], prompt_dir);
+            INFER_CONFIG_AUTO_SET(file_body["mode_param"], prompt_dir);
             {
                 auto has_http = [](const std::string &s) { return s.find("http") != std::string::npos; };
 
@@ -256,8 +284,32 @@ public:
             mode_config_.template_filename_axmodel = base_model + mode_config_.template_filename_axmodel;
             mode_config_.filename_speech_embed     = base_model + mode_config_.filename_speech_embed;
             mode_config_.filename_decoder_axmodel  = base_model + mode_config_.filename_decoder_axmodel;
-            mode_config_.token2wav_axmodel_dir     = base_model + mode_config_.token2wav_axmodel_dir;
-            mode_config_.prompt_files              = base_model + mode_config_.prompt_files;
+
+            infer_mode_config_.flow_input_embedding  = base_model + infer_mode_config_.flow_input_embedding;
+            infer_mode_config_.rand_noise            = base_model + infer_mode_config_.rand_noise;
+            infer_mode_config_.speech_window         = base_model + infer_mode_config_.speech_window;
+            infer_mode_config_.flow_encoder_28       = base_model + infer_mode_config_.flow_encoder_28;
+            infer_mode_config_.flow_encoder_53       = base_model + infer_mode_config_.flow_encoder_53;
+            infer_mode_config_.flow_encoder_78       = base_model + infer_mode_config_.flow_encoder_78;
+            infer_mode_config_.flow_encoder_50_final = base_model + infer_mode_config_.flow_encoder_50_final;
+            infer_mode_config_.flow_estimator_200    = base_model + infer_mode_config_.flow_estimator_200;
+            infer_mode_config_.flow_estimator_250    = base_model + infer_mode_config_.flow_estimator_250;
+            infer_mode_config_.flow_estimator_300    = base_model + infer_mode_config_.flow_estimator_300;
+            infer_mode_config_.hift_p2_50_first      = base_model + infer_mode_config_.hift_p2_50_first;
+            infer_mode_config_.hift_p2_58            = base_model + infer_mode_config_.hift_p2_58;
+            infer_mode_config_.hift_p1_50_first      = base_model + infer_mode_config_.hift_p1_50_first;
+            infer_mode_config_.hift_p1_58            = base_model + infer_mode_config_.hift_p1_58;
+
+            infer_mode_config_.prompt_text =
+                (fs::path(base_model) / infer_mode_config_.prompt_dir / infer_mode_config_.prompt_text).string();
+            infer_mode_config_.llm_prompt_speech_token =
+                (fs::path(base_model) / infer_mode_config_.prompt_dir / infer_mode_config_.llm_prompt_speech_token)
+                    .string();
+            infer_mode_config_.prompt_speech_feat =
+                (fs::path(base_model) / infer_mode_config_.prompt_dir / infer_mode_config_.prompt_speech_feat).string();
+            infer_mode_config_.flow_embedding =
+                (fs::path(base_model) / infer_mode_config_.prompt_dir / infer_mode_config_.flow_embedding).string();
+
             mode_config_.runing_callback = [this](int *p_token, int n_token, const char *p_str, float token_per_sec,
                                                   void *reserve) {
                 if (this->out_callback_) {
@@ -265,10 +317,10 @@ public:
                 }
             };
 
-            readtxt(mode_config_.prompt_files + "/prompt_text.txt", prompt_text_token);
-            readtxt(mode_config_.prompt_files + "/llm_prompt_speech_token.txt", prompt_speech_token);
-            readtxt(mode_config_.prompt_files + "/prompt_speech_feat.txt", prompt_feat);
-            readtxt<float>(mode_config_.prompt_files + "/flow_embedding.txt", spk_embeds);
+            readtxt(infer_mode_config_.prompt_text, prompt_text_token);
+            readtxt(infer_mode_config_.llm_prompt_speech_token, prompt_speech_token);
+            readtxt(infer_mode_config_.prompt_speech_feat, prompt_feat);
+            readtxt<float>(infer_mode_config_.flow_embedding, spk_embeds);
 
             lLaMa_ = std::make_unique<LLM>();
             if (!lLaMa_->Init(mode_config_)) {
@@ -276,7 +328,9 @@ public:
                 lLaMa_.reset();
                 return -2;
             }
-            if (!lToken2Wav.Init(mode_config_.token2wav_axmodel_dir, mode_config_.n_timesteps)) {
+            if (!lToken2Wav.Init(infer_mode_config_)) {
+                lLaMa_->Deinit();
+                lLaMa_.reset();
                 return -1;
             }
             lLaMa_->TextToken2Embeds(prompt_text_token, prompt_text_embeds);
@@ -347,6 +401,18 @@ public:
         src_delete(src_state);
     }
 
+    static std::string generateFilename(const fs::path &dir)
+    {
+        auto now             = std::chrono::system_clock::now();
+        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        std::tm tm_now;
+        localtime_r(&now_time, &tm_now);
+
+        std::ostringstream oss;
+        oss << "audio_" << std::put_time(&tm_now, "%Y%m%d_%H%M%S") << ".wav";
+        return (dir / oss.str()).string();
+    }
+
     int tts(const std::string &text, std::vector<unsigned short> &prompt_text_embeds,
             std::vector<unsigned short> &prompt_speech_embeds, const std::vector<float> &prompt_feat,
             const std::vector<float> &prompt_speech_embeds_flow, std::vector<float> &spk_embeds)
@@ -363,7 +429,7 @@ public:
             std::thread llm_thread(llm_thread_func);
 
             int token_offset     = 0;
-            int prompt_token_len = prompt_speech_embeds_flow.size() / lToken2Wav.flow_embed_size;
+            int prompt_token_len = prompt_speech_embeds_flow.size() / lToken2Wav._attr.flow_embed_size;
             if (prompt_token_len < 75) {
                 SLOGE("Error, prompt speech token len %d < 75", prompt_token_len);
                 return -1;
@@ -382,26 +448,27 @@ public:
             int this_token_hop_len;
             int i = 0;
             while (true) {
-                this_token_hop_len =
-                    (token_offset == 0) ? lToken2Wav.token_hop_len + promot_token_pad : lToken2Wav.token_hop_len;
+                this_token_hop_len = (token_offset == 0) ? lToken2Wav._attr.token_hop_len + promot_token_pad
+                                                         : lToken2Wav._attr.token_hop_len;
 
                 std::unique_lock<std::mutex> lock(g_buffer_mutex);
 
                 g_buffer_cv.wait(lock, [&] {
                     return (g_token_buffer.size() - token_offset >=
-                            this_token_hop_len + lToken2Wav.pre_lookahead_len) ||
+                            this_token_hop_len + lToken2Wav._attr.pre_lookahead_len) ||
                            g_llm_finished.load() || g_stop.load();
                 });
 
                 if (g_stop) {
                     lock.unlock();
                     break;
-                } else if (g_token_buffer.size() - token_offset >= this_token_hop_len + lToken2Wav.pre_lookahead_len) {
+                } else if (g_token_buffer.size() - token_offset >=
+                           this_token_hop_len + lToken2Wav._attr.pre_lookahead_len) {
                     std::vector<SpeechToken> token;
-                    int start = token_offset - std::min(int(token_offset / lToken2Wav.token_hop_len),
-                                                        lToken2Wav.max_infer_chunk_num - 1) *
-                                                   lToken2Wav.token_hop_len;
-                    int end = token_offset + this_token_hop_len + lToken2Wav.pre_lookahead_len;
+                    int start = token_offset - std::min(int(token_offset / lToken2Wav._attr.token_hop_len),
+                                                        lToken2Wav._attr.max_infer_chunk_num - 1) *
+                                                   lToken2Wav._attr.token_hop_len;
+                    int end = token_offset + this_token_hop_len + lToken2Wav._attr.pre_lookahead_len;
 
                     token.insert(token.end(), g_token_buffer.begin() + start, g_token_buffer.begin() + end);
 
@@ -448,12 +515,13 @@ public:
             }
 
             std::vector<SpeechToken> token;
-            int start = g_token_buffer.size() - std::min(int(g_token_buffer.size() / lToken2Wav.token_hop_len),
-                                                         lToken2Wav.max_infer_chunk_num - 1) *
-                                                    lToken2Wav.token_hop_len;
+            int start = g_token_buffer.size() - std::min(int(g_token_buffer.size() / lToken2Wav._attr.token_hop_len),
+                                                         lToken2Wav._attr.max_infer_chunk_num - 1) *
+                                                    lToken2Wav._attr.token_hop_len;
             token.insert(token.end(), g_token_buffer.begin() + start, g_token_buffer.end());
             auto speech = lToken2Wav.infer(token, prompt_speech_embeds_flow1, prompt_feat1, spk_embeds,
                                            token_offset - start, true);
+            output.insert(output.end(), speech.begin(), speech.end());
             double src_ratio =
                 static_cast<double>(mode_config_.audio_rate) / static_cast<double>(mode_config_.mode_rate);
             std::vector<float> resampled_pcm(static_cast<size_t>(speech.size() * src_ratio + 1));
@@ -472,6 +540,35 @@ public:
                 out_callback_(
                     std::string(reinterpret_cast<char *>(wav_pcm_data.data()), wav_pcm_data.size() * sizeof(int16_t)),
                     true);
+            }
+            if (response_format_.find("file") != std::string::npos) {
+                double src_ratio =
+                    static_cast<double>(mode_config_.audio_rate) / static_cast<double>(mode_config_.mode_rate);
+                std::vector<float> resampled_pcm(static_cast<size_t>(output.size() * src_ratio + 1));
+                int resampled_len = 0;
+                resample_audio(output.data(), output.size(), resampled_pcm.data(), &resampled_len, src_ratio);
+
+                std::vector<int16_t> wav_pcm_data_full;
+                wav_pcm_data_full.reserve(resampled_len);
+                for (int i = 0; i < resampled_len; i++) {
+                    float val = resampled_pcm[i];
+                    if (val > 1.0f) val = 1.0f;
+                    if (val < -1.0f) val = -1.0f;
+                    wav_pcm_data_full.push_back(static_cast<int16_t>(val * 32767.0f));
+                }
+
+                std::string wav_path;
+                if (mode_config_.output_path.empty()) {
+                    wav_path = generateFilename("/tmp");
+                } else {
+                    fs::path user_path(mode_config_.output_path);
+                    if (!user_path.has_filename()) {
+                        wav_path = generateFilename(user_path);
+                    } else {
+                        wav_path = user_path.string();
+                    }
+                }
+                saveVectorAsWavFloat(resampled_pcm, wav_path, mode_config_.audio_rate, 1);
             }
 
             SLOGI("tts total use time: %.3f s", time_total.cost() / 1000);
