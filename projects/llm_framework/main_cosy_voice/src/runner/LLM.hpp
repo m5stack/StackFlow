@@ -31,48 +31,51 @@ typedef std::function<void(int *, int, const char *, float, void *)> LLMRuningCa
 struct LLMAttrType {
     std::string template_filename_axmodel = "tinyllama-int8/tinyllama_l%d.axmodel";
     int axmodel_num                       = 22;
-
-    std::string filename_post_axmodel = "tinyllama-int8/tinyllama_post.axmodel";
+    std::string filename_post_axmodel     = "tinyllama-int8/tinyllama_post.axmodel";
+    std::string filename_tokenizer_model  = "http://127.0.0.1:12345";
     std::string filename_decoder_axmodel;
     std::string token2wav_axmodel_dir;
-    std::string prompt_files;
+    std::string output_path;
 
     int prefill_token_num     = 96;  // auto calc
     int prefill_max_token_num = 512;
-    std::vector<int> prefill_max_kv_cache_num_grp;
-    int precompute_len = 0;
-    int prefill_grpid  = -1;
 
-    TokenizerType tokenizer_type         = TKT_HTTP;
-    std::string filename_tokenizer_model = "http://127.0.0.1:12345";
-    std::string url_tokenizer_model      = "http://127.0.0.1:12345";
-    bool b_bos = false, b_eos = false;
+    std::string prompt_files;
+
+    TokenizerType tokenizer_type    = TKT_HTTP;
+    std::string url_tokenizer_model = "http://127.0.0.1:12345";
+    bool b_bos                      = false;
+    bool b_eos                      = false;
+    std::vector<int> dev_ids        = {0};
+
     std::string filename_tokens_embed = "tinyllama.model.embed_tokens.weight.bfloat16.bin";
     std::string filename_llm_embed    = "tinyllama.model.embed_tokens.weight.bfloat16.bin";
     std::string filename_speech_embed = "tinyllama.model.embed_tokens.weight.bfloat16.bin";
     int tokens_embed_num              = 151936;
     int tokens_embed_size             = 896;
 
+    int max_token_len = 127;
+    int kv_cache_num  = 1024;
+    int kv_cache_size = 256;
+
+    int precompute_len = 0;
+    std::vector<int> prefill_max_kv_cache_num_grp;
+    int prefill_grpid = -1;
+
     int llm_embed_num     = 2;
     int llm_embed_size    = 896;
     int speech_embed_num  = 6564;
     int speech_embed_size = 896;
 
-    int max_token_len = 127;  // auto calc
+    int n_timesteps;
 
-    int kv_cache_num  = 1024;  // auto calc
-    int kv_cache_size = 256;   // auto calc
+    int mode_rate  = 24000;
+    int audio_rate = 48000;
 
     bool b_use_mmap_load_embed        = false;
     bool b_dynamic_load_axmodel_layer = false;
+    bool b_use_mmap_load_layer        = true;
 
-    bool b_use_mmap_load_layer = true;
-
-    bool b_use_topk = false;
-
-    int n_timesteps;
-
-    // bool b_live_print = true;
     LLMRuningCallback runing_callback = nullptr;
     void *reserve                     = nullptr;
 };
@@ -282,7 +285,7 @@ public:
     }
 
     int Encode(std::vector<unsigned short> &out_embed, std::vector<std::vector<int>> &position_ids, std::string text,
-               const std::vector<unsigned short> &prompt_text_embeds, const std::vector<unsigned short> &prompt_speech_embeds)
+               std::vector<unsigned short> &prompt_text_embeds, std::vector<unsigned short> &prompt_speech_embeds)
     {
         // std::vector<int> prompt_ids = tokenizer->Encode(prompt_text, true);
         ImageInfo img_info;
@@ -333,9 +336,9 @@ public:
         return 0;
     }
 
-    int Run(const std::string &input_str, const std::vector<unsigned short> &prompt_text_embeds,
-            const std::vector<unsigned short> &prompt_speech_embeds, TokenBuffer &token_buffer,
-            std::mutex &buffer_mutex, std::condition_variable &buffer_cv, std::atomic<bool> &llm_finished)
+    int Run(std::string input_str, std::vector<unsigned short> &prompt_text_embeds,
+            std::vector<unsigned short> &prompt_speech_embeds, TokenBuffer &token_buffer, std::mutex &buffer_mutex,
+            std::condition_variable &buffer_cv, std::atomic<bool> &llm_finished)
     {
         std::vector<unsigned short> text_embed;
         std::vector<std::vector<int>> position_ids;
@@ -511,12 +514,7 @@ public:
             auto &input = llama_post.get_input(0);
             memcpy((void *)input.pVirAddr, embed.data(), embed.size() * sizeof(unsigned short));
             llama_post.inference();
-            if (_attr.b_use_topk) {
-                AX_SYS_MinvalidateCache(llama_post.get_output("indices").phyAddr,
-                                        llama_post.get_output("indices").pVirAddr,
-                                        llama_post.get_output("indices").nSize);
-                max_index = *(int *)llama_post.get_output("indices").pVirAddr;
-            } else {
+            {
                 auto &output_post        = llama_post.get_output("output_norm");  // 1 means get rmsnorm output
                 unsigned short *post_out = (unsigned short *)output_post.pVirAddr;
                 std::vector<float> logits(output_post.nSize / sizeof(unsigned short));

@@ -150,58 +150,67 @@ def create_lib_deb(package_name, version, src_folder, revision = 'm5stack1'):
     shutil.rmtree(deb_folder)
     return package_name + " creat success!"
 
-def create_data_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.6)'):
+def create_data_deb(package_name, version, src_folder, revision='m5stack1', depends='lib-llm (>= 1.6)'):
     deb_file = f"{package_name}_{version}-{revision}_arm64.deb"
-    deb_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debian-{}'.format(package_name))
+    deb_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), f'debian-{package_name}')
+    
     if os.path.exists(deb_folder):
         shutil.rmtree(deb_folder)
-    os.makedirs(deb_folder, exist_ok = True)
+    os.makedirs(deb_folder, exist_ok=True)
 
     zip_file = f"m5stack_{package_name[0:4]+package_name[10:]}_{version}_data.tar.gz"
     down_url = f"https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_{package_name[0:4]+package_name[10:]}_{version}_data.tar.gz"
     zip_file_extrpath = f"m5stack_{package_name}_{version}_data"
+
     if not os.path.exists(zip_file_extrpath):
-        # Downloading via HTTP (more common)
         if not os.path.exists(zip_file):
             response = requests.get(down_url)
             if response.status_code == 200:
                 with open(zip_file, 'wb') as file:
                     file.write(response.content)
             else:
-                print("{} down failed".format(down_url))
+                print(f"{down_url} download failed.")
         with tarfile.open(zip_file, 'r:gz') as tar:
             tar.extractall(path=zip_file_extrpath)
-        print("The {} download successful.".format(down_url))
+        print(f"The {down_url} download successful.")
+
     if os.path.exists(zip_file_extrpath):
         shutil.copytree(zip_file_extrpath, os.path.join(deb_folder, 'opt/m5stack/data'))
 
     RED = "\033[31m"
     RESET = "\033[0m"
-    os.makedirs(os.path.join(deb_folder, 'opt/m5stack/data/models'), exist_ok = True)
-    mode_config_file = os.path.join(src_folder,'mode_{}.json'.format(package_name[10:]))
+    os.makedirs(os.path.join(deb_folder, 'opt/m5stack/data/models'), exist_ok=True)
+
+    mode_config_file = os.path.join(src_folder, f'mode_{package_name[10:]}.json')
     if os.path.exists(mode_config_file):
-        shutil.copy2(mode_config_file, os.path.join(deb_folder, 'opt/m5stack/data/models', 'mode_{}.json'.format(package_name[10:])))
+        shutil.copy2(mode_config_file, os.path.join(deb_folder, 'opt/m5stack/data/models', f'mode_{package_name[10:]}.json'))
+
         try:
             with open(mode_config_file, 'r', encoding='utf-8') as file:
                 data = json.load(file)
-            for scripts_file in data['mode_param']['ext_scripts']:
-                src_path = os.path.join(src_folder, scripts_file)
-                dst_path = os.path.join(deb_folder, 'opt/m5stack/scripts', scripts_file)
-                if os.path.exists(src_path):
-                    if os.path.isdir(src_path):
-                        # 拷贝整个文件夹
-                        shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-                    else:
-                        # 确保目标目录存在
-                        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                        shutil.copy2(src_path, dst_path)
-        except:
-            pass
-    else:
-        print(RED, mode_config_file, " miss", RESET)
 
-    os.makedirs(os.path.join(deb_folder, 'DEBIAN'), exist_ok = True)
-    with open(os.path.join(deb_folder, 'DEBIAN/control'),'w') as f:
+            for scripts_file in data['mode_param'].get('ext_scripts', []):
+                src_path = os.path.join(src_folder, scripts_file)
+                dest_dir = os.path.join(deb_folder, 'opt/m5stack/scripts')
+                os.makedirs(dest_dir, exist_ok=True)
+
+                if os.path.isfile(src_path):
+                    shutil.copy2(src_path, os.path.join(dest_dir, os.path.basename(scripts_file)))
+                    print(f"Copied file: {scripts_file}")
+                elif os.path.isdir(src_path):
+                    shutil.copytree(src_path, os.path.join(dest_dir, os.path.basename(scripts_file)), dirs_exist_ok=True)
+                    print(f"Copied folder: {scripts_file}")
+                else:
+                    print(f"Warning: {scripts_file} not found in {src_folder}")
+
+        except Exception as e:
+            print(f"Error reading ext_scripts: {e}")
+
+    else:
+        print(RED, mode_config_file, " missing", RESET)
+
+    os.makedirs(os.path.join(deb_folder, 'DEBIAN'), exist_ok=True)
+    with open(os.path.join(deb_folder, 'DEBIAN/control'), 'w') as f:
         f.write(f'Package: {package_name}\n')
         f.write(f'Version: {version}\n')
         f.write(f'Architecture: arm64\n')
@@ -213,34 +222,34 @@ def create_data_deb(package_name, version, src_folder, revision = 'm5stack1', de
         f.write(f'Homepage: https://www.m5stack.com\n')
         if deb_file.startswith('llm-model-'):
             deb_name = deb_file[:deb_file.find('_')]
-            old_deb_name = deb_name.replace('model-','').lower()
-            f.write(f'Conflicts: {old_deb_name}\n')   
-        f.write(f'Packaged-Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')     
+            old_deb_name = deb_name.replace('model-', '').lower()
+            f.write(f'Conflicts: {old_deb_name}\n')
+        f.write(f'Packaged-Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
         f.write(f'Description: llm-module\n')
         f.write(f' bsp.\n')
-    with open(os.path.join(deb_folder, 'DEBIAN/postinst'),'w') as f:
-        f.write(f'#!/bin/sh\n')
-        f.write(f'exit 0\n')
-    with open(os.path.join(deb_folder, 'DEBIAN/prerm'),'w') as f:
-        f.write(f'#!/bin/sh\n')
-        f.write(f'exit 0\n')
+
+    with open(os.path.join(deb_folder, 'DEBIAN/postinst'), 'w') as f:
+        f.write('#!/bin/sh\nexit 0\n')
+    with open(os.path.join(deb_folder, 'DEBIAN/prerm'), 'w') as f:
+        f.write('#!/bin/sh\nexit 0\n')
     os.chmod(os.path.join(deb_folder, 'DEBIAN/postinst'), 0o755)
     os.chmod(os.path.join(deb_folder, 'DEBIAN/prerm'), 0o755)
+
     subprocess.run(["dpkg-deb", "-b", deb_folder, deb_file], check=True)
     print(f"Debian package created: {deb_file}")
+
     shutil.rmtree(deb_folder)
     return package_name + " creat success!"
 
 def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.8)'):
     bin_files = glob.glob(os.path.join(src_folder, package_name.replace("-", "_") + "-*"))
-    version_info = 0.0
-    print(os.path.join(src_folder, package_name + "-*"))
+    version_info = "0"
     if bin_files:
         for bin_file in bin_files:
-            version_info = float(bin_file.split('-')[-1])
-            if float(bin_file.split('-')[-1]) > version_info:
-                version_info = float(bin_file.split('-')[-1])
-        version = str(version_info)
+            ver = bin_file.split('-')[-1]
+            if ver > version_info:
+                version_info = ver
+        version = version_info
 
     deb_file = f"{package_name}_{version}-{revision}_arm64.deb"
     deb_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debian-{}'.format(package_name))
@@ -273,7 +282,7 @@ def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', dep
         cosy_voice_dir = os.path.join(src_folder, 'cosy-voice')
         if os.path.exists(cosy_voice_dir):
             shutil.copytree(cosy_voice_dir, os.path.join(deb_folder, 'opt/m5stack/lib/cosy-voice'))
-
+    
     bin_file_name = package_name.replace("-", "_")
     if version_info != 0.0:
         bin_file_name = package_name.replace("-", "_") + f'-{version}'
@@ -391,7 +400,6 @@ if __name__ == "__main__":
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
-        'llm-model-CosyVoice2-0.5B-ax650':[create_data_deb,'llm-model-CosyVoice2-0.5B-ax650', '0.6', src_folder, revision],
         # VAD model
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.4', src_folder, revision],
         # MeloTTS model
@@ -413,6 +421,9 @@ if __name__ == "__main__":
         'llm-model-melotts-en-us-ax650':[create_data_deb,'llm-model-melotts-en-us-ax650', '0.6', src_folder, revision],
         'llm-model-melotts-ja-jp-ax650':[create_data_deb,'llm-model-melotts-ja-jp-ax650', '0.6', src_folder, revision],
         'llm-model-melotts-es-es-ax650':[create_data_deb,'llm-model-melotts-es-es-ax650', '0.5', src_folder, revision],
+        # CosyVoice2 model
+        ## AX650
+        'llm-model-CosyVoice2-0.5B-ax650':[create_data_deb,'llm-model-CosyVoice2-0.5B-ax650', '0.6', src_folder, revision],
         # Yolo model
         ## AX630C
         'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
