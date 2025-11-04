@@ -411,45 +411,42 @@ public:
         timer time_total;
         time_total.start();
         try {
-            auto llm_thread_func = [this, &text, &prompt_text_embeds, &prompt_speech_embeds]() {
-                lLaMa_->Run(text, prompt_text_embeds, prompt_speech_embeds, g_token_buffer, g_buffer_mutex, g_buffer_cv,
-                            g_llm_finished);
+            int llm_ret          = 0;
+            auto llm_thread_func = [this, &text, &prompt_text_embeds, &prompt_speech_embeds, &llm_ret]() {
+                llm_ret = lLaMa_->Run(text, prompt_text_embeds, prompt_speech_embeds, g_token_buffer, g_buffer_mutex,
+                                      g_buffer_cv, g_llm_finished);
             };
-
             std::thread llm_thread(llm_thread_func);
-
-            int token_offset     = 0;
+            llm_thread.detach();
             int prompt_token_len = prompt_speech_embeds_flow.size() / lToken2Wav._attr.flow_embed_size;
             if (prompt_token_len < 75) {
                 SLOGE("Error, prompt speech token len %d < 75", prompt_token_len);
                 if (llm_thread.joinable()) llm_thread.join();
                 return -1;
             }
+            if (llm_ret == -1) {
+                return llm_ret;
+            }
             int prompt_token_align_len = 75;
-
             std::vector<float> prompt_speech_embeds_flow1;
             prompt_speech_embeds_flow1.insert(prompt_speech_embeds_flow1.begin(), prompt_speech_embeds_flow.begin(),
                                               prompt_speech_embeds_flow.begin() + prompt_token_align_len * 512);
-
             std::vector<float> prompt_feat1;
             prompt_feat1.insert(prompt_feat1.begin(), prompt_feat.begin(),
                                 prompt_feat.begin() + prompt_token_align_len * 2 * 80);
-
             int promot_token_pad = 0;
             int this_token_hop_len;
-            int i = 0;
+            int token_offset = 0;
+            int i            = 0;
             while (true) {
                 this_token_hop_len = (token_offset == 0) ? lToken2Wav._attr.token_hop_len + promot_token_pad
                                                          : lToken2Wav._attr.token_hop_len;
-
                 std::unique_lock<std::mutex> lock(g_buffer_mutex);
-
                 g_buffer_cv.wait(lock, [&] {
                     return (g_token_buffer.size() - token_offset >=
                             this_token_hop_len + lToken2Wav._attr.pre_lookahead_len) ||
                            g_llm_finished.load() || g_stop.load();
                 });
-
                 if (g_stop) {
                     lock.unlock();
                     break;
@@ -460,9 +457,7 @@ public:
                                                         lToken2Wav._attr.max_infer_chunk_num - 1) *
                                                    lToken2Wav._attr.token_hop_len;
                     int end = token_offset + this_token_hop_len + lToken2Wav._attr.pre_lookahead_len;
-
                     token.insert(token.end(), g_token_buffer.begin() + start, g_token_buffer.begin() + end);
-
                     lock.unlock();
                     auto speech = lToken2Wav.infer(token, prompt_speech_embeds_flow1, prompt_feat1, spk_embeds,
                                                    token_offset, false);
@@ -481,7 +476,6 @@ public:
                         if (val < -1.0f) val = -1.0f;
                         wav_pcm_data.push_back(static_cast<int16_t>(val * 32767.0f));
                     }
-
                     if (out_callback_) {
                         out_callback_(std::string(reinterpret_cast<char *>(wav_pcm_data.data()),
                                                   wav_pcm_data.size() * sizeof(int16_t)),
@@ -494,10 +488,6 @@ public:
                 } else {
                     lock.unlock();
                 }
-            }
-
-            if (llm_thread.joinable()) {
-                llm_thread.join();
             }
 
             if (g_stop) {
@@ -518,7 +508,6 @@ public:
             std::vector<float> resampled_pcm(static_cast<size_t>(speech.size() * src_ratio + 1));
             int resampled_len = 0;
             resample_audio(speech.data(), speech.size(), resampled_pcm.data(), &resampled_len, src_ratio);
-
             std::vector<int16_t> wav_pcm_data;
             wav_pcm_data.reserve(resampled_len);
             for (int i = 0; i < resampled_len; i++) {
@@ -538,7 +527,6 @@ public:
                 std::vector<float> resampled_pcm(static_cast<size_t>(output.size() * src_ratio + 1));
                 int resampled_len = 0;
                 resample_audio(output.data(), output.size(), resampled_pcm.data(), &resampled_len, src_ratio);
-
                 std::vector<int16_t> wav_pcm_data_full;
                 wav_pcm_data_full.reserve(resampled_len);
                 for (int i = 0; i < resampled_len; i++) {
@@ -547,7 +535,6 @@ public:
                     if (val < -1.0f) val = -1.0f;
                     wav_pcm_data_full.push_back(static_cast<int16_t>(val * 32767.0f));
                 }
-
                 std::string wav_path;
                 if (mode_config_.output_path.empty()) {
                     wav_path = generateFilename("/tmp");
@@ -561,14 +548,12 @@ public:
                 }
                 saveVectorAsWavFloat(resampled_pcm, wav_path, mode_config_.audio_rate, 1);
             }
-
             SLOGI("tts total use time: %.3f s", time_total.cost() / 1000);
             reset();
         } catch (const std::exception &e) {
             std::cerr << "Error in pipeline: " << e.what() << std::endl;
             return 1;
         }
-
         return 0;
     }
 
@@ -599,12 +584,7 @@ public:
     void inference(const std::string &msg)
     {
         try {
-            // std::string out = lLaMa_->Run(prompt_complete(msg));
-            // if (out_callback_) out_callback_(out, true);
             tts(msg, prompt_text_embeds, prompt_speech_embeds, prompt_feat, prompt_speech_embeds_flow, spk_embeds);
-            std::string out = "finish";
-            if (out_callback_) out_callback_(out, true);
-
         } catch (...) {
             SLOGW("lLaMa_->Run have error!");
         }
