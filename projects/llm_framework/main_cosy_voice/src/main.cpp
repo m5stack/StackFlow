@@ -183,7 +183,6 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], filename_decoder_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], token2wav_axmodel_dir);
             CONFIG_AUTO_SET(file_body["mode_param"], n_timesteps);
-            CONFIG_AUTO_SET(file_body["mode_param"], prompt_files);
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], b_bos);
             CONFIG_AUTO_SET(file_body["mode_param"], b_eos);
@@ -209,9 +208,6 @@ public:
             INFER_CONFIG_AUTO_SET(file_body["mode_param"], hift_p2_58);
             INFER_CONFIG_AUTO_SET(file_body["mode_param"], hift_p1_50_first);
             INFER_CONFIG_AUTO_SET(file_body["mode_param"], hift_p1_58);
-            INFER_CONFIG_AUTO_SET(file_body["mode_param"], prompt_dir);
-            INFER_CONFIG_AUTO_SET(file_body["mode_param"], prompt_dir);
-            INFER_CONFIG_AUTO_SET(file_body["mode_param"], prompt_dir);
             INFER_CONFIG_AUTO_SET(file_body["mode_param"], prompt_dir);
             {
                 auto has_http = [](const std::string &s) { return s.find("http") != std::string::npos; };
