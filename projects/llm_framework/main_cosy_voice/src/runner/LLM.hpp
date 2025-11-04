@@ -410,7 +410,7 @@ public:
     {
         std::vector<unsigned short> text_embed;
         std::vector<std::vector<int>> position_ids;
-        Encode(text_embed, position_ids, input_str, prompt_text_embeds, prompt_speech_embeds);
+        if (Encode(text_embed, position_ids, input_str, prompt_text_embeds, prompt_speech_embeds)) return -1;
         return Run(text_embed, position_ids, token_buffer, buffer_mutex, buffer_cv, llm_finished);
     }
 
@@ -628,7 +628,9 @@ public:
             if (b_stop) {
                 break;
             }
-
+            if (indices >= _attr.kv_cache_num) {
+                break;
+            }
             speech_embed_selector.getByIndex(next_token, embed.data());
             axcl_Memcpy((void *)llama_layers[0].layer.get_input(decode_grpid, "input").phyAddr, embed.data(),
                         llama_layers[0].layer.get_input(decode_grpid, "input").nSize, AXCL_MEMCPY_HOST_TO_DEVICE,
