@@ -374,7 +374,7 @@ if __name__ == "__main__":
         # Unit
         'lib-llm':[create_lib_deb,'lib-llm', '1.8', src_folder, revision],
         'llm-sys':[create_bin_deb,'llm-sys', '1.7', src_folder, revision],
-        'llm-audio':[create_bin_deb,'llm-audio', '1.6', src_folder, revision],
+        'llm-audio':[create_bin_deb,'llm-audio', '1.7', src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', '1.9', src_folder, revision],
         'llm-asr':[create_bin_deb,'llm-asr', '1.7', src_folder, revision],
         'llm-llm':[create_bin_deb,'llm-llm', '1.10', src_folder, revision],
@@ -387,7 +387,7 @@ if __name__ == "__main__":
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', '1.7', src_folder, revision],
         'llm-vad':[create_bin_deb,'llm-vad', '1.8', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.8', src_folder, revision],
-        'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.8', src_folder, revision],
+        'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.9', src_folder, revision],
         'llm-cosy-voice':[create_bin_deb,'llm-cosy-voice', '1.8', src_folder, revision],
         # keyword spotting Audio file
         'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
