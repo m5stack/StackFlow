@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <base64.h>
 #include <fstream>
+#include <future>
 #include <stdexcept>
 #include <samplerate.h>
 #include <semaphore.h>
@@ -225,6 +226,7 @@ public:
                 auto start_tokenizer_server = [&](const std::string &tokenizer_file) {
                     if (tokenizer_file.empty()) return;
                     if (tokenizer_server_flage_.load()) return;
+
                     tokenizer_pid_ = fork();
                     if (tokenizer_pid_ == 0) {
                         FILE *fp  = popen("python3 -V 2>&1", "r");
@@ -255,7 +257,7 @@ public:
                     tokenizer_server_flage_.store(true);
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
                           (base_model + std::string("tokenizer")).c_str(), prompt_.c_str());
-                    std::this_thread::sleep_for(std::chrono::seconds(3));
+                    std::this_thread::sleep_for(std::chrono::seconds(4));
                 };
 
                 auto process_field = [&](std::string &field, const char *name_for_log) -> bool {
@@ -417,22 +419,36 @@ public:
         timer time_total;
         time_total.start();
         try {
-            int llm_ret          = 0;
-            auto llm_thread_func = [this, &text, &prompt_text_embeds, &prompt_speech_embeds, &llm_ret]() {
+            int llm_ret = 0;
+            std::promise<int> prom;
+            std::future<int> fut = prom.get_future();
+            auto llm_thread_func = [this, &text, &prompt_text_embeds, &prompt_speech_embeds, &llm_ret, &prom]() {
                 llm_ret = lLaMa_->Run(text, prompt_text_embeds, prompt_speech_embeds, g_token_buffer, g_buffer_mutex,
                                       g_buffer_cv, g_llm_finished);
+                prom.set_value(llm_ret);
             };
             std::thread llm_thread(llm_thread_func);
             llm_thread.detach();
+
+            if (fut.wait_for(std::chrono::milliseconds(10)) == std::future_status::ready) {
+                int llm_ret = fut.get();
+                if (llm_ret == -1) {
+                    SLOGE("Error, Generate failed");
+                    if (out_callback_) out_callback_("Error, Generate failed", true);
+                    return llm_ret;
+                }
+            }
+
             int prompt_token_len = prompt_speech_embeds_flow.size() / lToken2Wav._attr.flow_embed_size;
             if (prompt_token_len < 75) {
                 SLOGE("Error, prompt speech token len %d < 75", prompt_token_len);
                 if (llm_thread.joinable()) llm_thread.join();
+                if (out_callback_) {
+                    out_callback_("Error, prompt speech token len %d < 75", true);
+                }
                 return -1;
             }
-            if (llm_ret == -1) {
-                return llm_ret;
-            }
+
             int prompt_token_align_len = 75;
             std::vector<float> prompt_speech_embeds_flow1;
             prompt_speech_embeds_flow1.insert(prompt_speech_embeds_flow1.begin(), prompt_speech_embeds_flow.begin(),
@@ -590,12 +606,7 @@ public:
     void inference(const std::string &msg)
     {
         try {
-            // std::string out = lLaMa_->Run(prompt_complete(msg));
-            // if (out_callback_) out_callback_(out, true);
             tts(msg, prompt_text_embeds, prompt_speech_embeds, prompt_feat, prompt_speech_embeds_flow, spk_embeds);
-            std::string out = "finish";
-            if (out_callback_) out_callback_(out, true);
-
         } catch (...) {
             SLOGW("lLaMa_->Run have error!");
         }

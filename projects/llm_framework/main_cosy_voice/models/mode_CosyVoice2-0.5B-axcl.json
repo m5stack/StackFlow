@@ -54,7 +54,7 @@
         "n_timesteps": 10,
         "b_use_mmap_load_embed": true,
         "b_dynamic_load_axmodel_layer": false,
-        "precompute_len": 100,
+        "precompute_len": 200,
         "cmm_size": 1185772,
         "ext_scripts": [
             "tokenizer_CosyVoice2-0.5B-axcl.py",
