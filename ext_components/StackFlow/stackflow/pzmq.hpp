@@ -382,7 +382,7 @@ public:
                     std::unique_lock<std::mutex> lock(zmq_fun_mtx_);
                     retval = zmq_fun_.at(msg_ptr->string())(this, msg1_ptr);
                 } catch (...) {
-                    retval = "NotAction";
+                    retval = msg_ptr->string() + " NotAction";
                 }
                 zmq_send(zmq_socket_, retval.c_str(), retval.length(), 0);
                 msg1_ptr.reset();
