@@ -1,0 +1,58 @@
+import os
+
+Import('env')
+with open(env['PROJECT_TOOL_S']) as f:
+    exec(f.read())
+
+if "CONFIG_AX_650C_MSP_ENABLED" not in os.environ:
+    Return('env')
+
+SRCS = []
+INCLUDE = []
+PRIVATE_INCLUDE = []
+REQUIREMENTS = ['pthread', 'utilities', 'eventpp', 'StackFlow', 'modbus_component', 'fmt']
+STATIC_LIB = []
+DYNAMIC_LIB = []
+DEFINITIONS = []
+DEFINITIONS_PRIVATE = []
+LDFLAGS = []
+LINK_SEARCH_PATH = []
+STATIC_FILES = []
+
+LINK_SEARCH_PATH += [ADir('../static_lib')]
+
+LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
+
+STATIC_FILES += []
+
+
+SRCS = [AFile('src/ec_proxy_main.cpp')]
+env['COMPONENTS'].append({'target':'ax650_ec_proxy-1.0',
+                          'SRCS':SRCS,
+                          'INCLUDE':INCLUDE,
+                          'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
+                          'REQUIREMENTS':REQUIREMENTS,
+                          'STATIC_LIB':STATIC_LIB,
+                          'DYNAMIC_LIB':DYNAMIC_LIB,
+                          'DEFINITIONS':DEFINITIONS,
+                          'DEFINITIONS_PRIVATE':DEFINITIONS_PRIVATE,
+                          'LDFLAGS':LDFLAGS,
+                          'LINK_SEARCH_PATH':LINK_SEARCH_PATH,
+                          'STATIC_FILES':STATIC_FILES,
+                          'REGISTER':'project'
+                          })
+SRCS = [AFile('src/ec_cli_main.cpp')]
+env['COMPONENTS'].append({'target':'ax650_ec_cli-1.0',
+                          'SRCS':SRCS,
+                          'INCLUDE':INCLUDE,
+                          'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
+                          'REQUIREMENTS':REQUIREMENTS,
+                          'STATIC_LIB':STATIC_LIB,
+                          'DYNAMIC_LIB':DYNAMIC_LIB,
+                          'DEFINITIONS':DEFINITIONS,
+                          'DEFINITIONS_PRIVATE':DEFINITIONS_PRIVATE,
+                          'LDFLAGS':LDFLAGS,
+                          'LINK_SEARCH_PATH':LINK_SEARCH_PATH,
+                          'STATIC_FILES':STATIC_FILES,
+                          'REGISTER':'project'
+                          })
