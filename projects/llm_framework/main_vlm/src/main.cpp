@@ -42,16 +42,26 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
     else if (obj.contains(#key))              \
         mode_config_.key = obj[#key];
 
+#define QWEN_CONFIG_AUTO_SET(obj, key)             \
+    if (config_body.contains(#key))                \
+        qwen_mode_config_.key = config_body[#key]; \
+    else if (obj.contains(#key))                   \
+        qwen_mode_config_.key = obj[#key];
+
 class llm_task {
 private:
     static std::atomic<unsigned int> next_port_;
     std::atomic_bool tokenizer_server_flage_;
     unsigned int port_;
     pid_t tokenizer_pid_ = -1;
+    enum class ModelType { Unknown = 0, Qwen, InternVL };
+    ModelType model_type_ = ModelType::Unknown;
 
 public:
     LLMAttrType mode_config_;
+    Config qwen_mode_config_;
     std::unique_ptr<LLM> lLaMa_;
+    std::unique_ptr<LLM_Qwen> qwen_;
     std::string model_;
     std::string response_format_;
     std::vector<std::string> inputs_;
@@ -60,6 +70,9 @@ public:
     std::vector<std::vector<unsigned char>> images_data;
     std::vector<cv::Mat> mats;
     std::vector<unsigned short> img_embed;
+    std::vector<std::vector<float>> deepstack_features;
+    std::vector<int> visual_pos_mask;
+    std::vector<std::vector<int>> position_ids;
     std::string prompt_;
     std::string last_reply;
     std::vector<int> tokens_ids, tokens_diff;
@@ -178,7 +191,19 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], vpm_width);
             CONFIG_AUTO_SET(file_body["mode_param"], vpm_height);
             CONFIG_AUTO_SET(file_body["mode_param"], precompute_len);
+            CONFIG_AUTO_SET(file_body["mode_param"], b_video);
 
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], vision_config.temporal_patch_size);
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], vision_config.tokens_per_second);
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], vision_config.spatial_merge_size);
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], vision_config.patch_size);
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], vision_config.width);
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], vision_config.height);
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], vision_config.fps);
+
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], image_token_id);
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], video_token_id);
+            QWEN_CONFIG_AUTO_SET(file_body["mode_param"], vision_start_token_id);
             {
                 auto has_http = [](const std::string &s) { return s.find("http") != std::string::npos; };
 
@@ -245,6 +270,18 @@ public:
                     SLOGI("filename_tokenizer_model: %s", mode_config_.filename_tokenizer_model.c_str());
                 }
             }
+
+            {
+                std::string encoder_name = mode_config_.filename_image_encoder_axmodel;
+                std::transform(encoder_name.begin(), encoder_name.end(), encoder_name.begin(), ::tolower);
+
+                if (encoder_name.find("qwen3") != std::string::npos)
+                    model_type_ = ModelType::Qwen;
+                else if (encoder_name.find("internvl3") != std::string::npos)
+                    model_type_ = ModelType::InternVL;
+                else
+                    model_type_ = ModelType::Unknown;
+            }
             mode_config_.filename_tokens_embed          = base_model + mode_config_.filename_tokens_embed;
             mode_config_.filename_post_axmodel          = base_model + mode_config_.filename_post_axmodel;
             mode_config_.filename_image_encoder_axmodel = base_model + mode_config_.filename_image_encoder_axmodel;
@@ -256,11 +293,31 @@ public:
                     this->out_callback_(std::string(p_str), false);
                 }
             };
-            lLaMa_ = std::make_unique<LLM>();
-            if (!lLaMa_->Init(mode_config_)) {
-                lLaMa_->Deinit();
-                lLaMa_.reset();
-                return -2;
+
+            switch (model_type_) {
+                case ModelType::InternVL: {
+                    lLaMa_ = std::make_unique<LLM>();
+                    if (!lLaMa_->Init(mode_config_)) {
+                        lLaMa_->Deinit();
+                        lLaMa_.reset();
+                        return -2;
+                    }
+                    break;
+                }
+
+                case ModelType::Qwen: {
+                    qwen_ = std::make_unique<LLM_Qwen>();
+                    if (!qwen_->Init(mode_config_)) {
+                        qwen_->Deinit();
+                        qwen_.reset();
+                        return -2;
+                    }
+                    break;
+                }
+                default:
+                    ALOGE("Unknown model type in filename_image_encoder_axmodel: %s",
+                          mode_config_.filename_image_encoder_axmodel.c_str());
+                    return -3;
             }
 
             if (lLaMa_) {
@@ -393,6 +450,30 @@ public:
                     lLaMa_->GetKVCache(k_caches, v_caches, precompute_len);
                     if (out_callback_) out_callback_(last_reply, true);
                 }
+            } else if (qwen_) {
+                if (images_data.empty()) {
+                    qwen_->Encode(prompt_data_, position_ids, qwen_mode_config_, prompt_complete(msg));
+                    last_reply = qwen_->Run(prompt_data_, position_ids, deepstack_features, visual_pos_mask);
+                    if (out_callback_) out_callback_(last_reply, true);
+                } else {
+                    for (const auto &img_buf : images_data) {
+                        cv::Mat src = cv::imdecode(img_buf, cv::IMREAD_COLOR);
+                        if (src.empty()) {
+                            std::cerr << "Decode failed!" << std::endl;
+                            continue;
+                        }
+                        mats.push_back(src);
+                    }
+                    images_data.clear();
+                    if (mats.empty()) return;
+                    std::vector<std::vector<unsigned short>> all_embeds;
+                    qwen_->EncodeImage(mats, mode_config_.b_video, qwen_mode_config_, all_embeds, deepstack_features);
+                    mats.clear();
+                    qwen_->Encode(all_embeds, prompt_data_, position_ids, visual_pos_mask, qwen_mode_config_,
+                                  prompt_complete(msg));
+                    last_reply = qwen_->Run(prompt_data_, position_ids, deepstack_features, visual_pos_mask);
+                    if (out_callback_) out_callback_(last_reply, true);
+                }
             }
         } catch (...) {
             SLOGW("lLaMa_->Run have error!");
@@ -422,7 +503,8 @@ public:
 
     bool pause()
     {
-        lLaMa_->Stop();
+        if (lLaMa_) lLaMa_->Stop();
+        if (qwen_) qwen_->Stop();
         return true;
     }
 
@@ -433,8 +515,10 @@ public:
             waitpid(tokenizer_pid_, nullptr, 0);
             tokenizer_pid_ = -1;
         }
-        lLaMa_->Deinit();
-        lLaMa_.reset();
+        if (lLaMa_) lLaMa_->Deinit();
+        if (lLaMa_) lLaMa_.reset();
+        if (qwen_) qwen_->Deinit();
+        if (qwen_) qwen_.reset();
         return true;
     }
 
@@ -470,6 +554,9 @@ public:
         }
         if (lLaMa_) {
             lLaMa_->Deinit();
+        }
+        if (qwen_) {
+            qwen_->Deinit();
         }
         _ax_deinit();
     }
@@ -527,7 +614,8 @@ public:
         if (!(llm_task_obj && llm_channel)) {
             return;
         }
-        llm_task_obj->lLaMa_->Stop();
+        if (llm_task_obj->lLaMa_) llm_task_obj->lLaMa_->Stop();
+        if (llm_task_obj->qwen_) llm_task_obj->qwen_->Stop();
     }
 
     void pause(const std::string &work_id, const std::string &object, const std::string &data) override
@@ -623,7 +711,8 @@ public:
         if (!(llm_task_obj && llm_channel)) {
             return;
         }
-        llm_task_obj->lLaMa_->Stop();
+        if (llm_task_obj->lLaMa_) llm_task_obj->lLaMa_->Stop();
+        if (llm_task_obj->qwen_) llm_task_obj->qwen_->Stop();
     }
 
     void task_camera_data(const std::weak_ptr<llm_task> llm_task_obj_weak,
