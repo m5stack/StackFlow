@@ -1,7 +1,7 @@
 {
-    "mode": "qwen3-vl-2B-axcl",
+    "mode": "qwen3-vl-4B-Int4-axcl",
     "type": "vlm",
-    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3-VL-2B-Instruct",
+    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3-VL-4B-Instruct-GPTQ-Int4",
     "capabilities": [
         "text_generation",
         "chat"
@@ -20,7 +20,7 @@
         "filename_tokens_embed": "model.embed_tokens.weight.bfloat16.bin",
         "filename_post_axmodel": "qwen3_vl_text_post.axmodel",
         "template_filename_axmodel": "qwen3_vl_text_p128_l%d_together.axmodel",
-        "filename_image_encoder_axmodel": "Qwen3-VL-2B-Instruct_vision.axmodel",
+        "filename_image_encoder_axmodel": "Qwen3-VL-4B-Instruct_vision.axmodel",
         "enable_temperature": true,
         "temperature": 0.7,
         "enable_top_p_sampling": false,
@@ -30,9 +30,9 @@
         "enable_repetition_penalty": false,
         "repetition_penalty": 1.1,
         "penalty_window": 50,
-        "axmodel_num": 28,
+        "axmodel_num": 36,
         "tokens_embed_num": 151936,
-        "tokens_embed_size": 2048,
+        "tokens_embed_size": 2560,
         "b_use_mmap_load_embed": true,
         "b_video": false,
         "vision_config.temporal_patch_size": 2,
@@ -48,7 +48,7 @@
         "precompute_len": 0,
         "cmm_size": 1919044,
         "ext_scripts": [
-            "tokenizer_qwen3-vl-2B-axcl.py"
+            "tokenizer_qwen3-vl-4B-Int4-axcl.py"
         ]
     }
 }

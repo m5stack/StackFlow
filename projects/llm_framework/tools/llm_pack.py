@@ -494,6 +494,8 @@ if __name__ == "__main__":
         ## AXCL
         'llm-model-qwen2.5-HA-0.5B-ctx-axcl':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-axcl', '0.5', src_folder, revision],
         'llm-model-qwen3-1.7B-Int8-ctx-axcl':[create_data_deb,'llm-model-qwen3-1.7B-Int8-ctx-axcl', '0.5', src_folder, revision],
+        'llm-model-qwen3-vl-2B-axcl':[create_data_deb,'llm-model-qwen3-vl-2B-axcl', '0.5', src_folder, revision],
+        'llm-model-qwen3-vl-4B-Int4-axcl':[create_data_deb,'llm-model-qwen3-vl-4B-Int4-axcl', '0.5', src_folder, revision],
         # Llama model
         'llm-model-llama3.2-1B-prefill-ax630c':[create_data_deb,'llm-model-llama3.2-1B-prefill-ax630c', data_version, src_folder, revision],
         'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],
