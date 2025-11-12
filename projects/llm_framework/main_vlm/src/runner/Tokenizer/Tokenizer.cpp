@@ -332,8 +332,13 @@ public:
         j["imgsz"]         = img_info.imgsz;
         j["num_img"]       = img_info.num_img;
         j["img_token_num"] = img_info.img_token_num;
-        auto ret           = cli->Post("/encode", j.dump(), "application/json");
-        auto rep           = ret.value();
+        if (img_info.type == ImgType::Image)
+            j["img_type"] = "image";
+        else if (img_info.type == ImgType::Video)
+            j["img_type"] = "video";
+
+        auto ret = cli->Post("/encode", j.dump(), "application/json");
+        auto rep = ret.value();
         if (rep.status != 200) {
             ALOGE("encode failed, status: %d", rep.status);
             return false;

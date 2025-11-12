@@ -69,7 +69,7 @@ public:
     // std::vector<unsigned char> image_data_;
     std::vector<std::vector<unsigned char>> images_data;
     std::vector<cv::Mat> mats;
-    std::vector<unsigned short> img_embed;
+    std::vector<std::vector<unsigned short>> img_embed;
     std::vector<std::vector<float>> deepstack_features;
     std::vector<int> visual_pos_mask;
     std::vector<std::vector<int>> position_ids;
@@ -132,6 +132,28 @@ public:
         } catch (const std::exception &e) {
             ALOGI("prepare_kvcache_folder: skip clear/create due to error: %s", e.what());
         }
+    }
+
+    void vlm_reset()
+    {
+        std::vector<unsigned short>().swap(prompt_data_);
+
+        for (auto &inner_vec : img_embed) {
+            std::vector<unsigned short>().swap(inner_vec);
+        }
+        std::vector<std::vector<unsigned short>>().swap(img_embed);
+
+        for (auto &inner_vec : deepstack_features) {
+            std::vector<float>().swap(inner_vec);
+        }
+        std::vector<std::vector<float>>().swap(deepstack_features);
+
+        std::vector<int>().swap(visual_pos_mask);
+
+        for (auto &inner_vec : position_ids) {
+            std::vector<int>().swap(inner_vec);
+        }
+        std::vector<std::vector<int>>().swap(position_ids);
     }
 
     int load_model(const nlohmann::json &config_body)
@@ -232,7 +254,7 @@ public:
                             pclose(fp);
                         }
 
-                        std::string python_path = "/opt/m5stack/lib/llm/python" + std::to_string(major) + "." +
+                        std::string python_path = "/opt/m5stack/lib/vlm/python" + std::to_string(major) + "." +
                                                   std::to_string(minor) + "/site-packages";
 
                         setenv("PYTHONPATH", python_path.c_str(), 1);
@@ -469,10 +491,11 @@ public:
                     std::vector<std::vector<unsigned short>> all_embeds;
                     qwen_->EncodeImage(mats, mode_config_.b_video, qwen_mode_config_, all_embeds, deepstack_features);
                     mats.clear();
-                    qwen_->Encode(all_embeds, prompt_data_, position_ids, visual_pos_mask, qwen_mode_config_,
-                                  prompt_complete(msg));
+                    qwen_->Encode(all_embeds, mode_config_.b_video, prompt_data_, position_ids, visual_pos_mask,
+                                  qwen_mode_config_, prompt_complete(msg));
                     last_reply = qwen_->Run(prompt_data_, position_ids, deepstack_features, visual_pos_mask);
                     if (out_callback_) out_callback_(last_reply, true);
+                    vlm_reset();
                 }
             }
         } catch (...) {

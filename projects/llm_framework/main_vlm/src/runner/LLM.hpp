@@ -1767,12 +1767,13 @@ public:
         return 0;
     }
 
-    int Encode(std::vector<std::vector<unsigned short>> &img_embed, std::vector<unsigned short> &out_embed,
-               std::vector<std::vector<int>> &position_ids, std::vector<int> &visual_pos_mask, Config &cfg,
-               std::string prompt = "What is in the image?")
+    int Encode(std::vector<std::vector<unsigned short>> &img_embed, bool b_video,
+               std::vector<unsigned short> &out_embed, std::vector<std::vector<int>> &position_ids,
+               std::vector<int> &visual_pos_mask, Config &cfg, std::string prompt = "What is in the image?")
     {
         ImageInfo img_info;
         img_info.img_prompt        = true;
+        img_info.type              = b_video ? ImgType::Video : ImgType::Image;
         img_info.img_token_num     = img_embed[0].size() / _attr.tokens_embed_size;
         img_info.num_img           = img_embed.size();
         std::vector<int> input_ids = tokenizer->Encode(prompt, img_info);
@@ -1901,10 +1902,10 @@ public:
             }
 
             int start_deepstack_feat = 0, offset_deepstack_feat = 0;
-            for (int j = 0; j < start; j++) {
-                start_deepstack_feat += visual_pos_mask[j];
-            }
             if (!visual_pos_mask.empty()) {
+                for (int j = 0; j < start; j++) {
+                    start_deepstack_feat += visual_pos_mask[j];
+                }
                 for (int j = start; j < start + offset; j++) {
                     offset_deepstack_feat += visual_pos_mask[j];
                 }
@@ -1984,10 +1985,9 @@ public:
                 axcl_Memcpy(embed_tmp.data(), (void *)output.phyAddr, embed_tmp.size() * sizeof(unsigned short),
                             AXCL_MEMCPY_DEVICE_TO_HOST, layer.layer.get_devid());
 
-                if (m < deepstack_features_num) {
+                if (!visual_pos_mask.empty() && m < deepstack_features.size()) {
                     int k = 0;
                     for (int j = start, k = start_deepstack_feat; j < start + offset; j++) {
-                        if (visual_pos_mask.empty() || deepstack_features.empty()) continue;
                         if (visual_pos_mask[j] == 0) {
                             continue;
                         }

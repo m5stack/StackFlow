@@ -24,14 +24,13 @@ class Tokenizer_Http:
         input_ids = self.tokenizer(text)
         return input_ids["input_ids"][0]
 
-    def encode_vpm(self, content="Describe this image.", num_img=1, img_token_num=256):
+    def encode_vpm_image(self, content="Describe this image.", num_img=1, img_token_num=256):
         imgs_token = (
-            '<|vision_start|>' +
-            '<|image_pad|>' * img_token_num +
-            '<|vision_end|>'
+            '<|vision_start|>'
+            + '<|image_pad|>' * img_token_num
+            + '<|vision_end|>'
         )
         imgs_token *= num_img
-
         text = (
             f'<|im_start|>system\n{self.system_content}<|im_end|>\n'
             f'<|im_start|>user\n{imgs_token}{content}<|im_end|>\n'
@@ -43,12 +42,37 @@ class Tokenizer_Http:
             'images_kwargs': {'return_tensors': 'pt'},
             'audio_kwargs': {'padding': True, 'return_tensors': 'pt'},
             'videos_kwargs': {'fps': 2.0, 'return_tensors': 'pt'},
-            'common_kwargs': {'return_tensors': 'pt'}
+            'common_kwargs': {'return_tensors': 'pt'},
         }
 
         text_inputs = self.tokenizer(text, **output_kwargs["text_kwargs"])
         return text_inputs["input_ids"].tolist()[0]
 
+
+    def encode_vpm_video(self, content="Describe this image.", num_img=1, img_token_num=256):
+        imgs_token = (
+            '<|vision_start|>'
+            + '<|video_pad|>' * img_token_num * num_img
+            + '<|vision_end|>'
+        )
+
+        text = (
+            f'<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n'
+            f'<|im_start|>user\n{imgs_token}{content}<|im_end|>\n'
+            f'<|im_start|>assistant\n'
+        )
+
+        output_kwargs = {
+            'text_kwargs': {'padding': True, 'return_tensors': 'pt'},
+            'images_kwargs': {'return_tensors': 'pt'},
+            'audio_kwargs': {'padding': True, 'return_tensors': 'pt'},
+            'videos_kwargs': {'fps': 2.0, 'return_tensors': 'pt'},
+            'common_kwargs': {'return_tensors': 'pt'},
+        }
+
+        text_inputs = self.tokenizer(text, **output_kwargs["text_kwargs"])
+        return text_inputs["input_ids"].tolist()[0]
+    
     def decode(self, token_ids):
         self.token_ids_cache += token_ids
         text = self.tokenizer.decode(self.token_ids_cache)
@@ -115,40 +139,44 @@ class Request(BaseHTTPRequestHandler):
 
     def do_POST(self):
         data = self.rfile.read(int(self.headers['content-length']))
-        data = data.decode()
-        self.send_response(200)
-        self.send_header("type", "post")
-        self.end_headers()
+        req = json.loads(data.decode())
 
-        if self.path == '/encode':
-            req = json.loads(data)
-            print(req)
+        if self.path == "/encode":
             prompt = req['text']
             b_img_prompt = req.get('img_prompt', False)
+            img_type = req.get('img_type', 'image')  # 默认 image
 
             if b_img_prompt:
-                token_ids = tokenizer.encode_vpm(
-                    prompt,
-                    req.get("num_img", 1),
-                    req.get("img_token_num", 256)
-                )
+                if img_type == 'image':
+                    token_ids = tokenizer.encode_vpm_image(
+                        prompt,
+                        req.get("num_img", 1),
+                        req.get("img_token_num", 256)
+                    )
+                elif img_type == 'video':
+                    token_ids = tokenizer.encode_vpm_video(
+                        prompt,
+                        req.get("num_img", 1),
+                        req.get("img_token_num", 256)
+                    )
+                else:
+                    token_ids = tokenizer.encode(prompt)  # fallback
             else:
                 token_ids = tokenizer.encode(prompt)
 
             msg = json.dumps({'token_ids': -1 if token_ids is None else token_ids})
 
-        elif self.path == '/decode':
-            req = json.loads(data)
+        elif self.path == "/decode":
+            req = json.loads(data.decode())
             token_ids = req['token_ids']
             text = tokenizer.decode(token_ids)
             msg = json.dumps({'text': "" if text is None else text})
-
         else:
             msg = 'error'
 
-        print(msg)
-        msg = str(msg).encode()
-        self.wfile.write(msg)
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(str(msg).encode())
 
 
 if __name__ == "__main__":
