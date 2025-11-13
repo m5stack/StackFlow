@@ -21,7 +21,17 @@ STATIC_FILES = []
 ModuleLLMOpenAIPluginPath = wget_github_commit('https://github.com/m5stack/ModuleLLM-OpenAI-Plugin.git', '1e7998d12f48d22f3eae7fb1790b35b57e0914c9', True)
 
 if "CONFIG_AXCL_ENABLED" in os.environ:
-    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-openai-api-python-axcl-rsp-venv_v1.8.tar.gz", 'm5stack_llm-openai-api-python-axcl-rsp-venv_v1.8.tar.gz')
+    if "CONFIG_RASPBERRYPI_ENV" in os.environ:
+        if "CONFIG_RPI_ENV_BOOKWORM" in os.environ:
+            python_venv = check_wget_down(
+                "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-openai-api-python-axcl-rsp-bookworm-venv_v1.9.tar.gz",
+                "m5stack_llm-openai-api-python-axcl-rsp-bookworm-venv_v1.9.tar.gz",
+            )
+        elif "CONFIG_RPI_ENV_TRIXIE" in os.environ:
+            python_venv = check_wget_down(
+                "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-openai-api-python-axcl-rsp-trixie-venv_v1.9.tar.gz",
+                "m5stack_llm-openai-api-python-axcl-rsp-trixie-venv_v1.9.tar.gz",
+            )
 else:
     python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-openai-api-python-venv_v1.6.tar.gz", 'm5stack_llm-openai-api-python-venv_v1.6.tar.gz')
 

@@ -1,10 +1,29 @@
-
 menuconfig STACKFLOW_ENABLED
     bool "Enable stackflow"
     default n
+    help
+        Enable Axera stackflow support
 
+menuconfig RASPBERRYPI_ENV
+    bool "Enable Raspberry Pi environment"
+    default n
+    help
+        Choose which Raspberry Pi OS environment to use.
 
+if RASPBERRYPI_ENV
 
+choice
+    prompt "Raspberry Pi environment version"
+    default RPI_ENV_BOOKWORM
+    help
+        Select the Raspberry Pi OS environment version.
 
+config RPI_ENV_BOOKWORM
+    bool "Bookworm"
 
+config RPI_ENV_TRIXIE
+    bool "Trixie"
 
+endchoice
+
+endif

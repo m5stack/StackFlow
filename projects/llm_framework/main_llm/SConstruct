@@ -18,7 +18,17 @@ LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
 if "CONFIG_AXCL_ENABLED" in os.environ:
-    python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-llm-python-axcl-rsp-venv_v1.9.tar.gz", 'm5stack_llm-llm-python-axcl-rsp-venv_v1.9.tar.gz')
+    if "CONFIG_RASPBERRYPI_ENV" in os.environ:
+        if "CONFIG_RPI_ENV_BOOKWORM" in os.environ:
+            python_venv = check_wget_down(
+                "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-llm-python-axcl-rsp-bookworm-venv_v1.10.tar.gz",
+                "m5stack_llm-llm-python-axcl-rsp-bookworm-venv_v1.10.tar.gz",
+            )
+        elif "CONFIG_RPI_ENV_TRIXIE" in os.environ:
+            python_venv = check_wget_down(
+                "https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-llm-python-axcl-rsp-trixie-venv_v1.10.tar.gz",
+                "m5stack_llm-llm-python-axcl-rsp-trixie-venv_v1.10.tar.gz",
+            )
 else:
     python_venv = check_wget_down("https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/linux/llm/m5stack_llm-llm-python-venv_v1.7.tar.gz", 'm5stack_llm-llm-python-venv_v1.7.tar.gz')
 
