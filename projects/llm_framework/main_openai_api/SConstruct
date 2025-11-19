@@ -18,7 +18,7 @@ LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
 
-ModuleLLMOpenAIPluginPath = wget_github_commit('https://github.com/m5stack/ModuleLLM-OpenAI-Plugin.git', '1e7998d12f48d22f3eae7fb1790b35b57e0914c9', True)
+ModuleLLMOpenAIPluginPath = wget_github_commit('https://github.com/m5stack/ModuleLLM-OpenAI-Plugin.git', '67a2c5bbb7cc545e5c73c25bc105a2d91ff0b10c', True)
 
 if "CONFIG_AXCL_ENABLED" in os.environ:
     if "CONFIG_RASPBERRYPI_ENV" in os.environ:
@@ -66,7 +66,7 @@ ignore['ignore'] = list(set(ignore['ignore']))
 with open('../dist/fileignore', 'w') as f:
     json.dump(ignore, f, indent=4)
 
-env['COMPONENTS'].append({'target':'llm_openai_api-1.9',
+env['COMPONENTS'].append({'target':'llm_openai_api-1.10',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
