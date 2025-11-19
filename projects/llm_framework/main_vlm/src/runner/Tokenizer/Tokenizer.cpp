@@ -25,7 +25,7 @@ public:
     bool Init(std::string model_path) override
     {
         base_url = model_path;
-        if (!test_connect_http(base_url, 20)) {
+        if (!test_connect_http(base_url, 30)) {
             ALOGE("connect %s failed", base_url.c_str());
             return false;
         } else {
@@ -153,7 +153,7 @@ public:
     bool Init(std::string model_path = "http://localhost:8080", bool b_bos = true, bool b_eos = false) override
     {
         base_url = model_path;
-        if (!test_connect_http(base_url, 10)) {
+        if (!test_connect_http(base_url, 30)) {
             ALOGE("connect %s failed", base_url.c_str());
             return false;
         } else {
@@ -200,7 +200,7 @@ public:
     bool Init_new(std::string model_path, bool b_bos, bool b_eos) override
     {
         base_url = model_path;
-        if (!test_connect_http(base_url, 10)) {
+        if (!test_connect_http(base_url, 30)) {
             ALOGE("connect %s failed", base_url.c_str());
             return false;
         } else {

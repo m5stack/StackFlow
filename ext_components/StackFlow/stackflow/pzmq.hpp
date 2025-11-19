@@ -394,6 +394,8 @@ public:
     }
     void close_zmq()
     {
+        int linger = 1000;
+        zmq_setsockopt(zmq_socket_, ZMQ_LINGER, &linger, sizeof(linger));
         zmq_close(zmq_socket_);
         zmq_ctx_destroy(zmq_ctx_);
         if ((mode_ == ZMQ_PUB) || (mode_ == ZMQ_PULL) || (mode_ == ZMQ_RPC_FUN)) {
