@@ -369,7 +369,6 @@ public:
         }
         else
         {
-            Stop();
             ALOGE("AXCLWorker initialization timeout");
             return false;
         }

@@ -18,7 +18,7 @@ LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
 
-ModuleLLMOpenAIPluginPath = wget_github_commit('https://github.com/m5stack/ModuleLLM-OpenAI-Plugin.git', '67a2c5bbb7cc545e5c73c25bc105a2d91ff0b10c', True)
+ModuleLLMOpenAIPluginPath = wget_github_commit('https://github.com/m5stack/ModuleLLM-OpenAI-Plugin.git', '6af969897e742b2cb589cc6a341948ed4427be05', True)
 
 if "CONFIG_AXCL_ENABLED" in os.environ:
     if "CONFIG_RASPBERRYPI_ENV" in os.environ:

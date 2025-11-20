@@ -195,12 +195,12 @@ public:
             update_cqdm(&cqdm, process_idx++, "count", axmodel_path);
         }
 
-        // for (int i = 0; i < attr.axmodel_num; i++) {
-        //     if (rets[i] != 0) {
-        //         ALOGE("init axmodel(%s) failed", llama_layers[i].filename.c_str());
-        //         return false;
-        //     }
-        // }
+        for (int i = 0; i < attr.axmodel_num; i++) {
+            if (rets[i] != 0) {
+                ALOGE("init axmodel(%s) failed", llama_layers[i].filename.c_str());
+                return false;
+            }
+        }
 
         int ret = llama_post.init(attr.filename_post_axmodel.c_str(),
                                   llama_layers[llama_layers.size() - 1].layer.get_devid());

@@ -1,15 +1,11 @@
 #pragma once
 #include <sys/mman.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <stdio.h>
-#include <string>
-#include <sys/stat.h>
-#include <errno.h>
-#include <mntent.h>
+#include <fstream>
 #include <vector>
-#include <cstring>
-#include "sample_log.h"
+#include <unistd.h>
+#include <string.h>
 
 bool file_exist(const std::string &path);
 

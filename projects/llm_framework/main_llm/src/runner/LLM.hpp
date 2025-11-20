@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <atomic>
+
 #include "bfloat16.hpp"
 #include "Tokenizer/Tokenizer.hpp"
 #include "LLMEmbedSelector.hpp"
@@ -12,7 +14,7 @@
 #include "timer.hpp"
 #include "LLMPostprocess.hpp"
 
-#include "utils/axcl_manager.h"
+#include "axcl_manager.h"
 
 #define ALIGN_DOWN(x, a) ((x) & ~((a) - 1))
 
@@ -179,6 +181,13 @@ public:
             sprintf(axmodel_path, "init %d axmodel ok,devid(%d) remain_cmm(%d MB)", i,
                     _attr.dev_ids[dev_assignments[i]], remain_cmm);
             update_cqdm(&cqdm, process_idx++, "count", axmodel_path);
+        }
+
+        for (int i = 0; i < attr.axmodel_num; i++) {
+            if (rets[i] != 0) {
+                ALOGE("init axmodel(%s) failed", llama_layers[i].filename.c_str());
+                return false;
+            }
         }
 
         int ret = llama_post.init(attr.filename_post_axmodel.c_str(),

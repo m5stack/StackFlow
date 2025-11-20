@@ -7,7 +7,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 
 SRCS = append_srcs_dir(ADir('src'))
 INCLUDE = [ADir('include'), ADir('.')]
-PRIVATE_INCLUDE = [ADir('../include')]
+PRIVATE_INCLUDE = []
 REQUIREMENTS = ['pthread','atomic','rt', 'dl', 'm', 'ax_msp', 'axcl', 'utilities', 'eventpp', 'StackFlow']
 STATIC_LIB = []
 DYNAMIC_LIB = []
@@ -40,9 +40,7 @@ LINK_SEARCH_PATH += [ADir('../static_lib')]
 
 
 INCLUDE += [ADir('src/runner'), ADir('src/runner/utils'), ADir('src/runner/ax_model_runner')]
-INCLUDE += [ADir('../static_lib/include/sentencepiece'),
-            ADir('../static_lib/include/protobuf-lite'),
-            ADir('../static_lib/include/abseil-cpp'),
+INCLUDE += [ADir('../static_lib/include/abseil-cpp'),
             ADir('../static_lib/include/re2')]
 
 static_file = Glob('../static_lib/module-llm/libabsl_*')
