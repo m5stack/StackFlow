@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <atomic>
+
 #include "bfloat16.hpp"
 #include "image_processor.hpp"
 #include "mrope.hpp"
@@ -49,7 +51,7 @@ struct LLMAttrType {
     TokenizerType tokenizer_type         = TKT_LLaMa;
     std::string filename_tokenizer_model = "tokenizer.model";
     std::string url_tokenizer_model;
-    bool b_bos                        = true;
+    bool b_bos                        = false;
     bool b_eos                        = false;
     std::string filename_tokens_embed = "tinyllama.model.embed_tokens.weight.bfloat16.bin";
     int tokens_embed_num              = 32000;

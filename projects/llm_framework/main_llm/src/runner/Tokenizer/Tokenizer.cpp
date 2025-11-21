@@ -349,11 +349,17 @@ public:
     bool Init(std::string model_path = "http://localhost:8080", bool b_bos = true, bool b_eos = false) override
     {
         base_url = model_path;
+        if (!test_connect_http(base_url, 20)) {
+            ALOGE("connect %s failed", base_url.c_str());
+            return false;
+        } else {
+            ALOGI("connect %s ok", base_url.c_str());
+        }
         try {
             cli = std::make_shared<httplib::Client>(base_url);
-            cli->set_connection_timeout(1);
-            cli->set_read_timeout(1);
-            cli->set_write_timeout(1);
+            cli->set_connection_timeout(10);
+            cli->set_read_timeout(10);
+            cli->set_write_timeout(10);
             {
                 auto ret = cli->Get("/bos_id");
                 auto rep = ret.value();
@@ -389,7 +395,7 @@ public:
     bool Init(std::string model_path = "http://localhost:8080") override
     {
         base_url = model_path;
-        if (!test_connect_http(base_url, 10)) {
+        if (!test_connect_http(base_url, 20)) {
             ALOGE("connect %s failed", base_url.c_str());
             return false;
         } else {

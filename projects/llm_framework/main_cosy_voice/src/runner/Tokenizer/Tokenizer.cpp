@@ -389,7 +389,7 @@ public:
     bool Init(std::string model_path = "http://localhost:8080") override
     {
         base_url = model_path;
-        if (!test_connect_http(base_url, 10)) {
+        if (!test_connect_http(base_url, 20)) {
             ALOGE("connect %s failed", base_url.c_str());
             return false;
         } else {

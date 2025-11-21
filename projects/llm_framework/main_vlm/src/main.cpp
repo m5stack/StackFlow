@@ -480,6 +480,7 @@ public:
                     std::vector<std::vector<unsigned short>> all_embeds;
                     if (auto ret = lLaMa_ctx_->Encode(mats, all_embeds); ret != 0) {
                         ALOGE("lLaMaCtx.Encode failed");
+                        if (out_callback_) out_callback_("Encode failed", true);
                         return;
                     }
                     mats.clear();
@@ -487,6 +488,7 @@ public:
                             lLaMa_ctx_->Encode(all_embeds, prompt_data_, prompt_complete(msg), tokens_ids, tokens_diff);
                         ret != 0) {
                         ALOGE("lLaMaCtx.Encode failed");
+                        if (out_callback_) out_callback_("Encode failed", true);
                         return;
                     }
                     if (auto ret = lLaMa_ctx_->SetKVCache(k_caches, v_caches, precompute_len, tokens_diff.size());

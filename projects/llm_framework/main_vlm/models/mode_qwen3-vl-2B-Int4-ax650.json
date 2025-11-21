@@ -46,7 +46,7 @@
         "video_token_id": 151656,
         "vision_start_token_id": 151652,
         "precompute_len": 0,
-        "cmm_size": 1919044,
+        "cmm_size": 3582336,
         "ext_scripts": [
             "tokenizer_qwen3-vl-2B-Int4-ax650.py"
         ]
