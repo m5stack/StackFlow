@@ -464,7 +464,7 @@ public:
         // fade_in_mel_data is now modified in-place with the faded result.
     }
 
-    void reset()
+    void clear()
     {
         std::unordered_map<std::string, std::vector<float>>().swap(hift_cache_dict);
     }

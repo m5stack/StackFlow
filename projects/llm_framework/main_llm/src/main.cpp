@@ -404,6 +404,7 @@ public:
     bool pause()
     {
         if (lLaMa_) lLaMa_->Stop();
+        if (lLaMa_ctx_) lLaMa_ctx_->Stop();
         return true;
     }
 
@@ -414,8 +415,10 @@ public:
             waitpid(tokenizer_pid_, nullptr, 0);
             tokenizer_pid_ = -1;
         }
-        lLaMa_->Deinit();
-        lLaMa_.reset();
+        if (lLaMa_) lLaMa_->Deinit();
+        if (lLaMa_) lLaMa_.reset();
+        if (lLaMa_ctx_) lLaMa_ctx_->Deinit();
+        if (lLaMa_ctx_) lLaMa_ctx_.reset();
         return true;
     }
 
@@ -447,6 +450,7 @@ public:
             std::string par;
             async_list_.put(par);
             if (lLaMa_) lLaMa_->Stop();
+            if (lLaMa_ctx_) lLaMa_ctx_->Stop();
             inference_run_->join();
             inference_run_.reset();
         }
@@ -461,6 +465,9 @@ public:
         }
         if (lLaMa_) {
             lLaMa_->Deinit();
+        }
+        if (lLaMa_ctx_) {
+            lLaMa_ctx_->Deinit();
         }
     }
 };
@@ -514,7 +521,8 @@ public:
         if (!(llm_task_obj && llm_channel)) {
             return;
         }
-        llm_task_obj->lLaMa_->Stop();
+        if (llm_task_obj->lLaMa_) llm_task_obj->lLaMa_->Stop();
+        if (llm_task_obj->lLaMa_ctx_) llm_task_obj->lLaMa_ctx_->Stop();
     }
 
     void pause(const std::string &work_id, const std::string &object, const std::string &data) override
@@ -605,7 +613,8 @@ public:
         if (!(llm_task_obj && llm_channel)) {
             return;
         }
-        llm_task_obj->lLaMa_->Stop();
+        if (llm_task_obj->lLaMa_) llm_task_obj->lLaMa_->Stop();
+        if (llm_task_obj->lLaMa_ctx_) llm_task_obj->lLaMa_ctx_->Stop();
     }
 
     int setup(const std::string &work_id, const std::string &object, const std::string &data) override

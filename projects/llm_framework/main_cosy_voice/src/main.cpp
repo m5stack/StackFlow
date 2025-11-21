@@ -65,7 +65,6 @@ private:
     std::atomic<bool> g_llm_finished{false};
     std::atomic<bool> g_stop{false};
     TokenBuffer g_token_buffer;
-    Token2Wav lToken2Wav;
 
     std::vector<int> prompt_text_token;
     std::vector<unsigned short> prompt_text_embeds;
@@ -81,6 +80,7 @@ public:
     LLMAttrType mode_config_;
     Token2WavAttr infer_mode_config_;
     std::unique_ptr<LLM> lLaMa_;
+    std::unique_ptr<Token2Wav> lToken2Wav_;
     std::string model_;
     std::string response_format_;
     std::vector<std::string> inputs_;
@@ -312,14 +312,15 @@ public:
                 lLaMa_.reset();
                 return -2;
             }
-            if (!lToken2Wav.Init(infer_mode_config_)) {
+            lToken2Wav_ = std::make_unique<Token2Wav>();
+            if (!lToken2Wav_->Init(infer_mode_config_)) {
                 lLaMa_->Deinit();
                 lLaMa_.reset();
                 return -1;
             }
             lLaMa_->TextToken2Embeds(prompt_text_token, prompt_text_embeds);
             lLaMa_->SpeechToken2Embeds(prompt_speech_token, prompt_speech_embeds);
-            lToken2Wav.SpeechToken2Embeds(prompt_speech_token, prompt_speech_embeds_flow);
+            lToken2Wav_->SpeechToken2Embeds(prompt_speech_token, prompt_speech_embeds_flow);
 
         } catch (...) {
             SLOGE("config false");
@@ -358,7 +359,7 @@ public:
     {
         g_llm_finished = false;
         g_token_buffer.erase(g_token_buffer.begin(), g_token_buffer.end());
-        lToken2Wav.reset();
+        lToken2Wav_->clear();
     }
 
     void resample_audio(float *input_buffer, int input_length, float *output_buffer, int *output_length,
@@ -428,7 +429,7 @@ public:
                 }
             }
 
-            int prompt_token_len = prompt_speech_embeds_flow.size() / lToken2Wav._attr.flow_embed_size;
+            int prompt_token_len = prompt_speech_embeds_flow.size() / lToken2Wav_->_attr.flow_embed_size;
             if (prompt_token_len < 75) {
                 SLOGE("Error, prompt speech token len %d < 75", prompt_token_len);
                 if (llm_thread.joinable()) llm_thread.join();
@@ -450,28 +451,28 @@ public:
             int token_offset = 0;
             int i            = 0;
             while (true) {
-                this_token_hop_len = (token_offset == 0) ? lToken2Wav._attr.token_hop_len + promot_token_pad
-                                                         : lToken2Wav._attr.token_hop_len;
+                this_token_hop_len = (token_offset == 0) ? lToken2Wav_->_attr.token_hop_len + promot_token_pad
+                                                         : lToken2Wav_->_attr.token_hop_len;
                 std::unique_lock<std::mutex> lock(g_buffer_mutex);
                 g_buffer_cv.wait(lock, [&] {
                     return (g_token_buffer.size() - token_offset >=
-                            this_token_hop_len + lToken2Wav._attr.pre_lookahead_len) ||
+                            this_token_hop_len + lToken2Wav_->_attr.pre_lookahead_len) ||
                            g_llm_finished.load() || g_stop.load();
                 });
                 if (g_stop) {
                     lock.unlock();
                     break;
                 } else if (g_token_buffer.size() - token_offset >=
-                           this_token_hop_len + lToken2Wav._attr.pre_lookahead_len) {
+                           this_token_hop_len + lToken2Wav_->_attr.pre_lookahead_len) {
                     std::vector<SpeechToken> token;
-                    int start = token_offset - std::min(int(token_offset / lToken2Wav._attr.token_hop_len),
-                                                        lToken2Wav._attr.max_infer_chunk_num - 1) *
-                                                   lToken2Wav._attr.token_hop_len;
-                    int end = token_offset + this_token_hop_len + lToken2Wav._attr.pre_lookahead_len;
+                    int start = token_offset - std::min(int(token_offset / lToken2Wav_->_attr.token_hop_len),
+                                                        lToken2Wav_->_attr.max_infer_chunk_num - 1) *
+                                                   lToken2Wav_->_attr.token_hop_len;
+                    int end = token_offset + this_token_hop_len + lToken2Wav_->_attr.pre_lookahead_len;
                     token.insert(token.end(), g_token_buffer.begin() + start, g_token_buffer.begin() + end);
                     lock.unlock();
-                    auto speech = lToken2Wav.infer(token, prompt_speech_embeds_flow1, prompt_feat1, spk_embeds,
-                                                   token_offset, false);
+                    auto speech = lToken2Wav_->infer(token, prompt_speech_embeds_flow1, prompt_feat1, spk_embeds,
+                                                     token_offset, false);
                     token_offset += this_token_hop_len;
                     output.insert(output.end(), speech.begin(), speech.end());
                     double src_ratio =
@@ -507,12 +508,12 @@ public:
             }
 
             std::vector<SpeechToken> token;
-            int start = g_token_buffer.size() - std::min(int(g_token_buffer.size() / lToken2Wav._attr.token_hop_len),
-                                                         lToken2Wav._attr.max_infer_chunk_num - 1) *
-                                                    lToken2Wav._attr.token_hop_len;
+            int start = g_token_buffer.size() - std::min(int(g_token_buffer.size() / lToken2Wav_->_attr.token_hop_len),
+                                                         lToken2Wav_->_attr.max_infer_chunk_num - 1) *
+                                                    lToken2Wav_->_attr.token_hop_len;
             token.insert(token.end(), g_token_buffer.begin() + start, g_token_buffer.end());
-            auto speech = lToken2Wav.infer(token, prompt_speech_embeds_flow1, prompt_feat1, spk_embeds,
-                                           token_offset - start, true);
+            auto speech = lToken2Wav_->infer(token, prompt_speech_embeds_flow1, prompt_feat1, spk_embeds,
+                                             token_offset - start, true);
             output.insert(output.end(), speech.begin(), speech.end());
             double src_ratio =
                 static_cast<double>(mode_config_.audio_rate) / static_cast<double>(mode_config_.mode_rate);
@@ -661,6 +662,9 @@ public:
         }
         if (lLaMa_) {
             lLaMa_->Deinit();
+        }
+        if (lToken2Wav_) {
+            lToken2Wav_->Deinit();
         }
     }
 };
