@@ -162,9 +162,9 @@ public:
 
         try {
             cli = std::make_shared<httplib::Client>(base_url);
-            cli->set_connection_timeout(1);
-            cli->set_read_timeout(1);
-            cli->set_write_timeout(1);
+            cli->set_connection_timeout(10);
+            cli->set_read_timeout(10);
+            cli->set_write_timeout(10);
             {
                 auto ret = cli->Get("/bos_id");
                 auto rep = ret.value();
@@ -209,9 +209,9 @@ public:
 
         try {
             cli = std::make_shared<httplib::Client>(base_url);
-            cli->set_connection_timeout(1);
-            cli->set_read_timeout(1);
-            cli->set_write_timeout(1);
+            cli->set_connection_timeout(10);
+            cli->set_read_timeout(10);
+            cli->set_write_timeout(10);
             {
                 auto ret = cli->Get("/bos_id");
                 auto rep = ret.value();
