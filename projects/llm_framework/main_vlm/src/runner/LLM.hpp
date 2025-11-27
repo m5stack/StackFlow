@@ -859,6 +859,7 @@ public:
             llama_layers[i].layer.release();
         }
         llama_post.release();
+        image_encoder.release();
         embed_selector.Deinit();
     }
 

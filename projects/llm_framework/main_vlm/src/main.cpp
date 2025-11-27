@@ -553,6 +553,8 @@ public:
         }
         if (lLaMa_) lLaMa_->Deinit();
         if (lLaMa_) lLaMa_.reset();
+        if (lLaMa_ctx_) lLaMa_ctx_->Deinit();
+        if (lLaMa_ctx_) lLaMa_ctx_.reset();
         if (qwen_) qwen_->Deinit();
         if (qwen_) qwen_.reset();
         return true;
