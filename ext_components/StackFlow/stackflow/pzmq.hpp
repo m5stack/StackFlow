@@ -127,7 +127,7 @@ public:
         if ((url[0] != 'i') && (url[1] != 'p')) {
             rpc_url_head_.clear();
         }
-        if (mode_ != ZMQ_RPC_FUN) creat(url, raw_call);
+        creat(url, raw_call);
     }
     void set_timeout(int ms)
     {
@@ -179,8 +179,6 @@ public:
         if (zmq_fun_.empty()) {
             std::string url = rpc_url_head_ + rpc_server_;
             mode_           = ZMQ_RPC_FUN;
-            zmq_fun_["list_action"] =
-                std::bind(&pzmq::_rpc_list_action, this, std::placeholders::_1, std::placeholders::_2);
             ret = creat(url);
         }
         zmq_fun_[action] = raw_call;
@@ -330,6 +328,7 @@ public:
     inline int creat_rep(const std::string &url, const msg_callback_fun &raw_call)
     {
         int ret     = zmq_bind(zmq_socket_, url.c_str());
+        zmq_fun_["list_action"] = std::bind(&pzmq::_rpc_list_action, this, std::placeholders::_1, std::placeholders::_2);
         flage_      = false;
         zmq_thread_ = std::make_unique<std::thread>(std::bind(&pzmq::zmq_event_loop, this, raw_call));
         return ret;
