@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 #include "StackFlow.h"
-#include "sherpa-onnx/csrc/keyword-spotter.h"
-#include "sherpa-onnx/csrc/parse-options.h"
 
 #include <signal.h>
 #include <sys/stat.h>
@@ -16,7 +14,6 @@
 #include <stdexcept>
 #include <thread_safe_list.h>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
-
 #define BUFFER_IMPLEMENTATION
 #include <stdbool.h>
 #include <stdint.h>
@@ -36,34 +33,78 @@ static std::string base_model_config_path_;
 
 typedef std::function<void(const std::string &data, bool finish)> task_callback_t;
 
-#define CONFIG_AUTO_SET(obj, key)             \
-    if (config_body.contains(#key))           \
-        mode_config_.key = config_body[#key]; \
-    else if (obj.contains(#key))              \
-        mode_config_.key = obj[#key];
+#include "sherpa-onnx/csrc/keyword-spotter.h"
+#include "sherpa-onnx/csrc/parse-options.h"
+
+#include <onnxruntime_cxx_api.h>
+#include "kaldi-native-fbank/csrc/online-feature.h"
+
+typedef struct mode_config_onnx {
+    int chunk_size            = 32;
+    float threshold           = 0.9f;
+    int min_continuous_frames = 5;
+    int REFRACTORY_TIME_MS    = 2000;
+    int RESAMPLE_RATE         = 16000;
+    int FEAT_DIM              = 80;
+    int delay_audio_frame_    = 32;
+} kws_config_onnx;
 
 class llm_task {
 private:
-    sherpa_onnx::KeywordSpotterConfig mode_config_;
-    std::unique_ptr<sherpa_onnx::KeywordSpotter> spotter_;
-    std::unique_ptr<sherpa_onnx::OnlineStream> spotter_stream_;
-
-public:
+    std::string model_type_;
     std::string model_;
     std::string response_format_;
     std::vector<std::string> inputs_;
     std::vector<std::string> kws_;
-    bool enoutput_;
-    bool enoutput_json_;
-    bool enstream_;
-    bool enwake_audio_;
+    bool enoutput_      = true;
+    bool enoutput_json_ = false;
+    bool enstream_      = false;
+    bool enwake_audio_  = true;
     std::atomic_bool audio_flage_;
     task_callback_t out_callback_;
-    int delay_audio_frame_ = 10;
     buffer_t *pcmdata;
     std::string wake_wav_file_;
-
     std::function<void(const std::string &)> play_awake_wav;
+    int delay_audio_frame_ = 10;
+
+    sherpa_onnx::KeywordSpotterConfig sherpa_config_;
+    std::unique_ptr<sherpa_onnx::KeywordSpotter> sherpa_spotter_;
+    std::unique_ptr<sherpa_onnx::OnlineStream> sherpa_stream_;
+
+    kws_config_onnx onnx_config_;
+    std::vector<float> onnx_cache_;
+    std::unique_ptr<Ort::Session> onnx_session_;
+    knf::FbankOptions fbank_opts_;
+    std::unique_ptr<knf::OnlineFbank> fbank_;
+    Ort::Env onnx_env_{ORT_LOGGING_LEVEL_WARNING, "kws"};
+    Ort::SessionOptions session_options_;
+    int count_frames_               = 0;
+    long long last_trigger_time_ms_ = -1e9;
+    long long frame_index_global_   = 0;
+
+public:
+    inline const std::string &model() const
+    {
+        return model_;
+    }
+    inline const std::string &response_format() const
+    {
+        return response_format_;
+    }
+    inline const std::vector<std::string> &inputs() const
+    {
+        return inputs_;
+    }
+    inline bool enoutput() const
+    {
+        return enoutput_;
+    }
+    bool enstream_flag() const
+    {
+        return enstream_;
+    }
+
+    friend class llm_kws;
 
     bool parse_config(const nlohmann::json &config_body)
     {
@@ -71,6 +112,13 @@ public:
             model_           = config_body.at("model");
             response_format_ = config_body.at("response_format");
             enoutput_        = config_body.at("enoutput");
+
+            if (model_.rfind("sherpa-onnx", 0) == 0) {
+                model_type_ = "sherpa";
+            } else {
+                model_type_ = "onnx";
+            }
+
             if (config_body.contains("enwake_audio")) {
                 enwake_audio_ = config_body["enwake_audio"];
             } else {
@@ -94,21 +142,23 @@ public:
                     }
                 }
             }
-            enoutput_json_ = response_format_.find("json") == std::string::npos ? false : true;
+            enoutput_json_ = response_format_.find("json") != std::string::npos;
+            enstream_      = response_format_.find("stream") != std::string::npos;
         } catch (...) {
             SLOGE("setup config_body error");
             return true;
         }
-        enstream_ = response_format_.find("stream") == std::string::npos ? false : true;
         return false;
     }
 
-    int load_model(const nlohmann::json &config_body)
-    {
-        if (parse_config(config_body)) {
-            return -1;
-        }
+#define CONFIG_AUTO_SET_SHERPA(obj, key)        \
+    if (config_body.contains(#key))             \
+        sherpa_config_.key = config_body[#key]; \
+    else if (obj.contains(#key))                \
+        sherpa_config_.key = obj[#key];
 
+    int load_model_sherpa(const nlohmann::json &config_body)
+    {
         nlohmann::json file_body;
         std::list<std::string> config_file_paths =
             get_config_file_paths(base_model_path_, base_model_config_path_, model_);
@@ -131,58 +181,77 @@ public:
             std::string base_model = base_model_path_ + model_ + "/";
             SLOGI("base_model %s", base_model.c_str());
 
-            CONFIG_AUTO_SET(file_body["mode_param"], feat_config.sampling_rate);
-            CONFIG_AUTO_SET(file_body["mode_param"], feat_config.feature_dim);
-            CONFIG_AUTO_SET(file_body["mode_param"], feat_config.low_freq);
-            CONFIG_AUTO_SET(file_body["mode_param"], feat_config.high_freq);
-            CONFIG_AUTO_SET(file_body["mode_param"], feat_config.dither);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.transducer.encoder);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.transducer.decoder);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.transducer.joiner);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.paraformer.encoder);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.paraformer.decoder);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.wenet_ctc.model);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.wenet_ctc.chunk_size);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.wenet_ctc.num_left_chunks);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer2_ctc.model);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.nemo_ctc.model);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.device);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.provider);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.cuda_config.cudnn_conv_algo_search);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.trt_config.trt_max_workspace_size);
-            CONFIG_AUTO_SET(file_body["mode_param"],
-                            model_config.provider_config.trt_config.trt_max_partition_iterations);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.trt_config.trt_min_subgraph_size);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.trt_config.trt_fp16_enable);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.trt_config.trt_detailed_build_log);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.trt_config.trt_engine_cache_enable);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.trt_config.trt_engine_cache_path);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.trt_config.trt_timing_cache_enable);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.trt_config.trt_timing_cache_path);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.trt_config.trt_dump_subgraphs);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.tokens);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.num_threads);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.warm_up);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.debug);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.model_type);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.modeling_unit);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.bpe_vocab);
-            CONFIG_AUTO_SET(file_body["mode_param"], max_active_paths);
-            CONFIG_AUTO_SET(file_body["mode_param"], num_trailing_blanks);
-            CONFIG_AUTO_SET(file_body["mode_param"], keywords_score);
-            CONFIG_AUTO_SET(file_body["mode_param"], keywords_threshold);
-            CONFIG_AUTO_SET(file_body["mode_param"], keywords_file);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], feat_config.sampling_rate);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], feat_config.feature_dim);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], feat_config.low_freq);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], feat_config.high_freq);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], feat_config.dither);
+
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.transducer.encoder);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.transducer.decoder);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.transducer.joiner);
+
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.paraformer.encoder);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.paraformer.decoder);
+
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.wenet_ctc.model);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.wenet_ctc.chunk_size);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.wenet_ctc.num_left_chunks);
+
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.zipformer2_ctc.model);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.nemo_ctc.model);
+
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.provider_config.device);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.provider_config.provider);
+
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"],
+                                   model_config.provider_config.cuda_config.cudnn_conv_algo_search);
+
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"],
+                                   model_config.provider_config.trt_config.trt_max_workspace_size);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"],
+                                   model_config.provider_config.trt_config.trt_max_partition_iterations);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"],
+                                   model_config.provider_config.trt_config.trt_min_subgraph_size);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.provider_config.trt_config.trt_fp16_enable);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"],
+                                   model_config.provider_config.trt_config.trt_detailed_build_log);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"],
+                                   model_config.provider_config.trt_config.trt_engine_cache_enable);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"],
+                                   model_config.provider_config.trt_config.trt_engine_cache_path);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"],
+                                   model_config.provider_config.trt_config.trt_timing_cache_enable);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"],
+                                   model_config.provider_config.trt_config.trt_timing_cache_path);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.provider_config.trt_config.trt_dump_subgraphs);
+
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.tokens);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.num_threads);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.warm_up);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.debug);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.model_type);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.modeling_unit);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], model_config.bpe_vocab);
+
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], max_active_paths);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], num_trailing_blanks);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], keywords_score);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], keywords_threshold);
+            CONFIG_AUTO_SET_SHERPA(file_body["mode_param"], keywords_file);
 
             if (config_body.contains("wake_wav_file"))
                 wake_wav_file_ = config_body["wake_wav_file"];
             else if (file_body["mode_param"].contains("wake_wav_file"))
                 wake_wav_file_ = file_body["mode_param"]["wake_wav_file"];
 
-            mode_config_.model_config.transducer.encoder = base_model + mode_config_.model_config.transducer.encoder;
-            mode_config_.model_config.transducer.decoder = base_model + mode_config_.model_config.transducer.decoder;
-            mode_config_.model_config.transducer.joiner  = base_model + mode_config_.model_config.transducer.joiner;
-            mode_config_.model_config.tokens             = base_model + mode_config_.model_config.tokens;
-            mode_config_.keywords_file                   = base_model + mode_config_.keywords_file;
+            sherpa_config_.model_config.transducer.encoder =
+                base_model + sherpa_config_.model_config.transducer.encoder;
+            sherpa_config_.model_config.transducer.decoder =
+                base_model + sherpa_config_.model_config.transducer.decoder;
+            sherpa_config_.model_config.transducer.joiner = base_model + sherpa_config_.model_config.transducer.joiner;
+            sherpa_config_.model_config.tokens            = base_model + sherpa_config_.model_config.tokens;
+            sherpa_config_.keywords_file                  = base_model + sherpa_config_.keywords_file;
 
             std::ofstream temp_awake_key("/tmp/kws_awake.txt.tmp");
             for (const auto &keyword : kws_) {
@@ -200,7 +269,7 @@ public:
                 SLOGE("text2token.py or llm-kws_text2token.py not found!");
             }
             awake_key_compile_cmd << "--text /tmp/kws_awake.txt.tmp ";
-            awake_key_compile_cmd << "--tokens " << mode_config_.model_config.tokens << " ";
+            awake_key_compile_cmd << "--tokens " << sherpa_config_.model_config.tokens << " ";
             if (file_body["mode_param"].contains("text2token-tokens-type")) {
                 awake_key_compile_cmd << "--tokens-type "
                                       << file_body["mode_param"]["text2token-tokens-type"].get<std::string>() << " ";
@@ -209,15 +278,188 @@ public:
                 awake_key_compile_cmd << "--bpe-model " << base_model
                                       << file_body["mode_param"]["text2token-bpe-model"].get<std::string>() << " ";
             }
-            awake_key_compile_cmd << "--output " << mode_config_.keywords_file;
+            awake_key_compile_cmd << "--output " << sherpa_config_.keywords_file;
             system(awake_key_compile_cmd.str().c_str());
-            spotter_        = std::make_unique<sherpa_onnx::KeywordSpotter>(mode_config_);
-            spotter_stream_ = spotter_->CreateStream();
+
+            sherpa_spotter_ = std::make_unique<sherpa_onnx::KeywordSpotter>(sherpa_config_);
+            sherpa_stream_  = sherpa_spotter_->CreateStream();
         } catch (...) {
             SLOGE("config file read false");
             return -3;
         }
+
+        delay_audio_frame_ = 10;
         return 0;
+    }
+#undef CONFIG_AUTO_SET_SHERPA
+
+#define CONFIG_AUTO_SET_ONNX(obj, key)        \
+    if (config_body.contains(#key))           \
+        onnx_config_.key = config_body[#key]; \
+    else if (obj.contains(#key))              \
+        onnx_config_.key = obj[#key];
+
+#define OPTS_AUTO_SET(obj, key)              \
+    if (config_body.contains(#key))          \
+        fbank_opts_.key = config_body[#key]; \
+    else if (obj.contains(#key))             \
+        fbank_opts_.key = obj[#key];
+
+    int load_model_onnx(const nlohmann::json &config_body)
+    {
+        nlohmann::json file_body;
+        std::list<std::string> config_file_paths =
+            get_config_file_paths(base_model_path_, base_model_config_path_, model_);
+        try {
+            for (auto file_name : config_file_paths) {
+                std::ifstream config_file(file_name);
+                if (!config_file.is_open()) {
+                    SLOGW("config file :%s miss", file_name.c_str());
+                    continue;
+                }
+                SLOGI("config file :%s read", file_name.c_str());
+                config_file >> file_body;
+                config_file.close();
+                break;
+            }
+            if (file_body.empty()) {
+                SLOGE("all config file miss");
+                return -2;
+            }
+            std::string base_model = base_model_path_ + model_ + "/";
+            SLOGI("base_model %s", base_model.c_str());
+            std::string model_file = base_model + "kws.onnx";
+
+            if (config_body.contains("wake_wav_file"))
+                wake_wav_file_ = config_body["wake_wav_file"];
+            else if (file_body["mode_param"].contains("wake_wav_file"))
+                wake_wav_file_ = file_body["mode_param"]["wake_wav_file"];
+
+            onnx_session_ = std::make_unique<Ort::Session>(onnx_env_, model_file.c_str(), session_options_);
+
+            onnx_cache_.assign(1 * 32 * 88, 0.0f);
+
+            auto &mp = file_body["mode_param"];
+            CONFIG_AUTO_SET_ONNX(mp, chunk_size);
+            CONFIG_AUTO_SET_ONNX(mp, threshold);
+            CONFIG_AUTO_SET_ONNX(mp, min_continuous_frames);
+            CONFIG_AUTO_SET_ONNX(mp, REFRACTORY_TIME_MS);
+            CONFIG_AUTO_SET_ONNX(mp, RESAMPLE_RATE);
+            CONFIG_AUTO_SET_ONNX(mp, FEAT_DIM);
+            CONFIG_AUTO_SET_ONNX(mp, delay_audio_frame_);
+
+            OPTS_AUTO_SET(mp, frame_opts.samp_freq);
+            OPTS_AUTO_SET(mp, frame_opts.frame_length_ms);
+            OPTS_AUTO_SET(mp, frame_opts.frame_shift_ms);
+            OPTS_AUTO_SET(mp, frame_opts.snip_edges);
+            OPTS_AUTO_SET(mp, frame_opts.dither);
+            OPTS_AUTO_SET(mp, frame_opts.preemph_coeff);
+            OPTS_AUTO_SET(mp, frame_opts.remove_dc_offset);
+            OPTS_AUTO_SET(mp, frame_opts.window_type);
+            OPTS_AUTO_SET(mp, mel_opts.num_bins);
+            OPTS_AUTO_SET(mp, mel_opts.low_freq);
+            OPTS_AUTO_SET(mp, mel_opts.high_freq);
+            OPTS_AUTO_SET(mp, energy_floor);
+            OPTS_AUTO_SET(mp, use_energy);
+            OPTS_AUTO_SET(mp, raw_energy);
+
+            fbank_ = std::make_unique<knf::OnlineFbank>(fbank_opts_);
+        } catch (...) {
+            SLOGE("config file read false");
+            return -3;
+        }
+        delay_audio_frame_ = onnx_config_.delay_audio_frame_;
+        return 0;
+    }
+#undef CONFIG_AUTO_SET_ONNX
+#undef OPTS_AUTO_SET
+
+    bool detect_wakeup(const std::vector<float> &scores)
+    {
+        bool triggered = false;
+        for (auto score : scores) {
+            if (score > onnx_config_.threshold) {
+                count_frames_++;
+                if (count_frames_ >= onnx_config_.min_continuous_frames) {
+                    long long trigger_time_ms = (frame_index_global_ - onnx_config_.min_continuous_frames + 1) * 10;
+                    if (trigger_time_ms - last_trigger_time_ms_ >= onnx_config_.REFRACTORY_TIME_MS) {
+                        last_trigger_time_ms_ = trigger_time_ms;
+                        triggered             = true;
+                    }
+                }
+            } else {
+                count_frames_ = 0;
+            }
+            frame_index_global_++;
+        }
+        return triggered;
+    }
+
+    std::vector<std::vector<float>> compute_fbank_kaldi(const std::vector<float> &waveform, int sample_rate,
+                                                        int num_mel_bins)
+    {
+        fbank_.reset();
+        fbank_ = std::make_unique<knf::OnlineFbank>(fbank_opts_);
+        fbank_->AcceptWaveform(sample_rate, waveform.data(), waveform.size());
+        int num_frames = fbank_->NumFramesReady();
+        std::vector<std::vector<float>> features;
+        features.reserve(num_frames);
+        for (int i = 0; i < num_frames; ++i) {
+            const float *frame_data = fbank_->GetFrame(i);
+            std::vector<float> frame(frame_data, frame_data + num_mel_bins);
+            features.push_back(std::move(frame));
+        }
+        return features;
+    }
+
+    std::vector<float> run_inference(const std::vector<float> &audio_chunk_16k)
+    {
+        std::vector<std::vector<float>> fbank_feats;
+        fbank_feats = compute_fbank_kaldi(audio_chunk_16k, onnx_config_.RESAMPLE_RATE, onnx_config_.FEAT_DIM);
+        if (fbank_feats.empty()) {
+            return {};
+        }
+        int T = fbank_feats.size();
+        std::vector<float> mat_flattened;
+        for (const auto &feat : fbank_feats) {
+            mat_flattened.insert(mat_flattened.end(), feat.begin(), feat.end());
+        }
+        std::vector<int64_t> input_shape = {1, static_cast<int64_t>(T), onnx_config_.FEAT_DIM};
+        std::vector<int64_t> cache_shape = {1, 32, 88};
+        Ort::MemoryInfo memory_info      = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
+        Ort::Value input_tensor          = Ort::Value::CreateTensor<float>(
+            memory_info, mat_flattened.data(), mat_flattened.size(), input_shape.data(), input_shape.size());
+        Ort::Value cache_tensor   = Ort::Value::CreateTensor<float>(memory_info, onnx_cache_.data(), onnx_cache_.size(),
+                                                                    cache_shape.data(), cache_shape.size());
+        const char *input_names[] = {"input", "cache"};
+        const char *output_names[] = {"output", "r_cache"};
+        std::vector<Ort::Value> inputs;
+        inputs.push_back(std::move(input_tensor));
+        inputs.push_back(std::move(cache_tensor));
+        auto output_tensors =
+            onnx_session_->Run(Ort::RunOptions{nullptr}, input_names, inputs.data(), 2, output_names, 2);
+        float *out_data                = output_tensors[0].GetTensorMutableData<float>();
+        float *cache_out_data          = output_tensors[1].GetTensorMutableData<float>();
+        std::vector<int64_t> out_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
+        size_t out_size                = 1;
+        for (auto dim : out_shape) out_size *= dim;
+        std::vector<float> out_chunk(out_data, out_data + out_size);
+        std::copy(cache_out_data, cache_out_data + onnx_cache_.size(), onnx_cache_.begin());
+        return out_chunk;
+    }
+
+    int load_model(const nlohmann::json &config_body)
+    {
+        if (parse_config(config_body)) {
+            return -1;
+        }
+        if (model_type_ == "onnx") {
+            SLOGE("load onnx kws model");
+            return load_model_onnx(config_body);
+        } else {
+            SLOGE("load sherpa kws model");
+            return load_model_sherpa(config_body);
+        }
     }
 
     void set_output(task_callback_t out_callback)
@@ -237,32 +479,47 @@ public:
         buffer_position_set(pcmdata, 0);
 
         std::vector<float> floatSamples;
-        {
-            int16_t audio_val;
-            while (buffer_read_i16(pcmdata, &audio_val, 1)) {
-                float normalizedSample = static_cast<float>(audio_val) / INT16_MAX;
-                floatSamples.push_back(normalizedSample);
+        std::vector<int16_t> int16Samples;
+
+        int16_t audio_val;
+        while (buffer_read_i16(pcmdata, &audio_val, 1)) {
+            int16Samples.push_back(audio_val);
+            if (model_type_ == "onnx") {
+                floatSamples.push_back(static_cast<float>(audio_val) / 1.0f);
+            } else {
+                floatSamples.push_back(static_cast<float>(audio_val) / INT16_MAX);
             }
         }
-
         buffer_resize(pcmdata, 0);
         count = 0;
 
-        spotter_stream_->AcceptWaveform(mode_config_.feat_config.sampling_rate, floatSamples.data(),
-                                        floatSamples.size());
-        while (spotter_->IsReady(spotter_stream_.get())) {
-            spotter_->DecodeStream(spotter_stream_.get());
-        }
-        sherpa_onnx::KeywordResult r = spotter_->GetResult(spotter_stream_.get());
-        if (!r.keyword.empty()) {
-            if (enwake_audio_ && (!wake_wav_file_.empty()) && play_awake_wav) {
-                play_awake_wav(wake_wav_file_);
-            }
-            if (out_callback_) {
-                if (enoutput_json_)
-                    out_callback_(r.AsJsonString(), true);
-                else
+        if (model_type_ == "onnx") {
+            auto scores = run_inference(floatSamples);
+            if (detect_wakeup(scores)) {
+                if (enwake_audio_ && (!wake_wav_file_.empty()) && play_awake_wav) {
+                    play_awake_wav(wake_wav_file_);
+                }
+                if (out_callback_) {
                     out_callback_("", true);
+                }
+            }
+        } else {
+            sherpa_stream_->AcceptWaveform(sherpa_config_.feat_config.sampling_rate, floatSamples.data(),
+                                           floatSamples.size());
+            while (sherpa_spotter_->IsReady(sherpa_stream_.get())) {
+                sherpa_spotter_->DecodeStream(sherpa_stream_.get());
+            }
+            sherpa_onnx::KeywordResult r = sherpa_spotter_->GetResult(sherpa_stream_.get());
+            if (!r.keyword.empty()) {
+                if (enwake_audio_ && (!wake_wav_file_.empty()) && play_awake_wav) {
+                    play_awake_wav(wake_wav_file_);
+                }
+                if (out_callback_) {
+                    if (enoutput_json_)
+                        out_callback_(r.AsJsonString(), true);
+                    else
+                        out_callback_("", true);
+                }
             }
         }
     }
@@ -274,7 +531,10 @@ public:
 
     bool delete_model()
     {
-        spotter_.reset();
+        sherpa_spotter_.reset();
+        sherpa_stream_.reset();
+        onnx_session_.reset();
+        fbank_.reset();
         return true;
     }
 
@@ -297,7 +557,6 @@ public:
         buffer_destroy(pcmdata);
     }
 };
-#undef CONFIG_AUTO_SET
 
 class llm_kws : public StackFlow {
 private:
@@ -366,7 +625,7 @@ public:
         fread(wav_data.data(), 1, wav_data.size(), fp);
         fclose(fp);
         int post = 0;
-        for (int i = 0; i < wav_data.size() - 4; i++) {
+        for (int i = 0; i < (int)wav_data.size() - 4; i++) {
             if ((wav_data[i] == 'd') && (wav_data[i + 1] == 'a') && (wav_data[i + 2] == 't') &&
                 (wav_data[i + 3] == 'a')) {
                 post = i + 8;
@@ -403,7 +662,8 @@ public:
         if ((!audio_url_.empty()) && (llm_task_obj->audio_flage_ == false)) {
             std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
             llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
+                auto p = _llm_task_obj.lock();
+                if (p) p->sys_pcm_on_data(raw->string());
             });
             llm_task_obj->audio_flage_ = true;
         }
@@ -411,8 +671,7 @@ public:
 
     void work(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_asr::work:%s", data.c_str());
-
+        SLOGI("llm_kws::work:%s", data.c_str());
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
         if (llm_task_.find(work_id_num) == llm_task_.end()) {
@@ -427,8 +686,7 @@ public:
 
     void pause(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_asr::work:%s", data.c_str());
-
+        SLOGI("llm_kws::pause:%s", data.c_str());
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
         if (llm_task_.find(work_id_num) == llm_task_.end()) {
@@ -495,7 +753,6 @@ public:
             send("None", "None", error_body, "kws");
             return -1;
         }
-
         int work_id_num                             = sample_get_work_id_num(work_id);
         auto llm_channel                            = get_channel(work_id);
         auto llm_task_obj                           = std::make_shared<llm_task>(work_id);
@@ -513,28 +770,26 @@ public:
         }
         int ret = llm_task_obj->load_model(config_body);
         if (ret == 0) {
-            llm_channel->set_output(llm_task_obj->enoutput_);
-            llm_channel->set_stream(llm_task_obj->enstream_);
+            llm_channel->set_output(llm_task_obj->enoutput());
+            llm_channel->set_stream(llm_task_obj->enstream_flag());
             llm_task_obj->play_awake_wav = std::bind(&llm_kws::play_awake_wav, this, std::placeholders::_1);
-            llm_task_obj->set_output(std::bind(&llm_kws::task_output, this, std::weak_ptr<llm_task>(llm_task_obj),
+            llm_task_obj->set_output(std::bind(&llm_kws::task_output, this, _llm_task_obj,
                                                std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
                                                std::placeholders::_2));
-
-            for (const auto input : llm_task_obj->inputs_) {
+            for (const auto &input : llm_task_obj->inputs()) {
                 if (input.find("sys") != std::string::npos) {
                     audio_url_ = unit_call("audio", "cap", "None");
                     llm_channel->subscriber(audio_url_,
                                             [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                                                auto llm_task_obj = _llm_task_obj.lock();
-                                                if (llm_task_obj) llm_task_obj->sys_pcm_on_data(raw->string());
+                                                auto p = _llm_task_obj.lock();
+                                                if (p) p->sys_pcm_on_data(raw->string());
                                             });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("kws") != std::string::npos) {
                     llm_task_obj->delay_audio_frame_ = 0;
-                    llm_channel->subscriber_work_id(
-                        "", std::bind(&llm_kws::task_user_data, this, std::weak_ptr<llm_task>(llm_task_obj),
-                                      std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
-                                      std::placeholders::_2));
+                    llm_channel->subscriber_work_id("", std::bind(&llm_kws::task_user_data, this, _llm_task_obj,
+                                                                  std::weak_ptr<llm_channel_obj>(llm_channel),
+                                                                  std::placeholders::_1, std::placeholders::_2));
                 }
             }
             llm_task_[work_id_num] = llm_task_obj;
@@ -558,7 +813,7 @@ public:
         if (WORK_ID_NONE == work_id_num) {
             std::vector<std::string> task_list;
             std::transform(llm_task_channel_.begin(), llm_task_channel_.end(), std::back_inserter(task_list),
-                           [](const auto task_channel) { return task_channel.second->work_id_; });
+                           [](const auto &task_channel) { return task_channel.second->work_id_; });
             req_body = task_list;
             send("kws.tasklist", req_body, LLM_NO_ERROR, work_id);
         } else {
@@ -569,10 +824,10 @@ public:
                 return;
             }
             auto llm_task_obj           = llm_task_[work_id_num];
-            req_body["model"]           = llm_task_obj->model_;
-            req_body["response_format"] = llm_task_obj->response_format_;
-            req_body["enoutput"]        = llm_task_obj->enoutput_;
-            req_body["inputs"]          = llm_task_obj->inputs_;
+            req_body["model"]           = llm_task_obj->model();
+            req_body["response_format"] = llm_task_obj->response_format();
+            req_body["enoutput"]        = llm_task_obj->enoutput();
+            req_body["inputs"]          = llm_task_obj->inputs();
             send("kws.taskinfo", req_body, LLM_NO_ERROR, work_id);
         }
     }
@@ -620,7 +875,6 @@ public:
             _zmq.send_data(out);
             return LLM_NONE;
         }
-
         int work_id_num = sample_get_work_id_num(work_id);
         if (llm_task_.find(work_id_num) == llm_task_.end()) {
             nlohmann::json out_body;
@@ -644,17 +898,17 @@ public:
     ~llm_kws()
     {
         while (1) {
-            auto iteam = llm_task_.begin();
-            if (iteam == llm_task_.end()) {
+            auto it = llm_task_.begin();
+            if (it == llm_task_.end()) {
                 break;
             }
-            iteam->second->stop();
-            if (iteam->second->audio_flage_) {
+            it->second->stop();
+            if (it->second->audio_flage_) {
                 unit_call("audio", "cap_stop", "None");
             }
-            get_channel(iteam->first)->stop_subscriber("");
-            iteam->second.reset();
-            llm_task_.erase(iteam->first);
+            get_channel(it->first)->stop_subscriber("");
+            it->second.reset();
+            llm_task_.erase(it->first);
         }
     }
 };
