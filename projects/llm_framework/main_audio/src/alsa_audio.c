@@ -6,7 +6,11 @@
 #include <errno.h>
 #include <string.h>
 
-static int gcapLoopExit = 0;
+static struct pcm *g_play_pcm = NULL;
+static int gplayLoopExit      = 1;
+static int gcapLoopExit       = 1;
+AlsaConfig cap_config;
+AlsaConfig play_config;
 
 void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int channel, int rate, int bit,
                     AUDIOCallback callback)
@@ -23,7 +27,7 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
 
     memset(&config, 0, sizeof(config));
     config.channels          = channel;
-    config.rate              = 48000;  // TODO: 部分USB MIC仅支持48k，暂时固定采集为48k
+    config.rate              = 48000;
     config.period_size       = 120;
     config.period_count      = 4;
     config.format            = PCM_FORMAT_S16_LE;
@@ -57,14 +61,16 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
 
     SRC_STATE *src_state = NULL;
     float *in_float = NULL, *out_float = NULL;
+
     int in_frames  = pcm_get_buffer_size(pcm);
     int out_frames = (int)((float)in_frames * ((float)rate / 48000.0f) + 1);
-    int out_bytes  = out_frames * channel * sizeof(short);
+
+    int src_channels = 1;
 
     if (rate != 48000) {
-        src_state = src_new(SRC_SINC_FASTEST, channel, NULL);
-        in_float  = malloc(in_frames * channel * sizeof(float));
-        out_float = malloc(out_frames * channel * sizeof(float));
+        src_state = src_new(SRC_SINC_FASTEST, src_channels, NULL);
+        in_float  = malloc(in_frames * src_channels * sizeof(float));
+        out_float = malloc(out_frames * src_channels * sizeof(float));
         if (!src_state || !in_float || !out_float) {
             fprintf(stderr, "Unable to allocate resample buffers\n");
             free(buffer);
@@ -82,16 +88,36 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
             fprintf(stderr, "Error capturing samples - %d (%s)\n", errno, strerror(errno));
             break;
         }
+
         frames_read = ret;
         total_frames_read += frames_read;
 
         if (rate == 48000) {
-            callback(buffer, frames_read * bytes_per_frame);
-        } else {
-            short *in_short = (short *)buffer;
-            for (int i = 0; i < frames_read * channel; ++i) {
-                in_float[i] = in_short[i] / 32768.0f;
+            int in_channels = channel;  // 比如 4
+            int16_t *in     = (int16_t *)buffer;
+
+            int16_t *ch0 = malloc(frames_read * sizeof(int16_t));
+            if (!ch0) {
+                fprintf(stderr, "Unable to allocate ch0 buffer\n");
+                break;
             }
+
+            for (unsigned int i = 0; i < frames_read; ++i) {
+                ch0[i] = in[i * in_channels + 0];
+            }
+
+            callback((const char *)ch0, frames_read * sizeof(int16_t));
+            free(ch0);
+
+        } else {
+            int in_channels = channel;  // 比如 4
+            short *in_short = (short *)buffer;
+
+            for (int i = 0; i < frames_read; ++i) {
+                short s     = in_short[i * in_channels + 0];
+                in_float[i] = s / 32768.0f;
+            }
+
             SRC_DATA src_data;
             src_data.data_in       = in_float;
             src_data.input_frames  = frames_read;
@@ -99,20 +125,25 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
             src_data.output_frames = out_frames;
             src_data.src_ratio     = (double)rate / 48000.0;
             src_data.end_of_input  = 0;
-            int error              = src_process(src_state, &src_data);
+
+            int error = src_process(src_state, &src_data);
             if (error) {
                 fprintf(stderr, "SRC error: %s\n", src_strerror(error));
                 break;
             }
-            // float转short
-            short *out_short = malloc(src_data.output_frames_gen * channel * sizeof(short));
-            for (int i = 0; i < src_data.output_frames_gen * channel; ++i) {
+            int out_samples  = src_data.output_frames_gen;
+            short *out_short = malloc(out_samples * sizeof(short));
+            if (!out_short) {
+                fprintf(stderr, "Unable to allocate out_short buffer\n");
+                break;
+            }
+            for (int i = 0; i < out_samples; ++i) {
                 float sample = out_float[i];
                 if (sample > 1.0f) sample = 1.0f;
                 if (sample < -1.0f) sample = -1.0f;
                 out_short[i] = (short)(sample * 32767.0f);
             }
-            callback((const char *)out_short, src_data.output_frames_gen * channel * sizeof(short));
+            callback((const char *)out_short, out_samples * sizeof(short));
             free(out_short);
         }
     }
@@ -124,7 +155,6 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
     }
     free(buffer);
     pcm_close(pcm);
-    printf("Total frames captured: %u\n", total_frames_read);
 }
 
 void alsa_close_cap()
@@ -135,4 +165,52 @@ void alsa_close_cap()
 int alsa_cap_status()
 {
     return gcapLoopExit;
+}
+
+void alsa_play(unsigned int card, unsigned int device, float Volume, int channel, int rate, int bit, const void *data,
+               int size)
+{
+    gplayLoopExit = 0;
+
+    struct pcm_config config;
+    memset(&config, 0, sizeof(config));
+    config.channels          = channel;
+    config.rate              = rate;
+    config.period_size       = 1024;
+    config.period_count      = 2;
+    config.format            = PCM_FORMAT_S16_LE;
+    config.silence_threshold = config.period_size * config.period_count;
+    config.stop_threshold    = config.period_size * config.period_count;
+    config.start_threshold   = config.period_size;
+
+    unsigned int pcm_open_flags = PCM_OUT;
+
+    struct pcm *pcm = pcm_open(card, device, pcm_open_flags, &config);
+    if (!pcm || !pcm_is_ready(pcm)) {
+        fprintf(stderr, "Unable to open PCM playback device (%s)\n", pcm ? pcm_get_error(pcm) : "invalid pcm");
+        if (pcm) {
+            pcm_close(pcm);
+        }
+        gplayLoopExit = 2;
+        return;
+    }
+
+    int frames         = pcm_bytes_to_frames(pcm, size);
+    int written_frames = pcm_writei(pcm, data, frames);
+    if (written_frames < 0) {
+        fprintf(stderr, "PCM playback error %s\n", pcm_get_error(pcm));
+    }
+    printf("Played %d frames\n", written_frames);
+    pcm_close(pcm);
+    gplayLoopExit = 2;
+}
+
+void alsa_close_play()
+{
+    gplayLoopExit = 1;
+}
+
+int alsa_play_status()
+{
+    return gplayLoopExit;
 }

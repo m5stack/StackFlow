@@ -191,9 +191,7 @@ public:
     bool detect_wakeup(const std::vector<float> &scores)
     {
         bool triggered = false;
-        SLOGE("%d", scores.size());
         for (auto score : scores) {
-            printf("%f ", score);
             if (score > threshold) {
                 count_frames++;
                 if (count_frames >= min_continuous_frames) {
@@ -208,7 +206,6 @@ public:
             }
             frame_index_global++;
         }
-        SLOGE("\n");
         return triggered;
     }
 

@@ -5,7 +5,11 @@ with open(env['PROJECT_TOOL_S']) as f:
     exec(f.read())
 
 # SRCS = append_srcs_dir(ADir('src'))
-SRCS = Glob('src/*.c*')
+if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
+    SRCS = [AFile('src/sample_audio.c'), AFile('src/main.cpp')]
+else:
+    SRCS = [AFile('src/alsa_audio.c'), AFile('src/main.cpp')]
+
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
 REQUIREMENTS = ['pthread', 'utilities', 'ax_msp', 'eventpp', 'StackFlow', 'single_header_libs']

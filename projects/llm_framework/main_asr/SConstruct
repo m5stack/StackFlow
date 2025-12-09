@@ -7,7 +7,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = Glob('src/*.c*')
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['pthread', 'utilities', 'eventpp', 'StackFlow', 'single_header_libs']
+REQUIREMENTS = ['pthread', 'utilities', 'ax_msp', 'eventpp', 'StackFlow', 'single_header_libs']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = []
@@ -17,12 +17,22 @@ LINK_SEARCH_PATH = []
 STATIC_FILES = []
 
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
-DEFINITIONS += ['-std=c++17']
+DEFINITIONS += ['-std=c++17', '-fopenmp']
 LINK_SEARCH_PATH += [ADir('../static_lib')]
+REQUIREMENTS += ['ax_engine', 'ax_interpreter', 'ax_sys']
 
 INCLUDE += [ADir('../static_lib/include/sherpa'), ADir('../static_lib/include/sherpa/sherpa-ncnn')]
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/ncnn')]
-REQUIREMENTS += ['ncnn', 'sherpa-ncnn-core']
+LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
+REQUIREMENTS += ['ncnn', '', 'onnxruntime']
+LDFLAGS += [
+            '-l:libsherpa-onnx-core.a', '-l:libkaldi-native-fbank-core.a','-l:libkissfft-float.a',
+            '-l:libkaldi-decoder-core.a', '-l:libssentencepiece_core.a', '-l:libsherpa-onnx-fst.a',
+            '-l:libsherpa-onnx-kaldifst-core.a', '-l:libsherpa-onnx-fstfar.a',
+
+            '-l:libsherpa-ncnn-core.a', '-l:libsherpa-ncnn-fst.a', '-l:libsherpa-ncnn-kaldifst-core.a',
+            '-lgomp',
+            ]
 
 STATIC_FILES += Glob('mode_*.json')
 
