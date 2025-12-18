@@ -244,7 +244,7 @@ public:
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
                           (base_model + std::string("tokenizer")).c_str(), prompt_.c_str());
 
-                    std::this_thread::sleep_for(std::chrono::seconds(15));
+                    std::this_thread::sleep_for(std::chrono::seconds(5));
                 };
 
                 auto process_field = [&](std::string &field, const char *name_for_log) -> bool {

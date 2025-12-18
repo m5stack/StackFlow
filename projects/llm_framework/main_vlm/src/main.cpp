@@ -263,7 +263,7 @@ public:
                     SLOGI("port_=%s model_id=%s content=%s", std::to_string(port_).c_str(),
                           (base_model + std::string("tokenizer")).c_str(), prompt_.c_str());
 
-                    std::this_thread::sleep_for(std::chrono::seconds(15));
+                    std::this_thread::sleep_for(std::chrono::seconds(5));
                 };
 
                 auto process_field = [&](std::string &field, const char *name_for_log) -> bool {
@@ -291,7 +291,7 @@ public:
                     model_type_ = ModelType::Qwen;
                 else if (encoder_name.find("internvl3") != std::string::npos && mode_config_.precompute_len > 0)
                     model_type_ = ModelType::InternVL_CTX;
-                else if (encoder_name.find("internvl3") != std::string::npos)
+                else if ((encoder_name.find("internvl3") != std::string::npos) || (encoder_name.find("vpm") != std::string::npos))
                     model_type_ = ModelType::InternVL;
                 else
                     model_type_ = ModelType::Unknown;

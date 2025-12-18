@@ -149,7 +149,7 @@ public:
             llama_layers[i].filename = axmodel_path;
 
             if (!attr.b_dynamic_load_axmodel_layer) {
-                int ret = llama_layers[i].layer.init(llama_layers[i].filename.c_str(), false);
+                int ret = llama_layers[i].layer.init(llama_layers[i].filename.c_str(), true);
                 if (ret != 0) {
                     ALOGE("init axmodel(%s) failed", llama_layers[i].filename.c_str());
                     return false;
@@ -172,12 +172,12 @@ public:
             }
         }
 
-        int ret = llama_post.init(attr.filename_post_axmodel.c_str(), false);
+        int ret = llama_post.init(attr.filename_post_axmodel.c_str(), true);
         if (ret != 0) {
             ALOGE("init post axmodel(%s) failed", attr.filename_post_axmodel.c_str());
             return false;
         }
-        ret = llm_decoder.init(attr.filename_decoder_axmodel.c_str(), false);
+        ret = llm_decoder.init(attr.filename_decoder_axmodel.c_str(), true);
         if (ret != 0) {
             ALOGE("init llm decoder axmodel(%s) failed", attr.filename_decoder_axmodel.c_str());
             return false;

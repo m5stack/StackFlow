@@ -139,7 +139,7 @@ public:
             llama_layers[i].filename = axmodel_path;
 
             if (!attr.b_dynamic_load_axmodel_layer) {
-                int ret = llama_layers[i].layer.init(llama_layers[i].filename.c_str(), false);
+                int ret = llama_layers[i].layer.init(llama_layers[i].filename.c_str(), true);
                 if (ret != 0) {
                     ALOGE("init axmodel(%s) failed", llama_layers[i].filename.c_str());
                     return false;
@@ -162,7 +162,7 @@ public:
             }
         }
 
-        int ret = llama_post.init(attr.filename_post_axmodel.c_str(), false);
+        int ret = llama_post.init(attr.filename_post_axmodel.c_str(), true);
         if (ret != 0) {
             ALOGE("init post axmodel(%s) failed", attr.filename_post_axmodel.c_str());
             return false;
@@ -602,7 +602,7 @@ public:
             sprintf(axmodel_path, attr.template_filename_axmodel.c_str(), i);
             llama_layers[i].filename = axmodel_path;
 
-            int ret = llama_layers[i].layer.init(llama_layers[i].filename.c_str(), false);
+            int ret = llama_layers[i].layer.init(llama_layers[i].filename.c_str(), true);
             if (ret != 0) {
                 ALOGE("init axmodel(%s) failed", llama_layers[i].filename.c_str());
                 return false;
@@ -612,7 +612,7 @@ public:
             update_cqdm(&cqdm, i + 2, "count", axmodel_path);
         }
 
-        int ret = llama_post.init(attr.filename_post_axmodel.c_str(), false);
+        int ret = llama_post.init(attr.filename_post_axmodel.c_str(), true);
         if (ret != 0) {
             ALOGE("init post axmodel(%s) failed", attr.filename_post_axmodel.c_str());
             return false;
@@ -810,9 +810,6 @@ public:
 
                 layer.layer.inference(prefill_grpid);
 
-                auto &input_decoder_k_cache = layer.layer.get_input(decode_grpid, "K_cache");
-                auto &input_decoder_v_cache = layer.layer.get_input(decode_grpid, "V_cache");
-
                 auto &input_prefill_k_cache = layer.layer.get_input(prefill_grpid, "K_cache");
                 auto &input_prefill_v_cache = layer.layer.get_input(prefill_grpid, "V_cache");
 
@@ -820,12 +817,6 @@ public:
                 auto &output_v_cache = layer.layer.get_output(prefill_grpid, "V_cache_out");
 
                 int kv_offset = (p * _attr.prefill_token_num) * _attr.kv_cache_size;
-
-                memcpy((unsigned short *)input_decoder_k_cache.pVirAddr + kv_offset, (void *)output_k_cache.pVirAddr,
-                       sizeof(unsigned short) * _attr.prefill_token_num * _attr.kv_cache_size);
-
-                memcpy((unsigned short *)input_decoder_v_cache.pVirAddr + kv_offset, (void *)output_v_cache.pVirAddr,
-                       sizeof(unsigned short) * _attr.prefill_token_num * _attr.kv_cache_size);
 
                 memcpy((unsigned short *)input_prefill_k_cache.pVirAddr + kv_offset, (void *)output_k_cache.pVirAddr,
                        sizeof(unsigned short) * _attr.prefill_token_num * _attr.kv_cache_size);
