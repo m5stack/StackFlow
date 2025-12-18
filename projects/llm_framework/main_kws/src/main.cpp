@@ -5,6 +5,9 @@
  */
 #include "StackFlow.h"
 
+#include "EngineWrapper.hpp"
+#include "ax_sys_api.h"
+
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -34,9 +37,6 @@ static std::string base_model_config_path_;
 typedef std::function<void(const std::string &data, bool finish)> task_callback_t;
 
 #include "sherpa-onnx/csrc/keyword-spotter.h"
-#include "sherpa-onnx/csrc/parse-options.h"
-
-#include <onnxruntime_cxx_api.h>
 #include "kaldi-native-fbank/csrc/online-feature.h"
 
 typedef struct mode_config_onnx {
@@ -61,6 +61,7 @@ private:
     bool enstream_      = false;
     bool enwake_audio_  = true;
     std::atomic_bool audio_flage_;
+    static int ax_init_flage_;
     task_callback_t out_callback_;
     buffer_t *pcmdata;
     std::string wake_wav_file_;
@@ -72,8 +73,8 @@ private:
     std::unique_ptr<sherpa_onnx::OnlineStream> sherpa_stream_;
 
     kws_config_onnx onnx_config_;
-    std::vector<float> onnx_cache_;
-    std::unique_ptr<Ort::Session> onnx_session_;
+    std::vector<float> axera_cache_;
+    std::unique_ptr<EngineWrapper> axera_session_;
     knf::FbankOptions fbank_opts_;
     std::unique_ptr<knf::OnlineFbank> fbank_;
     Ort::Env onnx_env_{ORT_LOGGING_LEVEL_WARNING, "kws"};
@@ -328,16 +329,20 @@ public:
             }
             std::string base_model = base_model_path_ + model_ + "/";
             SLOGI("base_model %s", base_model.c_str());
-            std::string model_file = base_model + "kws.onnx";
+            std::string model_file = base_model + "kws.axmodel";
 
             if (config_body.contains("wake_wav_file"))
                 wake_wav_file_ = config_body["wake_wav_file"];
             else if (file_body["mode_param"].contains("wake_wav_file"))
                 wake_wav_file_ = file_body["mode_param"]["wake_wav_file"];
 
-            onnx_session_ = std::make_unique<Ort::Session>(onnx_env_, model_file.c_str(), session_options_);
+            axera_session_ = std::make_unique<EngineWrapper>();
+            if (0 != axera_session_->Init(model_file.c_str())) {
+                SLOGE("Init axera model failed!");
+                return -5;
+            }
 
-            onnx_cache_.assign(1 * 32 * 88, 0.0f);
+            axera_cache_.assign(1 * 32 * 88, 0.0f);
 
             auto &mp = file_body["mode_param"];
             CONFIG_AUTO_SET_ONNX(mp, chunk_size);
@@ -414,37 +419,46 @@ public:
 
     std::vector<float> run_inference(const std::vector<float> &audio_chunk_16k)
     {
-        std::vector<std::vector<float>> fbank_feats;
-        fbank_feats = compute_fbank_kaldi(audio_chunk_16k, onnx_config_.RESAMPLE_RATE, onnx_config_.FEAT_DIM);
-        if (fbank_feats.empty()) {
+        std::vector<std::vector<float>> fbank_feats =
+            compute_fbank_kaldi(audio_chunk_16k, onnx_config_.RESAMPLE_RATE, onnx_config_.FEAT_DIM);
+        if (fbank_feats.empty()) return {};
+
+        constexpr int FIX_T = 32;
+        const int FEAT_DIM  = onnx_config_.FEAT_DIM;
+
+        std::vector<float> mat_flattened;
+        mat_flattened.resize(FIX_T * FEAT_DIM, 0.0f);
+
+        const int T_in   = static_cast<int>(fbank_feats.size());
+        const int T_copy = std::min(T_in, FIX_T);
+
+        for (int t = 0; t < T_copy; ++t) {
+            if ((int)fbank_feats[t].size() < FEAT_DIM) continue;
+            std::memcpy(mat_flattened.data() + t * FEAT_DIM, fbank_feats[t].data(), sizeof(float) * FEAT_DIM);
+        }
+
+        axera_session_->SetInput(mat_flattened.data(), 0);
+
+        axera_session_->SetInput(axera_cache_.data(), 1);
+
+        int ret = axera_session_->Run();
+        if (ret) {
+            SLOGE("axera_session run failed!");
             return {};
         }
-        int T = fbank_feats.size();
-        std::vector<float> mat_flattened;
-        for (const auto &feat : fbank_feats) {
-            mat_flattened.insert(mat_flattened.end(), feat.begin(), feat.end());
+
+        const float *out_ptr = reinterpret_cast<const float *>(axera_session_->GetOutputPtr(0));
+        size_t out_size_f    = axera_session_->GetOutputSize(0) / sizeof(float);
+        std::vector<float> out_chunk(out_ptr, out_ptr + out_size_f);
+
+        const float *cache_ptr = reinterpret_cast<const float *>(axera_session_->GetOutputPtr(1));
+        size_t cache_size_f    = axera_session_->GetOutputSize(1) / sizeof(float);
+        if (cache_size_f != axera_cache_.size()) {
+            SLOGE("cache size mismatch: out=%zu, local=%zu", cache_size_f, axera_cache_.size());
+            return out_chunk;
         }
-        std::vector<int64_t> input_shape = {1, static_cast<int64_t>(T), onnx_config_.FEAT_DIM};
-        std::vector<int64_t> cache_shape = {1, 32, 88};
-        Ort::MemoryInfo memory_info      = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeDefault);
-        Ort::Value input_tensor          = Ort::Value::CreateTensor<float>(
-            memory_info, mat_flattened.data(), mat_flattened.size(), input_shape.data(), input_shape.size());
-        Ort::Value cache_tensor   = Ort::Value::CreateTensor<float>(memory_info, onnx_cache_.data(), onnx_cache_.size(),
-                                                                    cache_shape.data(), cache_shape.size());
-        const char *input_names[] = {"input", "cache"};
-        const char *output_names[] = {"output", "r_cache"};
-        std::vector<Ort::Value> inputs;
-        inputs.push_back(std::move(input_tensor));
-        inputs.push_back(std::move(cache_tensor));
-        auto output_tensors =
-            onnx_session_->Run(Ort::RunOptions{nullptr}, input_names, inputs.data(), 2, output_names, 2);
-        float *out_data                = output_tensors[0].GetTensorMutableData<float>();
-        float *cache_out_data          = output_tensors[1].GetTensorMutableData<float>();
-        std::vector<int64_t> out_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape();
-        size_t out_size                = 1;
-        for (auto dim : out_shape) out_size *= dim;
-        std::vector<float> out_chunk(out_data, out_data + out_size);
-        std::copy(cache_out_data, cache_out_data + onnx_cache_.size(), onnx_cache_.begin());
+        std::memcpy(axera_cache_.data(), cache_ptr, axera_cache_.size() * sizeof(float));
+
         return out_chunk;
     }
 
@@ -531,16 +545,45 @@ public:
 
     bool delete_model()
     {
-        sherpa_spotter_.reset();
-        sherpa_stream_.reset();
-        onnx_session_.reset();
-        fbank_.reset();
+        if (sherpa_spotter_) sherpa_spotter_.reset();
+        if (sherpa_stream_) sherpa_stream_.reset();
+        if (axera_session_) axera_session_->Release();
+        if (fbank_) fbank_.reset();
         return true;
     }
 
     llm_task(const std::string &workid) : audio_flage_(false)
     {
         pcmdata = buffer_create();
+        _ax_init();
+    }
+
+    void _ax_init()
+    {
+        if (!ax_init_flage_) {
+            int ret = AX_SYS_Init();
+            if (0 != ret) {
+                fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
+            }
+            AX_ENGINE_NPU_ATTR_T npu_attr;
+            memset(&npu_attr, 0, sizeof(npu_attr));
+            ret = AX_ENGINE_Init(&npu_attr);
+            if (0 != ret) {
+                fprintf(stderr, "Init ax-engine failed{0x%8x}.\n", ret);
+            }
+        }
+        ax_init_flage_++;
+    }
+
+    void _ax_deinit()
+    {
+        if (ax_init_flage_ > 0) {
+            --ax_init_flage_;
+            if (!ax_init_flage_) {
+                AX_ENGINE_Deinit();
+                AX_SYS_Deinit();
+            }
+        }
     }
 
     void start()
@@ -555,8 +598,12 @@ public:
     {
         stop();
         buffer_destroy(pcmdata);
+        if (axera_session_) axera_session_->Release();
+        _ax_deinit();
     }
 };
+
+int llm_task::ax_init_flage_ = 0;
 
 class llm_kws : public StackFlow {
 private:
