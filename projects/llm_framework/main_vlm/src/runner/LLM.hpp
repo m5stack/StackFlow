@@ -285,11 +285,11 @@ public:
     void Deinit()
     {
         for (int i = 0; i < _attr.axmodel_num; i++) {
-            llama_layers[i].layer.release();
+            llama_layers[i].layer.deinit();
         }
-        llama_post.release();
-        vpm_encoder.release();
-        vpm_resampler.release();
+        llama_post.deinit();
+        vpm_encoder.deinit();
+        vpm_resampler.deinit();
         embed_selector.Deinit();
     }
 
@@ -856,10 +856,10 @@ public:
     void Deinit()
     {
         for (int i = 0; i < _attr.axmodel_num; i++) {
-            llama_layers[i].layer.release();
+            llama_layers[i].layer.deinit();
         }
-        llama_post.release();
-        image_encoder.release();
+        llama_post.deinit();
+        image_encoder.deinit();
         embed_selector.Deinit();
     }
 
@@ -1958,10 +1958,10 @@ public:
     void Deinit()
     {
         for (int i = 0; i < _attr.axmodel_num; i++) {
-            llama_layers[i].layer.release();
+            llama_layers[i].layer.deinit();
         }
-        llama_post.release();
-        image_encoder.release();
+        llama_post.deinit();
+        image_encoder.deinit();
         embed_selector.Deinit();
     }
 

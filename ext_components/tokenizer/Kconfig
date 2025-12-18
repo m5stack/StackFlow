@@ -1,0 +1,5 @@
+menuconfig AX_TOKENIZER_ENABLED
+    bool "Enable tokenizer support"
+    default n
+    help
+        enable tokenizer support

@@ -246,10 +246,10 @@ public:
     void Deinit()
     {
         for (int i = 0; i < _attr.axmodel_num; i++) {
-            llama_layers[i].layer.release();
+            llama_layers[i].layer.deinit();
         }
-        llama_post.release();
-        llm_decoder.release();
+        llama_post.deinit();
+        llm_decoder.deinit();
         embed_selector.Deinit();
         llm_embed_selector.Deinit();
         speech_embed_selector.Deinit();
