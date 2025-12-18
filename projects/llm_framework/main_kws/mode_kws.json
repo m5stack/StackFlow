@@ -14,7 +14,7 @@
         "kws.bool"
     ],
     "mode_param": {
-        "model": "kws.onnx",
+        "model": "kws.axmodel",
         "model_type": "onnx",
         "wake_wav_file": "/opt/m5stack/data/audio/wakeup_zh_cn.wav",
         "chunk_size": 32,
