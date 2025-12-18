@@ -92,6 +92,7 @@ public:
     std::string kvcache_path;
     int precompute_len = 0;
     std::vector<int> _token_ids;
+    static int ax_init_flage_;
     task_callback_t out_callback_;
     bool enoutput_;
     bool enstream_;
@@ -630,9 +631,38 @@ public:
         return port;
     }
 
+    void _ax_init()
+    {
+        if (!ax_init_flage_) {
+            int ret = AX_SYS_Init();
+            if (0 != ret) {
+                fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
+            }
+            AX_ENGINE_NPU_ATTR_T npu_attr;
+            memset(&npu_attr, 0, sizeof(npu_attr));
+            ret = AX_ENGINE_Init(&npu_attr);
+            if (0 != ret) {
+                fprintf(stderr, "Init ax-engine failed{0x%8x}.\n", ret);
+            }
+        }
+        ax_init_flage_++;
+    }
+
+    void _ax_deinit()
+    {
+        if (ax_init_flage_ > 0) {
+            --ax_init_flage_;
+            if (!ax_init_flage_) {
+                AX_ENGINE_Deinit();
+                AX_SYS_Deinit();
+            }
+        }
+    }
+
     llm_task(const std::string &workid) : tokenizer_server_flage_(false), port_(getNextPort())
     {
         inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
+        _ax_init();
     }
 
     void start()
@@ -666,10 +696,12 @@ public:
         if (lToken2Wav_) {
             lToken2Wav_->Deinit();
         }
+        _ax_deinit();
     }
 };
 
 std::atomic<unsigned int> llm_task::next_port_{8070};
+int llm_task::ax_init_flage_ = 0;
 
 #undef CONFIG_AUTO_SET
 

@@ -7,12 +7,14 @@
 #include "Tokenizer/Tokenizer.hpp"
 #include "LLMEmbedSelector.hpp"
 #include "ax_model_runner/ax_model_runner_ax650.hpp"
+#include "ax_model_runner/legacy/ax_model_runner_ax650.hpp"
 #include "ax_cmm_utils.hpp"
 #include "cqdm.h"
 #include "timer.hpp"
 #include "LLMPostprocess.hpp"
 
-#include <ax_sys_api.h>
+#include "ax_sys_api.h"
+#include "ax_engine_api.h"
 
 #include <arm_neon.h>
 #define ALIGN_DOWN(x, a) ((x) & ~((a) - 1))
@@ -78,14 +80,14 @@ private:
     LLMAttrType _attr;
 
     struct LLMLayer {
-        ax_runner_ax650 layer;
+        ax::legacy::ax_runner_ax650 layer;
         std::string filename;
         MMap layer_buffer;
         std::vector<char> layer_buffer_vec;
     };
 
     std::vector<LLMLayer> llama_layers;
-    ax_runner_ax650 llama_post;
+    ax::legacy::ax_runner_ax650 llama_post;
 
     int prefill_grpid = 1;
     int decode_grpid  = 0;
@@ -243,9 +245,9 @@ public:
     void Deinit()
     {
         for (int i = 0; i < _attr.axmodel_num; i++) {
-            llama_layers[i].layer.deinit();
+            llama_layers[i].layer.release();
         }
-        llama_post.deinit();
+        llama_post.release();
         embed_selector.Deinit();
     }
 
@@ -1245,9 +1247,6 @@ public:
 
                 layer.layer.inference(_attr.prefill_grpid);
 
-                auto &input_decoder_k_cache = layer.layer.get_input(decode_grpid, "K_cache");
-                auto &input_decoder_v_cache = layer.layer.get_input(decode_grpid, "V_cache");
-
                 auto &input_prefill_k_cache = layer.layer.get_input(_attr.prefill_grpid, "K_cache");
                 auto &input_prefill_v_cache = layer.layer.get_input(_attr.prefill_grpid, "V_cache");
 
@@ -1255,12 +1254,6 @@ public:
                 auto &output_v_cache = layer.layer.get_output(_attr.prefill_grpid, "V_cache_out");
 
                 int kv_offset = (_attr.precompute_len + p * _attr.prefill_token_num) * _attr.kv_cache_size;
-
-                memcpy((unsigned short *)input_decoder_k_cache.pVirAddr + kv_offset, (void *)output_k_cache.pVirAddr,
-                       sizeof(unsigned short) * input_num_token * _attr.kv_cache_size);
-
-                memcpy((unsigned short *)input_decoder_v_cache.pVirAddr + kv_offset, (void *)output_v_cache.pVirAddr,
-                       sizeof(unsigned short) * input_num_token * _attr.kv_cache_size);
 
                 memcpy((unsigned short *)input_prefill_k_cache.pVirAddr + kv_offset, (void *)output_k_cache.pVirAddr,
                        sizeof(unsigned short) * input_num_token * _attr.kv_cache_size);

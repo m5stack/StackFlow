@@ -18,6 +18,7 @@
 #include "cqdm.h"
 #include "timer.hpp"
 #include "ax_sys_api.h"
+#include "ax_engine_api.h"
 #include "utils/sampling.hpp"
 #include "utils/utils.hpp"
 
@@ -463,19 +464,10 @@ public:
 
                 layer.layer.inference(_attr.prefill_grpid);
 
-                auto &input_decoder_k_cache = layer.layer.get_input(decode_grpid, "K_cache");
-                auto &input_decoder_v_cache = layer.layer.get_input(decode_grpid, "V_cache");
-
                 auto &output_k_cache = layer.layer.get_output(_attr.prefill_grpid, "K_cache_out");
                 auto &output_v_cache = layer.layer.get_output(_attr.prefill_grpid, "V_cache_out");
 
                 int kv_offset = (_attr.precompute_len + p * _attr.prefill_token_num) * _attr.kv_cache_size;
-
-                memcpy((unsigned short *)input_decoder_k_cache.pVirAddr + kv_offset, (void *)output_k_cache.pVirAddr,
-                       sizeof(unsigned short) * input_num_token * _attr.kv_cache_size);
-
-                memcpy((unsigned short *)input_decoder_v_cache.pVirAddr + kv_offset, (void *)output_v_cache.pVirAddr,
-                       sizeof(unsigned short) * input_num_token * _attr.kv_cache_size);
 
                 for (int gid = _attr.prefill_grpid + 1; gid < prefill_split_num + 1; gid++) {
                     auto &input_prefill_k_cache = layer.layer.get_input(gid, "K_cache");
