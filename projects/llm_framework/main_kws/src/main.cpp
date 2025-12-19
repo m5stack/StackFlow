@@ -81,6 +81,7 @@ private:
     int count_frames_               = 0;
     long long last_trigger_time_ms_ = -1e9;
     long long frame_index_global_   = 0;
+    int last_btn_204_state          = -1;
 
 public:
     inline const std::string &model() const
@@ -294,9 +295,9 @@ public:
 #undef CONFIG_AUTO_SET_SHERPA
 
 #define CONFIG_AUTO_SET_AXERA(obj, key)        \
-    if (config_body.contains(#key))           \
+    if (config_body.contains(#key))            \
         axera_config_.key = config_body[#key]; \
-    else if (obj.contains(#key))              \
+    else if (obj.contains(#key))               \
         axera_config_.key = obj[#key];
 
 #define OPTS_AUTO_SET(obj, key)              \
@@ -537,9 +538,27 @@ public:
         }
     }
 
-    void trigger()
+    void trigger_wakeup()
     {
-        if (out_callback_) out_callback_("", true);
+        if (enwake_audio_ && (!wake_wav_file_.empty()) && play_awake_wav) {
+            play_awake_wav(wake_wav_file_);
+        }
+        if (out_callback_) {
+            if (enoutput_json_)
+                out_callback_("{\"reason\":\"button_204\"}", true);
+            else
+                out_callback_("", true);
+        }
+    }
+
+    void set_btn_204_state(int state)
+    {
+        last_btn_204_state = state;
+    }
+
+    int get_btn_204_state()
+    {
+        return last_btn_204_state;
     }
 
     bool delete_model()
@@ -790,6 +809,40 @@ public:
         llm_task_obj->sys_pcm_on_data((*next_data));
     }
 
+    void task_buttons_data(const std::weak_ptr<llm_task> llm_task_obj_weak,
+                           const std::weak_ptr<llm_channel_obj> llm_channel_weak, const std::string &object,
+                           const std::string &data)
+    {
+        auto llm_task_obj = llm_task_obj_weak.lock();
+        auto llm_channel  = llm_channel_weak.lock();
+        if (!(llm_task_obj && llm_channel)) {
+            return;
+        }
+        if (data.empty() || (data == "None")) return;
+
+        try {
+            std::string user_msg    = sample_unescapeString(data);
+            nlohmann::json btn_json = nlohmann::json::parse(user_msg);
+
+            if (btn_json.contains("code") && btn_json.contains("vale")) {
+                int current_code = btn_json["code"];
+                int current_vale = btn_json["vale"];
+
+                if (current_vale == 204) {
+                    int last_code = llm_task_obj->get_btn_204_state();
+
+                    if (last_code == 0 && current_code == 1) {
+                        llm_task_obj->trigger_wakeup();
+                    }
+
+                    llm_task_obj->set_btn_204_state(current_code);
+                }
+            }
+        } catch (const std::exception &e) {
+            SLOGE("Button data JSON parse error: %s", e.what());
+        }
+    }
+
     int setup(const std::string &work_id, const std::string &object, const std::string &data) override
     {
         nlohmann::json error_body;
@@ -836,6 +889,17 @@ public:
                     llm_channel->subscriber_work_id("", std::bind(&llm_kws::task_user_data, this, _llm_task_obj,
                                                                   std::weak_ptr<llm_channel_obj>(llm_channel),
                                                                   std::placeholders::_1, std::placeholders::_2));
+                } else if (input.find("buttons_thread") != std::string::npos) {
+                    std::string socket_url = "ipc:///tmp/llm/ec_prox.event.socket";
+                    auto business_logic    = std::bind(
+                        &llm_kws::task_buttons_data, this, std::weak_ptr<llm_task>(llm_task_obj),
+                        std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2);
+
+                    llm_channel->subscriber(
+                        socket_url, [llm_channel, business_logic](StackFlows::pzmq *p,
+                                                                  const std::shared_ptr<StackFlows::pzmq_data> &d) {
+                            llm_channel->subscriber_event_call(business_logic, p, d);
+                        });
                 }
             }
             llm_task_[work_id_num] = llm_task_obj;
@@ -849,6 +913,94 @@ public:
             send("None", "None", error_body, "kws");
             return -1;
         }
+    }
+
+    void link(const std::string &work_id, const std::string &object, const std::string &data) override
+    {
+        SLOGI("llm_kws::link:%s", data.c_str());
+        int ret = 0;
+        nlohmann::json error_body;
+
+        int work_id_num = sample_get_work_id_num(work_id);
+        if (llm_task_.find(work_id_num) == llm_task_.end()) {
+            error_body["code"]    = -6;
+            error_body["message"] = "Unit Does Not Exist";
+            send("None", "None", error_body, work_id);
+            return;
+        }
+
+        auto llm_channel  = get_channel(work_id);
+        auto llm_task_obj = llm_task_[work_id_num];
+
+        if (data.find("sys") != std::string::npos) {
+            if (audio_url_.empty()) audio_url_ = unit_call("audio", "cap", data);
+
+            std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
+            llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                if (auto p = _llm_task_obj.lock()) p->sys_pcm_on_data(raw->string());
+            });
+
+            llm_task_obj->audio_flage_ = true;
+            llm_task_obj->inputs_.push_back(data);
+        } else if (data.find("buttons_thread") != std::string::npos) {
+            std::string socket_url = "ipc:///tmp/llm/ec_prox.event.socket";
+            auto business_logic =
+                std::bind(&llm_kws::task_buttons_data, this, std::weak_ptr<llm_task>(llm_task_obj),
+                          std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2);
+
+            llm_channel->subscriber(
+                socket_url,
+                [llm_channel, business_logic](StackFlows::pzmq *p, const std::shared_ptr<StackFlows::pzmq_data> &d) {
+                    llm_channel->subscriber_event_call(business_logic, p, d);
+                });
+
+            llm_task_obj->inputs_.push_back(data);
+        } else {
+            error_body["code"]    = -22;
+            error_body["message"] = "unsupported link target";
+            send("None", "None", error_body, work_id);
+            return;
+        }
+
+        if (ret) {
+            error_body["code"]    = -20;
+            error_body["message"] = "link false";
+            send("None", "None", error_body, work_id);
+            return;
+        }
+        send("None", "None", LLM_NO_ERROR, work_id);
+    }
+
+    void unlink(const std::string &work_id, const std::string &object, const std::string &data) override
+    {
+        SLOGI("llm_kws::unlink:%s", data.c_str());
+        nlohmann::json error_body;
+
+        int work_id_num = sample_get_work_id_num(work_id);
+        if (llm_task_.find(work_id_num) == llm_task_.end()) {
+            error_body["code"]    = -6;
+            error_body["message"] = "Unit Does Not Exist";
+            send("None", "None", error_body, work_id);
+            return;
+        }
+
+        auto llm_channel  = get_channel(work_id);
+        auto llm_task_obj = llm_task_[work_id_num];
+
+        llm_channel->stop_subscriber_work_id(data);
+
+        for (auto it = llm_task_obj->inputs_.begin(); it != llm_task_obj->inputs_.end();) {
+            if (*it == data)
+                it = llm_task_obj->inputs_.erase(it);
+            else
+                ++it;
+        }
+
+        if (data.find("sys") != std::string::npos) {
+            llm_task_obj->audio_flage_ = false;
+        }
+
+        send("None", "None", LLM_NO_ERROR, work_id);
     }
 
     void taskinfo(const std::string &work_id, const std::string &object, const std::string &data) override
@@ -937,7 +1089,7 @@ public:
             _zmq.send_data(out);
             return LLM_NONE;
         }
-        llm_task_[work_id_num]->trigger();
+        llm_task_[work_id_num]->trigger_wakeup();
         return LLM_NONE;
     }
 

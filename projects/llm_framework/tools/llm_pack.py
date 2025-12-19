@@ -480,7 +480,7 @@ if __name__ == "__main__":
         'llm-model-qwen3-vl-2B-Int4-ax630c':[create_data_deb,'llm-model-qwen3-vl-2B-Int4-ax630c', '0.5', src_folder, revision],
         ## AX650
         'llm-model-qwen2.5-0.5B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-0.5B-Int4-ax650', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-HA-0.5B-ctx-ax650':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-ax650', '0.5', src_folder, revision],
+        'llm-model-qwen2.5-HA-0.5B-ctx-ax650':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-ax650', '0.6', src_folder, revision],
         'llm-model-qwen2.5-1.5B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-1.5B-Int4-ax650', '0.4', src_folder, revision],
         'llm-model-qwen2.5-3B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-3B-Int4-ax650', '0.4', src_folder, revision],
         'llm-model-qwen2.5-7B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-7B-Int4-ax650', '0.4', src_folder, revision],
