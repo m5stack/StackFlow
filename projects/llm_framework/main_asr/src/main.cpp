@@ -73,6 +73,7 @@ private:
     sherpa_onnx::OnlineRecognizerConfig onnx_online_config;
 
     sherpa_onnx::VadModelConfig vad_config_;
+    std::unique_ptr<sherpa_onnx::OfflineStream> offline_stream_;
     std::unique_ptr<sherpa_onnx::OfflineRecognizer> onnx_recognizer_;
     std::unique_ptr<sherpa_onnx::OnlineRecognizer> onnx_online_recognizer_;
     std::unique_ptr<sherpa_onnx::OnlineStream> online_stream;
@@ -549,16 +550,16 @@ public:
         vad_->AcceptWaveform(floatSamples.data(), floatSamples.size());
         while (!vad_->Empty()) {
             const auto &segment = vad_->Front();
-            auto s              = onnx_recognizer_->CreateStream();
-            s->AcceptWaveform(onnx_asr_config_.feat_config.sampling_rate, segment.samples.data(),
-                              segment.samples.size());
-            onnx_recognizer_->DecodeStream(s.get());
-            const auto &result = s->GetResult();
+            if (!offline_stream_) offline_stream_ = onnx_recognizer_->CreateStream();
+            offline_stream_->AcceptWaveform(onnx_asr_config_.feat_config.sampling_rate, segment.samples.data(),
+                                            segment.samples.size());
+            onnx_recognizer_->DecodeStream(offline_stream_.get());
+            const auto &result = offline_stream_->GetResult();
             if (!result.text.empty() && out_callback_) {
-                SLOGI("onnx-asr result: %s", result.text.c_str());
                 out_callback_(result.text, true);
             }
             vad_->Pop();
+            offline_stream_.reset();
         }
 
         {

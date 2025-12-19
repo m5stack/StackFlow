@@ -209,7 +209,7 @@ public:
         }
 #else
         std::list<std::string> config_file_paths =
-            get_config_file_paths(base_model_path, base_model_config_path, "audio");
+            get_config_file_paths(base_model_path, base_model_config_path, "audio_pyramid");
 #endif
         try {
             config_body = nlohmann::json::parse(data);

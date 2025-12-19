@@ -397,6 +397,18 @@ if __name__ == "__main__":
         'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23', data_version, src_folder, revision],
         'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
         'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
+        'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16':[create_data_deb,'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16', '0.4', src_folder, revision],
+        'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-ax650':[create_data_deb,'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-ax650', '0.4', src_folder, revision],
+        # KWS model
+        ## AX630C
+        'llm-model-kws':[create_data_deb,'llm-model-kws', '0.4', src_folder, revision],
+        ## AX650
+        'llm-model-kws-ax650':[create_data_deb,'llm-model-kws-ax650', '0.4', src_folder, revision],
+        # ASR model
+        ## AX630C
+        'llm-model-sense-voice-small-10s':[create_data_deb,'llm-model-sense-voice-small-10s', '0.4', src_folder, revision],
+        ## AX650
+        'llm-model-sense-voice-small-10s-ax650':[create_data_deb,'llm-model-sense-voice-small-10s-ax650', '0.4', src_folder, revision],
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],

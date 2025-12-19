@@ -1,7 +1,7 @@
 {
-    "mode": "sherpa-onnx-zipformer-bilingual-zh-en-t",
+    "mode": "sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16",
     "type": "asr",
-    "homepage": "",
+    "homepage": "https://huggingface.co/csukuangfj/k2fsa-zipformer-bilingual-zh-en-t",
     "capabilities": [
         "Automatic_Speech_Recognition",
         "Chinese",

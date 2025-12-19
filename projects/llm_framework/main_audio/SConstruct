@@ -29,7 +29,7 @@ REQUIREMENTS += ['ax_sys', 'ax_audio', 'ax_audio_3a', 'tinyalsa', 'fdk-aac', 'op
 if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
     REQUIREMENTS += ['ax_interpreter', 'ax_fdk', 'ax_opus']
 
-STATIC_FILES += [AFile('audio.json'), AFile('audio_kit.json')]
+STATIC_FILES += [AFile('audio.json'), AFile('audio_kit.json'), AFile('audio_pyramid.json')]
 STATIC_FILES += Glob('mode_*.json')
 
 env['COMPONENTS'].append({'target':'llm_audio-1.7',

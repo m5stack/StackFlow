@@ -39,7 +39,7 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
 #include "sherpa-onnx/csrc/keyword-spotter.h"
 #include "kaldi-native-fbank/csrc/online-feature.h"
 
-typedef struct mode_config_onnx {
+typedef struct mode_config_axera {
     int chunk_size            = 32;
     float threshold           = 0.9f;
     int min_continuous_frames = 5;
@@ -47,7 +47,7 @@ typedef struct mode_config_onnx {
     int RESAMPLE_RATE         = 16000;
     int FEAT_DIM              = 80;
     int delay_audio_frame_    = 32;
-} kws_config_onnx;
+} kws_config_axera;
 
 class llm_task {
 private:
@@ -72,12 +72,11 @@ private:
     std::unique_ptr<sherpa_onnx::KeywordSpotter> sherpa_spotter_;
     std::unique_ptr<sherpa_onnx::OnlineStream> sherpa_stream_;
 
-    kws_config_onnx onnx_config_;
+    kws_config_axera axera_config_;
     std::vector<float> axera_cache_;
     std::unique_ptr<EngineWrapper> axera_session_;
     knf::FbankOptions fbank_opts_;
     std::unique_ptr<knf::OnlineFbank> fbank_;
-    Ort::Env onnx_env_{ORT_LOGGING_LEVEL_WARNING, "kws"};
     Ort::SessionOptions session_options_;
     int count_frames_               = 0;
     long long last_trigger_time_ms_ = -1e9;
@@ -117,7 +116,7 @@ public:
             if (model_.rfind("sherpa-onnx", 0) == 0) {
                 model_type_ = "sherpa";
             } else {
-                model_type_ = "onnx";
+                model_type_ = "axera";
             }
 
             if (config_body.contains("enwake_audio")) {
@@ -294,11 +293,11 @@ public:
     }
 #undef CONFIG_AUTO_SET_SHERPA
 
-#define CONFIG_AUTO_SET_ONNX(obj, key)        \
+#define CONFIG_AUTO_SET_AXERA(obj, key)        \
     if (config_body.contains(#key))           \
-        onnx_config_.key = config_body[#key]; \
+        axera_config_.key = config_body[#key]; \
     else if (obj.contains(#key))              \
-        onnx_config_.key = obj[#key];
+        axera_config_.key = obj[#key];
 
 #define OPTS_AUTO_SET(obj, key)              \
     if (config_body.contains(#key))          \
@@ -306,7 +305,7 @@ public:
     else if (obj.contains(#key))             \
         fbank_opts_.key = obj[#key];
 
-    int load_model_onnx(const nlohmann::json &config_body)
+    int load_model_axera(const nlohmann::json &config_body)
     {
         nlohmann::json file_body;
         std::list<std::string> config_file_paths =
@@ -345,13 +344,13 @@ public:
             axera_cache_.assign(1 * 32 * 88, 0.0f);
 
             auto &mp = file_body["mode_param"];
-            CONFIG_AUTO_SET_ONNX(mp, chunk_size);
-            CONFIG_AUTO_SET_ONNX(mp, threshold);
-            CONFIG_AUTO_SET_ONNX(mp, min_continuous_frames);
-            CONFIG_AUTO_SET_ONNX(mp, REFRACTORY_TIME_MS);
-            CONFIG_AUTO_SET_ONNX(mp, RESAMPLE_RATE);
-            CONFIG_AUTO_SET_ONNX(mp, FEAT_DIM);
-            CONFIG_AUTO_SET_ONNX(mp, delay_audio_frame_);
+            CONFIG_AUTO_SET_AXERA(mp, chunk_size);
+            CONFIG_AUTO_SET_AXERA(mp, threshold);
+            CONFIG_AUTO_SET_AXERA(mp, min_continuous_frames);
+            CONFIG_AUTO_SET_AXERA(mp, REFRACTORY_TIME_MS);
+            CONFIG_AUTO_SET_AXERA(mp, RESAMPLE_RATE);
+            CONFIG_AUTO_SET_AXERA(mp, FEAT_DIM);
+            CONFIG_AUTO_SET_AXERA(mp, delay_audio_frame_);
 
             OPTS_AUTO_SET(mp, frame_opts.samp_freq);
             OPTS_AUTO_SET(mp, frame_opts.frame_length_ms);
@@ -373,7 +372,7 @@ public:
             SLOGE("config file read false");
             return -3;
         }
-        delay_audio_frame_ = onnx_config_.delay_audio_frame_;
+        delay_audio_frame_ = axera_config_.delay_audio_frame_;
         return 0;
     }
 #undef CONFIG_AUTO_SET_ONNX
@@ -383,11 +382,11 @@ public:
     {
         bool triggered = false;
         for (auto score : scores) {
-            if (score > onnx_config_.threshold) {
+            if (score > axera_config_.threshold) {
                 count_frames_++;
-                if (count_frames_ >= onnx_config_.min_continuous_frames) {
-                    long long trigger_time_ms = (frame_index_global_ - onnx_config_.min_continuous_frames + 1) * 10;
-                    if (trigger_time_ms - last_trigger_time_ms_ >= onnx_config_.REFRACTORY_TIME_MS) {
+                if (count_frames_ >= axera_config_.min_continuous_frames) {
+                    long long trigger_time_ms = (frame_index_global_ - axera_config_.min_continuous_frames + 1) * 10;
+                    if (trigger_time_ms - last_trigger_time_ms_ >= axera_config_.REFRACTORY_TIME_MS) {
                         last_trigger_time_ms_ = trigger_time_ms;
                         triggered             = true;
                     }
@@ -420,11 +419,11 @@ public:
     std::vector<float> run_inference(const std::vector<float> &audio_chunk_16k)
     {
         std::vector<std::vector<float>> fbank_feats =
-            compute_fbank_kaldi(audio_chunk_16k, onnx_config_.RESAMPLE_RATE, onnx_config_.FEAT_DIM);
+            compute_fbank_kaldi(audio_chunk_16k, axera_config_.RESAMPLE_RATE, axera_config_.FEAT_DIM);
         if (fbank_feats.empty()) return {};
 
         constexpr int FIX_T = 32;
-        const int FEAT_DIM  = onnx_config_.FEAT_DIM;
+        const int FEAT_DIM  = axera_config_.FEAT_DIM;
 
         std::vector<float> mat_flattened;
         mat_flattened.resize(FIX_T * FEAT_DIM, 0.0f);
@@ -467,11 +466,11 @@ public:
         if (parse_config(config_body)) {
             return -1;
         }
-        if (model_type_ == "onnx") {
-            SLOGE("load onnx kws model");
-            return load_model_onnx(config_body);
+        if (model_type_ == "axera") {
+            SLOGI("load axera kws model");
+            return load_model_axera(config_body);
         } else {
-            SLOGE("load sherpa kws model");
+            SLOGI("load sherpa kws model");
             return load_model_sherpa(config_body);
         }
     }
@@ -498,7 +497,7 @@ public:
         int16_t audio_val;
         while (buffer_read_i16(pcmdata, &audio_val, 1)) {
             int16Samples.push_back(audio_val);
-            if (model_type_ == "onnx") {
+            if (model_type_ == "axera") {
                 floatSamples.push_back(static_cast<float>(audio_val) / 1.0f);
             } else {
                 floatSamples.push_back(static_cast<float>(audio_val) / INT16_MAX);
@@ -507,7 +506,7 @@ public:
         buffer_resize(pcmdata, 0);
         count = 0;
 
-        if (model_type_ == "onnx") {
+        if (model_type_ == "axera") {
             auto scores = run_inference(floatSamples);
             if (detect_wakeup(scores)) {
                 if (enwake_audio_ && (!wake_wav_file_.empty()) && play_awake_wav) {
