@@ -22,6 +22,7 @@
 #include <samplerate.h>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
 #include "subprocess.h"
+#include <global_config.h>
 
 using namespace StackFlows;
 
@@ -87,6 +88,7 @@ public:
     task_callback_t out_callback_;
     bool enaudio_;
     int awake_delay_ = 1000;
+    bool cap_;
     std::string tts_string_stream_buff;
 
     bool parse_config(const nlohmann::json &config_body)
@@ -255,12 +257,42 @@ public:
     {
         try {
             std::vector<int16_t> wav_pcm_data;
+#if !defined(CONFIG_AX_620E_MSP_ENABLED) && !defined(CONFIG_AX_620Q_MSP_ENABLED)
+            std::string initial_status = unit_call("audio", "audio_status", "sys");
+            if (!cap_ && initial_status.find("\"cap\":\"Running\"") != std::string::npos) {
+                unit_call("audio", "cap_stop_all", "sys");
+                cap_ = true;
+            }
+#endif
             if (msg_str.empty()) {
                 if (out_callback_) {
                     std::string output = wav_pcm_data.empty() ? std::string()
                                                               : std::string((char *)wav_pcm_data.data(),
                                                                             wav_pcm_data.size() * sizeof(int16_t));
                     out_callback_(output, finish);
+#if !defined(CONFIG_AX_620E_MSP_ENABLED) && !defined(CONFIG_AX_620Q_MSP_ENABLED)
+                    int none_count           = 0;
+                    const int max_iterations = 100;
+
+                    for (int i = 0; i < max_iterations; ++i) {
+                        std::string current_status = unit_call("audio", "audio_status", "sys");
+                        if (current_status.find("\"play\":\"None\"") != std::string::npos) {
+                            none_count++;
+                        } else {
+                            none_count = 0;
+                        }
+                        if (none_count >= 5) {
+                            break;
+                        }
+
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
+
+                    if (cap_) {
+                        unit_call("audio", "cap", "sys");
+                        cap_ = false;
+                    }
+#endif
                 }
                 return false;
             }
@@ -528,7 +560,11 @@ public:
             llm_channel->send(llm_task_obj->response_format_, base64_data, LLM_NO_ERROR);
         }
         if (llm_task_obj->response_format_.find("sys") != std::string::npos) {
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
             unit_call("audio", "queue_play", data);
+#else
+            unit_call("audio", "play_raw", data);
+#endif
         }
     }
 

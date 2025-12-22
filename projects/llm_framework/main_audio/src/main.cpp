@@ -495,13 +495,13 @@ public:
 #endif
 
         if (_rawdata == "play") {
-            return play_state ? "None" : "Runing";
+            return play_state ? "None" : "Running";
         } else if (_rawdata == "cap") {
-            return cap_state ? "None" : "Runing";
+            return cap_state ? "None" : "Running";
         } else {
             std::ostringstream return_val;
-            return_val << "{\"play\":" << (play_state ? "\"None\"" : "\"Runing\"")
-                       << ",\"cap\":" << (cap_state ? "\"None\"" : "\"Runing\"") << "}";
+            return_val << "{\"play\":" << (play_state ? "\"None\"" : "\"Running\"")
+                       << ",\"cap\":" << (cap_state ? "\"None\"" : "\"Running\"") << "}";
             return return_val.str();
         }
     }
