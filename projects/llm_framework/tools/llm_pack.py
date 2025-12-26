@@ -387,7 +387,7 @@ if __name__ == "__main__":
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', '1.7', src_folder, revision],
         'llm-vad':[create_bin_deb,'llm-vad', '1.8', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.8', src_folder, revision],
-        'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.9', src_folder, revision],
+        'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.10', src_folder, revision],
         'llm-cosy-voice':[create_bin_deb,'llm-cosy-voice', '1.10', src_folder, revision],
         # keyword spotting Audio file
         'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
