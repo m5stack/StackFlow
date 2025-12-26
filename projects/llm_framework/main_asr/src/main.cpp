@@ -120,6 +120,14 @@ public:
     buffer_t *pcmdata;
     std::function<void(void)> pause;
 
+    bool is_using_itn() const
+    {
+        if (engine_type_ == ENGINE_ONNX) {
+            return onnx_asr_config_.model_config.sense_voice.use_itn;
+        }
+        return false;
+    }
+
     bool parse_config(const nlohmann::json &config_body)
     {
         try {
@@ -546,91 +554,146 @@ public:
 
     void sys_pcm_on_data_onnx(const std::string &raw)
     {
-        if (raw.size() >= sizeof(int16_t)) {
-            const int16_t *pcm16 = reinterpret_cast<const int16_t *>(raw.data());
-            size_t n16           = raw.size() / sizeof(int16_t);
-            PushPreRollPcm(pcm16, n16);
-        }
-
-        static int count = 0;
-        if (count < delay_audio_frame_) {
+        if (delay_audio_frame_ == 0) {
             buffer_write_char(pcmdata, raw.data(), raw.length());
-            count++;
-            return;
-        }
+            buffer_position_set(pcmdata, 0);
 
-        buffer_write_char(pcmdata, raw.data(), raw.length());
-        buffer_position_set(pcmdata, 0);
-
-        std::vector<float> floatSamples;
-        floatSamples.reserve((delay_audio_frame_ + 1) * kFrameSamples);
-
-        int16_t audio_val;
-        while (buffer_read_i16(pcmdata, &audio_val, 1)) {
-            floatSamples.push_back(static_cast<float>(audio_val) / 32768.0f);
-        }
-
-        buffer_resize(pcmdata, 0);
-        count = 0;
-
-        vad_->AcceptWaveform(floatSamples.data(), floatSamples.size());
-
-        bool detected      = vad_->IsSpeechDetected();
-        bool speech_start  = (!prev_vad_detected_ && detected);
-        prev_vad_detected_ = detected;
-
-        while (!vad_->Empty()) {
-            const auto &segment = vad_->Front();
-
-            if (!offline_stream_) {
-                offline_stream_ = onnx_recognizer_->CreateStream();
+            std::vector<float> floatSamples;
+            int16_t audio_val;
+            while (buffer_read_i16(pcmdata, &audio_val, 1)) {
+                float normalizedSample = static_cast<float>(audio_val) / INT16_MAX;
+                floatSamples.push_back(normalizedSample);
             }
 
-            if (speech_start && !pre_roll_pcm_.empty()) {
-                std::vector<float> pre;
-                pre.reserve(pre_roll_pcm_.size());
-                for (int16_t s : pre_roll_pcm_) {
-                    pre.push_back(static_cast<float>(s) / 32768.0f);
+            buffer_resize(pcmdata, 0);
+            int32_t window_size = vad_config_.silero_vad.window_size;
+            int32_t i           = 0;
+            std::string final_text;
+
+            while (i < floatSamples.size()) {
+                if (i + window_size <= floatSamples.size()) {
+                    vad_->AcceptWaveform(floatSamples.data() + i, window_size);
+                } else {
+                    vad_->Flush();
+                }
+                i += window_size;
+
+                while (!vad_->Empty()) {
+                    const auto &segment = vad_->Front();
+                    float duration      = segment.samples.size() / 16000.f;
+                    float start_time    = segment.start / 16000.f;
+                    float end_time      = start_time + duration;
+
+                    if (duration < 0.1f) {
+                        vad_->Pop();
+                        continue;
+                    }
+
+                    if (!offline_stream_) offline_stream_ = onnx_recognizer_->CreateStream();
+
+                    offline_stream_->AcceptWaveform(onnx_asr_config_.feat_config.sampling_rate, segment.samples.data(),
+                                                    segment.samples.size());
+
+                    onnx_recognizer_->DecodeStream(offline_stream_.get());
+                    const auto &result = offline_stream_->GetResult();
+
+                    final_text += result.text;
+
+                    vad_->Pop();
+                    offline_stream_.reset();
+                }
+            }
+
+            if (out_callback_) {
+                out_callback_(final_text, true);
+            }
+        } else {
+            if (raw.size() >= sizeof(int16_t)) {
+                const int16_t *pcm16 = reinterpret_cast<const int16_t *>(raw.data());
+                size_t n16           = raw.size() / sizeof(int16_t);
+                PushPreRollPcm(pcm16, n16);
+            }
+
+            static int count = 0;
+            if (count < delay_audio_frame_) {
+                buffer_write_char(pcmdata, raw.data(), raw.length());
+                count++;
+                return;
+            }
+
+            buffer_write_char(pcmdata, raw.data(), raw.length());
+            buffer_position_set(pcmdata, 0);
+
+            std::vector<float> floatSamples;
+            floatSamples.reserve((delay_audio_frame_ + 1) * kFrameSamples);
+
+            int16_t audio_val;
+            while (buffer_read_i16(pcmdata, &audio_val, 1)) {
+                floatSamples.push_back(static_cast<float>(audio_val) / 32768.0f);
+            }
+
+            buffer_resize(pcmdata, 0);
+            count = 0;
+
+            vad_->AcceptWaveform(floatSamples.data(), floatSamples.size());
+
+            bool detected      = vad_->IsSpeechDetected();
+            bool speech_start  = (!prev_vad_detected_ && detected);
+            prev_vad_detected_ = detected;
+
+            while (!vad_->Empty()) {
+                const auto &segment = vad_->Front();
+
+                if (!offline_stream_) {
+                    offline_stream_ = onnx_recognizer_->CreateStream();
                 }
 
-                std::vector<float> merged;
-                merged.reserve(pre.size() + segment.samples.size());
-                merged.insert(merged.end(), pre.begin(), pre.end());
-                merged.insert(merged.end(), segment.samples.begin(), segment.samples.end());
+                if (speech_start && !pre_roll_pcm_.empty()) {
+                    std::vector<float> pre;
+                    pre.reserve(pre_roll_pcm_.size());
+                    for (int16_t s : pre_roll_pcm_) {
+                        pre.push_back(static_cast<float>(s) / 32768.0f);
+                    }
 
-                offline_stream_->AcceptWaveform(kSampleRate, merged.data(), merged.size());
+                    std::vector<float> merged;
+                    merged.reserve(pre.size() + segment.samples.size());
+                    merged.insert(merged.end(), pre.begin(), pre.end());
+                    merged.insert(merged.end(), segment.samples.begin(), segment.samples.end());
 
-                pre_roll_pcm_.clear();
-                speech_start = false;
-            } else {
-                offline_stream_->AcceptWaveform(kSampleRate, segment.samples.data(), segment.samples.size());
-            }
+                    offline_stream_->AcceptWaveform(kSampleRate, merged.data(), merged.size());
 
-            onnx_recognizer_->DecodeStream(offline_stream_.get());
-
-            const auto &result = offline_stream_->GetResult();
-            if (!result.text.empty() && out_callback_) {
-                out_callback_(result.text, true);
-            }
-
-            vad_->Pop();
-
-            offline_stream_.reset();
-        }
-
-        {
-            float chunk_ms = (delay_audio_frame_ + 1) * 10.0f;
-            if (detected) {
-                silence_ms_accum_ = 0.0f;
-            } else {
-                silence_ms_accum_ += chunk_ms;
-            }
-
-            if (silence_ms_accum_ >= silence_timeout) {
-                if (ensleep_) {
-                    if (pause) pause();
+                    pre_roll_pcm_.clear();
+                    speech_start = false;
+                } else {
+                    offline_stream_->AcceptWaveform(kSampleRate, segment.samples.data(), segment.samples.size());
                 }
-                silence_ms_accum_ = 0.0f;
+
+                onnx_recognizer_->DecodeStream(offline_stream_.get());
+
+                const auto &result = offline_stream_->GetResult();
+                if (!result.text.empty() && out_callback_) {
+                    out_callback_(result.text, true);
+                }
+
+                vad_->Pop();
+
+                offline_stream_.reset();
+            }
+
+            {
+                float chunk_ms = (delay_audio_frame_ + 1) * 10.0f;
+                if (detected) {
+                    silence_ms_accum_ = 0.0f;
+                } else {
+                    silence_ms_accum_ += chunk_ms;
+                }
+
+                if (silence_ms_accum_ >= silence_timeout) {
+                    if (ensleep_) {
+                        if (pause) pause();
+                    }
+                    silence_ms_accum_ = 0.0f;
+                }
             }
         }
     }
@@ -755,8 +818,10 @@ public:
         std::string tmp_msg1;
         const std::string *next_data = &data;
         if (finish) {
-            tmp_msg1  = data + ".";
-            next_data = &tmp_msg1;
+            if (!llm_task_obj->is_using_itn()) {
+                tmp_msg1  = data + ".";
+                next_data = &tmp_msg1;
+            }
         }
 
         if (llm_channel->enstream_) {

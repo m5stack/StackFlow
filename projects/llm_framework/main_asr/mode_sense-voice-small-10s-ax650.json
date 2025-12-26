@@ -20,6 +20,7 @@
     ],
     "mode_param": {
         "model_config.sense_voice.model": "model.axmodel",
+        "model_config.sense_voice.use_itn": true,
         "model_config.tokens": "tokens.txt",
         "silero_vad.model": "silero_vad.ort",
         "model_config.provider": "axera",
