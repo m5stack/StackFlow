@@ -23,7 +23,7 @@
         "lexicon": "lexicon-es.txt",
         "spacker_speed": 1.2,
         "mode_rate": 44100,
-        "audio_rate": 16000,
+        "audio_rate": 48000,
         "awake_delay": 1000
     }
 }

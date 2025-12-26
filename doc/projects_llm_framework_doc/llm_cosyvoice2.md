@@ -31,7 +31,7 @@ cosy_voice
 - object：传输的数据类型为 `cosy_voice.setup`。
 - model：使用的模型为 `CosyVoice2-0.5B-ax650` 模型。
 - prompt_files：要克隆的音频信息文件。
-- response_format：返回结果为 `sys.pcm`, 系统音频数据，并直接发送到 llm-audio 模块进行播放。返回结果为 `file`, 生成的音频写 wav 文件，可用 `prompt_data` 指定路径或文件名。
+- response_format：返回结果为 `sys.pcm`, 系统音频数据，并直接发送到 llm-audio 模块进行播放。返回结果为 `file`, 生成的音频写 wav 文件，可用 `prompt_dir` 指定路径或文件名。
 - input：输入的为 `tts.utf-8`,代表的是从用户输入。
 - enoutput：是否起用用户结果输出。
 
