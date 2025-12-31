@@ -5,6 +5,9 @@
  */
 #include "StackFlow.h"
 #include "sherpa-ncnn/csrc/recognizer.h"
+#include "sherpa-onnx/csrc/offline-recognizer.h"
+#include "sherpa-onnx/csrc/online-recognizer.h"
+#include "sherpa-onnx/csrc/voice-activity-detector.h"
 
 #include <iostream>
 #include <signal.h>
@@ -24,6 +27,7 @@
 using namespace StackFlows;
 
 int main_exit_flage = 0;
+
 static void __sigint(int iSigNo)
 {
     SLOGW("llm_asr will be exit!");
@@ -35,17 +39,68 @@ static std::string base_model_config_path_;
 
 typedef std::function<void(const std::string &data, bool finish)> task_callback_t;
 
-#define CONFIG_AUTO_SET(obj, key)             \
+#define NCNN_ASR_CONFIG_AUTO_SET(obj, key)    \
     if (config_body.contains(#key))           \
-        mode_config_.key = config_body[#key]; \
+        ncnn_config_.key = config_body[#key]; \
     else if (obj.contains(#key))              \
-        mode_config_.key = obj[#key];
+        ncnn_config_.key = obj[#key];
+
+#define ONNX_ONLINE_CONFIG_AUTO_SET(obj, key)                \
+    if (config_body.contains(#key))                          \
+        config_body.at(#key).get_to(onnx_online_config.key); \
+    else if ((obj).contains(#key))                           \
+        (obj).at(#key).get_to(onnx_online_config.key);
+
+#define ONNX_ASR_CONFIG_AUTO_SET(obj, key)        \
+    if (config_body.contains(#key))               \
+        onnx_asr_config_.key = config_body[#key]; \
+    else if (obj.contains(#key))                  \
+        onnx_asr_config_.key = obj[#key];
+
+#define ONNX_VAD_CONFIG_AUTO_SET(obj, key)   \
+    if (config_body.contains(#key))          \
+        vad_config_.key = config_body[#key]; \
+    else if (obj.contains(#key))             \
+        vad_config_.key = obj[#key];
 
 class llm_task {
 private:
-    sherpa_ncnn::RecognizerConfig mode_config_;
-    std::unique_ptr<sherpa_ncnn::Recognizer> recognizer_;
-    std::unique_ptr<sherpa_ncnn::Stream> recognizer_stream_;
+    sherpa_ncnn::RecognizerConfig ncnn_config_;
+    std::unique_ptr<sherpa_ncnn::Recognizer> ncnn_recognizer_;
+    std::unique_ptr<sherpa_ncnn::Stream> ncnn_stream_;
+
+    sherpa_onnx::OfflineRecognizerConfig onnx_asr_config_;
+    sherpa_onnx::OnlineRecognizerConfig onnx_online_config;
+
+    sherpa_onnx::VadModelConfig vad_config_;
+    std::unique_ptr<sherpa_onnx::OfflineStream> offline_stream_;
+    std::unique_ptr<sherpa_onnx::OfflineRecognizer> onnx_recognizer_;
+    std::unique_ptr<sherpa_onnx::OnlineRecognizer> onnx_online_recognizer_;
+    std::unique_ptr<sherpa_onnx::OnlineStream> online_stream;
+    std::unique_ptr<sherpa_onnx::VoiceActivityDetector> vad_;
+
+    enum EngineType {
+        ENGINE_NCNN   = 0,
+        ENGINE_ONNX   = 1,
+        ENGINE_ONLINE = 3,
+    } engine_type_ = ENGINE_NCNN;
+
+    static constexpr int kSampleRate   = 16000;
+    static constexpr int kFrameSamples = 160;
+    int pre_roll_frames_               = 30;
+    std::deque<int16_t> pre_roll_pcm_;
+    bool prev_vad_detected_ = false;
+
+private:
+    void PushPreRollPcm(const int16_t *pcm, size_t n)
+    {
+        pre_roll_pcm_.insert(pre_roll_pcm_.end(), pcm, pcm + n);
+
+        const size_t max_samples = (size_t)pre_roll_frames_ * kFrameSamples;
+        while (pre_roll_pcm_.size() > max_samples) {
+            pre_roll_pcm_.pop_front();
+        }
+    }
 
 public:
     std::string model_;
@@ -57,11 +112,21 @@ public:
     task_callback_t out_callback_;
     std::atomic_bool audio_flage_;
     std::atomic_bool awake_flage_;
-    int awake_delay_       = 50;
-    int delay_audio_frame_ = 10;
-    buffer_t *pcmdata;
+    int awake_delay_        = 50;
+    int delay_audio_frame_  = 10;
+    float silence_ms_accum_ = 0.0f;
+    float silence_timeout   = 1000.0f;
 
+    buffer_t *pcmdata;
     std::function<void(void)> pause;
+
+    bool is_using_itn() const
+    {
+        if (engine_type_ == ENGINE_ONNX) {
+            return onnx_asr_config_.model_config.sense_voice.use_itn;
+        }
+        return false;
+    }
 
     bool parse_config(const nlohmann::json &config_body)
     {
@@ -82,8 +147,310 @@ public:
             SLOGE("setup config_body error");
             return true;
         }
+
+        if (model_.rfind("sherpa-ncnn", 0) == 0) {
+            engine_type_ = ENGINE_NCNN;
+        } else if (model_.rfind("sherpa-onnx", 0) == 0) {
+            engine_type_ = ENGINE_ONLINE;
+        } else {
+            engine_type_ = ENGINE_ONNX;
+        }
+
         enstream_ = response_format_.find("stream") == std::string::npos ? false : true;
         return false;
+    }
+
+    int load_ncnn_model(const nlohmann::json &config_body, const nlohmann::json &file_body)
+    {
+        std::string base_model = base_model_path_ + model_ + "/";
+        SLOGI("base_model (ncnn) %s", base_model.c_str());
+
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.sampling_rate);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.feature_dim);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.encoder_param);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.encoder_bin);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.decoder_param);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.decoder_bin);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.joiner_param);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.joiner_bin);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.tokens);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.encoder_opt.num_threads);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.decoder_opt.num_threads);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.joiner_opt.num_threads);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], decoder_config.method);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], decoder_config.num_active_paths);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule1.must_contain_nonsilence);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule1.min_trailing_silence);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule1.min_utterance_length);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule2.must_contain_nonsilence);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule2.min_trailing_silence);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule2.min_utterance_length);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule3.must_contain_nonsilence);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule3.min_trailing_silence);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule3.min_utterance_length);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], enable_endpoint);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], hotwords_file);
+        NCNN_ASR_CONFIG_AUTO_SET(file_body["mode_param"], hotwords_score);
+
+        if (config_body.contains("awake_delay"))
+            awake_delay_ = config_body["awake_delay"].get<int>();
+        else if (file_body["mode_param"].contains("awake_delay"))
+            awake_delay_ = file_body["mode_param"]["awake_delay"];
+
+        if (config_body.contains("rule1")) {
+            ncnn_config_.endpoint_config.rule1.min_trailing_silence = config_body["rule1"].get<float>();
+            ncnn_config_.endpoint_config.rule1.must_contain_nonsilence =
+                (ncnn_config_.endpoint_config.rule1.min_trailing_silence == 0.0f) ? false : true;
+        }
+        if (config_body.contains("rule2")) {
+            ncnn_config_.endpoint_config.rule2.min_trailing_silence = config_body["rule2"].get<float>();
+            ncnn_config_.endpoint_config.rule2.must_contain_nonsilence =
+                (ncnn_config_.endpoint_config.rule2.min_trailing_silence == 0.0f) ? false : true;
+        }
+        if (config_body.contains("rule3")) {
+            ncnn_config_.endpoint_config.rule3.min_utterance_length = config_body["rule3"].get<float>();
+            ncnn_config_.endpoint_config.rule3.must_contain_nonsilence =
+                (ncnn_config_.endpoint_config.rule3.min_utterance_length == 0.0f) ? false : true;
+        }
+
+        ncnn_config_.model_config.tokens        = base_model + ncnn_config_.model_config.tokens;
+        ncnn_config_.model_config.encoder_param = base_model + ncnn_config_.model_config.encoder_param;
+        ncnn_config_.model_config.encoder_bin   = base_model + ncnn_config_.model_config.encoder_bin;
+        ncnn_config_.model_config.decoder_param = base_model + ncnn_config_.model_config.decoder_param;
+        ncnn_config_.model_config.decoder_bin   = base_model + ncnn_config_.model_config.decoder_bin;
+        ncnn_config_.model_config.joiner_param  = base_model + ncnn_config_.model_config.joiner_param;
+        ncnn_config_.model_config.joiner_bin    = base_model + ncnn_config_.model_config.joiner_bin;
+
+        ncnn_recognizer_ = std::make_unique<sherpa_ncnn::Recognizer>(ncnn_config_);
+        return 0;
+    }
+
+    int load_onnx_model(const nlohmann::json &config_body, const nlohmann::json &file_body)
+    {
+        std::string base_model = base_model_path_ + model_ + "/";
+        SLOGI("base_model (onnx) %s", base_model.c_str());
+
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.sampling_rate);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.feature_dim);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.low_freq);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.dither);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.normalize_samples);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.snip_edges);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.frame_shift_ms);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.frame_length_ms);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.is_librosa);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.remove_dc_offset);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.preemph_coeff);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.window_type);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.nemo_normalize_type);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.num_ceps);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.use_energy);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.is_mfcc);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.is_whisper);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.is_t_one);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.round_to_power_of_two);
+
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.transducer.encoder_filename);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.transducer.decoder_filename);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.transducer.joiner_filename);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.paraformer.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.nemo_ctc.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.whisper.encoder);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.whisper.decoder);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.whisper.language);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.whisper.task);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.whisper.tail_paddings);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.fire_red_asr.encoder);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.fire_red_asr.decoder);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.tdnn.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer_ctc.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.wenet_ctc.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.sense_voice.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.sense_voice.language);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.sense_voice.use_itn);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.moonshine.preprocessor);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.moonshine.encoder);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.moonshine.uncached_decoder);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.moonshine.cached_decoder);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.dolphin.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.canary.encoder);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.canary.decoder);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.canary.src_lang);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.canary.tgt_lang);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.canary.use_pnc);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.omnilingual.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.telespeech_ctc);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.tokens);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.num_threads);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.debug);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.model_type);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.modeling_unit);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.bpe_vocab);
+
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.scale);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lm_num_threads);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lm_provider);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lodr_fst);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lodr_scale);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lodr_backoff_id);
+
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], ctc_fst_decoder_config.graph);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], ctc_fst_decoder_config.max_active);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], decoding_method);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], max_active_paths);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], hotwords_file);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], hotwords_score);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], blank_penalty);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], rule_fsts);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], rule_fars);
+
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], silero_vad.model);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], silero_vad.threshold);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], silero_vad.min_silence_duration);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], silero_vad.min_speech_duration);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], silero_vad.window_size);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], silero_vad.max_speech_duration);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], ten_vad.model);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], ten_vad.threshold);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], ten_vad.min_silence_duration);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], ten_vad.min_speech_duration);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], ten_vad.window_size);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], ten_vad.max_speech_duration);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], sample_rate);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], num_threads);
+        ONNX_VAD_CONFIG_AUTO_SET(file_body["mode_param"], debug);
+
+        if (config_body.contains("awake_delay"))
+            awake_delay_ = config_body["awake_delay"].get<int>();
+        else if (file_body["mode_param"].contains("awake_delay"))
+            awake_delay_ = file_body["mode_param"]["awake_delay"];
+
+        if (config_body.contains("silence_timeout"))
+            silence_timeout = config_body["silence_timeout"].get<int>();
+        else if (file_body["mode_param"].contains("silence_timeout"))
+            silence_timeout = file_body["mode_param"]["silence_timeout"];
+
+        onnx_asr_config_.model_config.sense_voice.model = base_model + onnx_asr_config_.model_config.sense_voice.model;
+        onnx_asr_config_.model_config.tokens            = base_model + onnx_asr_config_.model_config.tokens;
+        vad_config_.silero_vad.model                    = base_model + vad_config_.silero_vad.model;
+
+        onnx_recognizer_ = std::make_unique<sherpa_onnx::OfflineRecognizer>(onnx_asr_config_);
+        vad_             = std::make_unique<sherpa_onnx::VoiceActivityDetector>(vad_config_);
+        return 0;
+    }
+
+    int load_online_model(const nlohmann::json &config_body, const nlohmann::json &file_body)
+    {
+        std::string base_model = base_model_path_ + model_ + "/";
+        SLOGI("base_model (onnx) %s", base_model.c_str());
+
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.sampling_rate);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.feature_dim);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.low_freq);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.high_freq);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.dither);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.normalize_samples);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.snip_edges);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.frame_shift_ms);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.frame_length_ms);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.is_librosa);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.remove_dc_offset);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.preemph_coeff);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.window_type);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.nemo_normalize_type);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.num_ceps);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.use_energy);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.is_mfcc);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.is_whisper);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.is_t_one);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], feat_config.round_to_power_of_two);
+
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.transducer.encoder);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.transducer.decoder);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.transducer.joiner);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.provider_config.provider);
+
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.paraformer.encoder);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.paraformer.decoder);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.wenet_ctc.model);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.wenet_ctc.chunk_size);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.wenet_ctc.num_left_chunks);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer2_ctc.model);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.nemo_ctc.model);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.t_one_ctc.model);
+
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer_meta.encoder_dims);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer_meta.attention_dims);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer_meta.num_encoder_layers);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer_meta.cnn_module_kernels);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer_meta.left_context_len);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer_meta.T);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer_meta.decode_chunk_len);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.zipformer_meta.context_size);
+
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.tokens);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.num_threads);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.warm_up);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.model_type);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.modeling_unit);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.bpe_vocab);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], model_config.tokens_buf);
+
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.model);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.scale);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lm_num_threads);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lm_provider);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lodr_fst);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lodr_scale);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.lodr_backoff_id);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], lm_config.shallow_fusion);
+
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule1.must_contain_nonsilence);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule1.min_trailing_silence);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule1.min_utterance_length);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule2.must_contain_nonsilence);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule2.min_trailing_silence);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule2.min_utterance_length);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule3.must_contain_nonsilence);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule3.min_trailing_silence);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule3.min_utterance_length);
+
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], ctc_fst_decoder_config.graph);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], ctc_fst_decoder_config.max_active);
+
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], enable_endpoint);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], decoding_method);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], max_active_paths);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], hotwords_file);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], hotwords_score);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], blank_penalty);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], temperature_scale);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], rule_fsts);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], rule_fars);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], reset_encoder);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], hr.dict_dir);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], hr.lexicon);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], hr.rule_fsts);
+        ONNX_ONLINE_CONFIG_AUTO_SET(file_body["mode_param"], hotwords_buf);
+
+        if (config_body.contains("awake_delay"))
+            awake_delay_ = config_body["awake_delay"].get<int>();
+        else if (file_body["mode_param"].contains("awake_delay"))
+            awake_delay_ = file_body["mode_param"]["awake_delay"];
+
+        onnx_online_config.model_config.transducer.encoder =
+            base_model + onnx_online_config.model_config.transducer.encoder;
+        onnx_online_config.model_config.transducer.decoder =
+            base_model + onnx_online_config.model_config.transducer.decoder;
+        onnx_online_config.model_config.transducer.joiner =
+            base_model + onnx_online_config.model_config.transducer.joiner;
+        onnx_online_config.model_config.tokens = base_model + onnx_online_config.model_config.tokens;
+
+        onnx_online_recognizer_ = std::make_unique<sherpa_onnx::OnlineRecognizer>(onnx_online_config);
+
+        return 0;
     }
 
     int load_model(const nlohmann::json &config_body)
@@ -91,9 +458,11 @@ public:
         if (parse_config(config_body)) {
             return -1;
         }
+
         nlohmann::json file_body;
         std::list<std::string> config_file_paths =
             get_config_file_paths(base_model_path_, base_model_config_path_, model_);
+
         try {
             for (auto file_name : config_file_paths) {
                 std::ifstream config_file(file_name);
@@ -110,68 +479,18 @@ public:
                 SLOGE("all config file miss");
                 return -2;
             }
-            std::string base_model = base_model_path_ + model_ + "/";
-            SLOGI("base_model %s", base_model.c_str());
 
-            CONFIG_AUTO_SET(file_body["mode_param"], feat_config.sampling_rate);
-            CONFIG_AUTO_SET(file_body["mode_param"], feat_config.feature_dim);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.encoder_param);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.encoder_bin);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.decoder_param);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.decoder_bin);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.joiner_param);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.joiner_bin);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.tokens);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.encoder_opt.num_threads);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.decoder_opt.num_threads);
-            CONFIG_AUTO_SET(file_body["mode_param"], model_config.joiner_opt.num_threads);
-            CONFIG_AUTO_SET(file_body["mode_param"], decoder_config.method);
-            CONFIG_AUTO_SET(file_body["mode_param"], decoder_config.num_active_paths);
-            CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule1.must_contain_nonsilence);
-            CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule1.min_trailing_silence);
-            CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule1.min_utterance_length);
-            CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule2.must_contain_nonsilence);
-            CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule2.min_trailing_silence);
-            CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule2.min_utterance_length);
-            CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule3.must_contain_nonsilence);
-            CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule3.min_trailing_silence);
-            CONFIG_AUTO_SET(file_body["mode_param"], endpoint_config.rule3.min_utterance_length);
-            CONFIG_AUTO_SET(file_body["mode_param"], enable_endpoint);
-            CONFIG_AUTO_SET(file_body["mode_param"], hotwords_file);
-            CONFIG_AUTO_SET(file_body["mode_param"], hotwords_score);
-            if (config_body.contains("awake_delay"))
-                awake_delay_ = config_body["awake_delay"].get<int>();
-            else if (file_body["mode_param"].contains("awake_delay"))
-                awake_delay_ = file_body["mode_param"]["awake_delay"];
-            if (config_body.contains("rule1")) {
-                mode_config_.endpoint_config.rule1.min_trailing_silence = config_body["rule1"].get<float>();
-                mode_config_.endpoint_config.rule1.must_contain_nonsilence =
-                    (mode_config_.endpoint_config.rule1.min_trailing_silence == 0.0f) ? false : true;
+            if (engine_type_ == ENGINE_NCNN) {
+                return load_ncnn_model(config_body, file_body);
+            } else if (engine_type_ == ENGINE_ONLINE) {
+                return load_online_model(config_body, file_body);
+            } else {
+                return load_onnx_model(config_body, file_body);
             }
-            if (config_body.contains("rule2")) {
-                mode_config_.endpoint_config.rule2.min_trailing_silence = config_body["rule2"].get<float>();
-                mode_config_.endpoint_config.rule2.must_contain_nonsilence =
-                    (mode_config_.endpoint_config.rule2.min_trailing_silence == 0.0f) ? false : true;
-            }
-            if (config_body.contains("rule3")) {
-                mode_config_.endpoint_config.rule3.min_utterance_length = config_body["rule3"].get<float>();
-                mode_config_.endpoint_config.rule3.must_contain_nonsilence =
-                    (mode_config_.endpoint_config.rule3.min_utterance_length == 0.0f) ? false : true;
-            }
-
-            mode_config_.model_config.tokens        = base_model + mode_config_.model_config.tokens;
-            mode_config_.model_config.encoder_param = base_model + mode_config_.model_config.encoder_param;
-            mode_config_.model_config.encoder_bin   = base_model + mode_config_.model_config.encoder_bin;
-            mode_config_.model_config.decoder_param = base_model + mode_config_.model_config.decoder_param;
-            mode_config_.model_config.decoder_bin   = base_model + mode_config_.model_config.decoder_bin;
-            mode_config_.model_config.joiner_param  = base_model + mode_config_.model_config.joiner_param;
-            mode_config_.model_config.joiner_bin    = base_model + mode_config_.model_config.joiner_bin;
-            recognizer_                             = std::make_unique<sherpa_ncnn::Recognizer>(mode_config_);
         } catch (...) {
             SLOGE("config false");
             return -3;
         }
-        return 0;
     }
 
     void set_output(task_callback_t out_callback)
@@ -179,7 +498,7 @@ public:
         out_callback_ = out_callback;
     }
 
-    void sys_pcm_on_data(const std::string &raw)
+    void sys_pcm_on_data_ncnn(const std::string &raw)
     {
         static int count = 0;
         if (count < delay_audio_frame_) {
@@ -191,45 +510,250 @@ public:
         buffer_position_set(pcmdata, 0);
 
         std::vector<float> floatSamples;
-        {
+        int16_t audio_val;
+        while (buffer_read_i16(pcmdata, &audio_val, 1)) {
+            float normalizedSample = static_cast<float>(audio_val) / INT16_MAX;
+            floatSamples.push_back(normalizedSample);
+        }
+        buffer_resize(pcmdata, 0);
+        count = 0;
+
+        if (awake_flage_ && ncnn_stream_) {
+            ncnn_stream_.reset();
+            awake_flage_ = false;
+        }
+        if (!ncnn_stream_) {
+            ncnn_stream_ = ncnn_recognizer_->CreateStream();
+        }
+
+        ncnn_stream_->AcceptWaveform(ncnn_config_.feat_config.sampling_rate, floatSamples.data(), floatSamples.size());
+
+        while (ncnn_recognizer_->IsReady(ncnn_stream_.get())) {
+            ncnn_recognizer_->DecodeStream(ncnn_stream_.get());
+        }
+
+        std::string text = ncnn_recognizer_->GetResult(ncnn_stream_.get()).text;
+        std::string lower_text;
+        lower_text.resize(text.size());
+        std::transform(text.begin(), text.end(), lower_text.begin(), [](const char c) { return std::tolower(c); });
+
+        if ((!lower_text.empty()) && out_callback_) out_callback_(lower_text, false);
+
+        bool is_endpoint = ncnn_recognizer_->IsEndpoint(ncnn_stream_.get());
+        if (is_endpoint) {
+            ncnn_stream_->Finalize();
+            if ((!lower_text.empty()) && out_callback_) {
+                out_callback_(lower_text, true);
+            }
+            ncnn_stream_.reset();
+            if (ensleep_) {
+                if (pause) pause();
+            }
+        }
+    }
+
+    void sys_pcm_on_data_onnx(const std::string &raw)
+    {
+        if (delay_audio_frame_ == 0) {
+            buffer_write_char(pcmdata, raw.data(), raw.length());
+            buffer_position_set(pcmdata, 0);
+
+            std::vector<float> floatSamples;
             int16_t audio_val;
             while (buffer_read_i16(pcmdata, &audio_val, 1)) {
                 float normalizedSample = static_cast<float>(audio_val) / INT16_MAX;
                 floatSamples.push_back(normalizedSample);
             }
-        }
 
+            buffer_resize(pcmdata, 0);
+            int32_t window_size = vad_config_.silero_vad.window_size;
+            int32_t i           = 0;
+            std::string final_text;
+
+            while (i < floatSamples.size()) {
+                if (i + window_size <= floatSamples.size()) {
+                    vad_->AcceptWaveform(floatSamples.data() + i, window_size);
+                } else {
+                    vad_->Flush();
+                }
+                i += window_size;
+
+                while (!vad_->Empty()) {
+                    const auto &segment = vad_->Front();
+                    float duration      = segment.samples.size() / 16000.f;
+                    float start_time    = segment.start / 16000.f;
+                    float end_time      = start_time + duration;
+
+                    if (duration < 0.1f) {
+                        vad_->Pop();
+                        continue;
+                    }
+
+                    if (!offline_stream_) offline_stream_ = onnx_recognizer_->CreateStream();
+
+                    offline_stream_->AcceptWaveform(onnx_asr_config_.feat_config.sampling_rate, segment.samples.data(),
+                                                    segment.samples.size());
+
+                    onnx_recognizer_->DecodeStream(offline_stream_.get());
+                    const auto &result = offline_stream_->GetResult();
+
+                    final_text += result.text;
+
+                    vad_->Pop();
+                    offline_stream_.reset();
+                }
+            }
+
+            if (out_callback_) {
+                out_callback_(final_text, true);
+            }
+        } else {
+            if (raw.size() >= sizeof(int16_t)) {
+                const int16_t *pcm16 = reinterpret_cast<const int16_t *>(raw.data());
+                size_t n16           = raw.size() / sizeof(int16_t);
+                PushPreRollPcm(pcm16, n16);
+            }
+
+            static int count = 0;
+            if (count < delay_audio_frame_) {
+                buffer_write_char(pcmdata, raw.data(), raw.length());
+                count++;
+                return;
+            }
+
+            buffer_write_char(pcmdata, raw.data(), raw.length());
+            buffer_position_set(pcmdata, 0);
+
+            std::vector<float> floatSamples;
+            floatSamples.reserve((delay_audio_frame_ + 1) * kFrameSamples);
+
+            int16_t audio_val;
+            while (buffer_read_i16(pcmdata, &audio_val, 1)) {
+                floatSamples.push_back(static_cast<float>(audio_val) / 32768.0f);
+            }
+
+            buffer_resize(pcmdata, 0);
+            count = 0;
+
+            vad_->AcceptWaveform(floatSamples.data(), floatSamples.size());
+
+            bool detected      = vad_->IsSpeechDetected();
+            bool speech_start  = (!prev_vad_detected_ && detected);
+            prev_vad_detected_ = detected;
+
+            while (!vad_->Empty()) {
+                const auto &segment = vad_->Front();
+
+                if (!offline_stream_) {
+                    offline_stream_ = onnx_recognizer_->CreateStream();
+                }
+
+                if (speech_start && !pre_roll_pcm_.empty()) {
+                    std::vector<float> pre;
+                    pre.reserve(pre_roll_pcm_.size());
+                    for (int16_t s : pre_roll_pcm_) {
+                        pre.push_back(static_cast<float>(s) / 32768.0f);
+                    }
+
+                    std::vector<float> merged;
+                    merged.reserve(pre.size() + segment.samples.size());
+                    merged.insert(merged.end(), pre.begin(), pre.end());
+                    merged.insert(merged.end(), segment.samples.begin(), segment.samples.end());
+
+                    offline_stream_->AcceptWaveform(kSampleRate, merged.data(), merged.size());
+
+                    pre_roll_pcm_.clear();
+                    speech_start = false;
+                } else {
+                    offline_stream_->AcceptWaveform(kSampleRate, segment.samples.data(), segment.samples.size());
+                }
+
+                onnx_recognizer_->DecodeStream(offline_stream_.get());
+
+                const auto &result = offline_stream_->GetResult();
+                if (!result.text.empty() && out_callback_) {
+                    out_callback_(result.text, true);
+                }
+
+                vad_->Pop();
+
+                offline_stream_.reset();
+            }
+
+            {
+                float chunk_ms = (delay_audio_frame_ + 1) * 10.0f;
+                if (detected) {
+                    silence_ms_accum_ = 0.0f;
+                } else {
+                    silence_ms_accum_ += chunk_ms;
+                }
+
+                if (silence_ms_accum_ >= silence_timeout) {
+                    if (ensleep_) {
+                        if (pause) pause();
+                    }
+                    silence_ms_accum_ = 0.0f;
+                }
+            }
+        }
+    }
+
+    void sys_pcm_on_data_online(const std::string &raw)
+    {
+        static int count = 0;
+        if (count < delay_audio_frame_) {
+            buffer_write_char(pcmdata, raw.data(), raw.length());
+            count++;
+            return;
+        }
+        buffer_write_char(pcmdata, raw.data(), raw.length());
+        buffer_position_set(pcmdata, 0);
+
+        std::vector<float> floatSamples;
+        int16_t audio_val;
+        while (buffer_read_i16(pcmdata, &audio_val, 1)) {
+            float normalizedSample = static_cast<float>(audio_val) / INT16_MAX;
+            floatSamples.push_back(normalizedSample);
+        }
         buffer_resize(pcmdata, 0);
         count = 0;
 
-        if (awake_flage_ && recognizer_stream_) {
-            recognizer_stream_.reset();
-            awake_flage_ = false;
+        if (!online_stream) online_stream = onnx_online_recognizer_->CreateStream();
+        online_stream->AcceptWaveform(onnx_online_config.feat_config.sampling_rate, floatSamples.data(),
+                                      floatSamples.size());
+
+        while (onnx_online_recognizer_->IsReady(online_stream.get())) {
+            onnx_online_recognizer_->DecodeStream(online_stream.get());
         }
-        if (!recognizer_stream_) {
-            recognizer_stream_ = recognizer_->CreateStream();
-        }
-        recognizer_stream_->AcceptWaveform(mode_config_.feat_config.sampling_rate, floatSamples.data(),
-                                           floatSamples.size());
-        while (recognizer_->IsReady(recognizer_stream_.get())) {
-            recognizer_->DecodeStream(recognizer_stream_.get());
-        }
-        std::string text = recognizer_->GetResult(recognizer_stream_.get()).text;
+
+        auto text = onnx_online_recognizer_->GetResult(online_stream.get()).text;
         std::string lower_text;
         lower_text.resize(text.size());
-        std::transform(text.begin(), text.end(), lower_text.begin(), [](const char c) { return std::tolower(c); });
+        std::transform(text.begin(), text.end(), lower_text.begin(), [](auto c) { return std::tolower(c); });
+
         if ((!lower_text.empty()) && out_callback_) out_callback_(lower_text, false);
-        bool is_endpoint = recognizer_->IsEndpoint(recognizer_stream_.get());
+
+        bool is_endpoint = onnx_online_recognizer_->IsEndpoint(online_stream.get());
+
         if (is_endpoint) {
-            std::cout << "asr have a is_endpoint \n";
-            recognizer_stream_->Finalize();
             if ((!lower_text.empty()) && out_callback_) {
                 out_callback_(lower_text, true);
             }
-            recognizer_stream_.reset();
+            online_stream.reset();
             if (ensleep_) {
                 if (pause) pause();
             }
+        }
+    }
+
+    void sys_pcm_on_data(const std::string &raw)
+    {
+        if (engine_type_ == ENGINE_NCNN) {
+            sys_pcm_on_data_ncnn(raw);
+        } else if (engine_type_ == ENGINE_ONLINE) {
+            sys_pcm_on_data_online(raw);
+        } else {
+            sys_pcm_on_data_onnx(raw);
         }
     }
 
@@ -240,7 +764,8 @@ public:
 
     bool delete_model()
     {
-        recognizer_.reset();
+        ncnn_recognizer_.reset();
+        onnx_recognizer_.reset();
         return true;
     }
 
@@ -254,7 +779,6 @@ public:
     void start()
     {
     }
-
     void stop()
     {
     }
@@ -265,8 +789,6 @@ public:
         buffer_destroy(pcmdata);
     }
 };
-
-#undef CONFIG_AUTO_SET
 
 class llm_asr : public StackFlow {
 public:
@@ -292,12 +814,16 @@ public:
         if (!(llm_task_obj && llm_channel)) {
             return;
         }
+
         std::string tmp_msg1;
         const std::string *next_data = &data;
         if (finish) {
-            tmp_msg1  = data + ".";
-            next_data = &tmp_msg1;
+            if (!llm_task_obj->is_using_itn()) {
+                tmp_msg1  = data + ".";
+                next_data = &tmp_msg1;
+            }
         }
+
         if (llm_channel->enstream_) {
             static int count = 0;
             nlohmann::json data_body;
@@ -317,7 +843,7 @@ public:
     {
         int post = 0;
         if (in.length() > 10)
-            for (int i = 0; i < in.length() - 4; i++) {
+            for (int i = 0; i < (int)in.length() - 4; i++) {
                 if ((in[i] == 'd') && (in[i + 1] == 'a') && (in[i + 2] == 't') && (in[i + 3] == 'a')) {
                     post = i + 8;
                     break;
@@ -329,7 +855,6 @@ public:
         } else {
             return 0;
         }
-        return 0;
     }
 
     int decode_mp3(const std::string &in, std::string &out)
@@ -350,15 +875,17 @@ public:
             send("None", "None", error_body, unit_name_);
             return;
         }
+
         std::string tmp_msg1;
         const std::string *next_data = &data;
         int ret;
+
         if (object.find("stream") != std::string::npos) {
             static std::unordered_map<int, std::string> stream_buff;
             try {
                 if (decode_stream(data, tmp_msg1, stream_buff)) {
                     return;
-                };
+                }
             } catch (...) {
                 stream_buff.clear();
                 error_body["code"]    = -25;
@@ -368,6 +895,7 @@ public:
             }
             next_data = &tmp_msg1;
         }
+
         std::string tmp_msg2;
         if (object.find("base64") != std::string::npos) {
             ret = decode_base64((*next_data), tmp_msg2);
@@ -379,6 +907,7 @@ public:
             }
             next_data = &tmp_msg2;
         }
+
         std::string tmp_msg3;
         if (object.find("wav") != std::string::npos) {
             ret = decode_wav((*next_data), tmp_msg3);
@@ -387,6 +916,7 @@ public:
             }
             next_data = &tmp_msg3;
         }
+
         std::string tmp_msg4;
         if (object.find("mp3") != std::string::npos) {
             ret = decode_mp3((*next_data), tmp_msg4);
@@ -395,6 +925,7 @@ public:
             }
             next_data = &tmp_msg4;
         }
+
         llm_task_obj->sys_pcm_on_data((*next_data));
     }
 
@@ -430,7 +961,9 @@ public:
         if ((!audio_url_.empty()) && (llm_task_obj->audio_flage_ == false)) {
             std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
             llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
+                if (auto p = _llm_task_obj.lock()) {
+                    p->sys_pcm_on_data(raw->string());
+                }
             });
             llm_task_obj->audio_flage_ = true;
         }
@@ -452,7 +985,6 @@ public:
     void work(const std::string &work_id, const std::string &object, const std::string &data) override
     {
         SLOGI("llm_asr::work:%s", data.c_str());
-
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
         if (llm_task_.find(work_id_num) == llm_task_.end()) {
@@ -467,8 +999,7 @@ public:
 
     void pause(const std::string &work_id, const std::string &object, const std::string &data) override
     {
-        SLOGI("llm_asr::work:%s", data.c_str());
-
+        SLOGI("llm_asr::pause:%s", data.c_str());
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
         if (llm_task_.find(work_id_num) == llm_task_.end()) {
@@ -502,9 +1033,10 @@ public:
             SLOGE("setup json format error.");
             error_body["code"]    = -2;
             error_body["message"] = "json format error.";
-            send("None", "None", error_body, "kws");
+            send("None", "None", error_body, "asr");
             return -2;
         }
+
         int ret = llm_task_obj->load_model(config_body);
         if (ret == 0) {
             llm_channel->set_output(llm_task_obj->enoutput_);
@@ -514,13 +1046,15 @@ public:
                                                std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1,
                                                std::placeholders::_2));
 
-            for (const auto input : llm_task_obj->inputs_) {
+            for (const auto &input : llm_task_obj->inputs_) {
                 if (input.find("sys") != std::string::npos) {
                     audio_url_                            = unit_call("audio", "cap", input);
                     std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
                     llm_channel->subscriber(audio_url_,
                                             [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                                                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
+                                                if (auto p = _llm_task_obj.lock()) {
+                                                    p->sys_pcm_on_data(raw->string());
+                                                }
                                             });
                     llm_task_obj->audio_flage_ = true;
                 } else if (input.find("asr") != std::string::npos) {
@@ -538,12 +1072,13 @@ public:
                                          std::placeholders::_2));
                 }
             }
+
             llm_task_[work_id_num] = llm_task_obj;
-            SLOGI("load_mode success");
+            SLOGI("load_model success");
             send("None", "None", LLM_NO_ERROR, work_id);
             return 0;
         } else {
-            SLOGE("load_mode Failed");
+            SLOGE("load_model Failed");
             error_body["code"]    = -5;
             error_body["message"] = "Model loading failed.";
             send("None", "None", error_body, "asr");
@@ -563,13 +1098,17 @@ public:
             send("None", "None", error_body, work_id);
             return;
         }
+
         auto llm_channel  = get_channel(work_id);
         auto llm_task_obj = llm_task_[work_id_num];
+
         if (data.find("sys") != std::string::npos) {
             if (audio_url_.empty()) audio_url_ = unit_call("audio", "cap", data);
             std::weak_ptr<llm_task> _llm_task_obj = llm_task_obj;
             llm_channel->subscriber(audio_url_, [_llm_task_obj](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                _llm_task_obj.lock()->sys_pcm_on_data(raw->string());
+                if (auto p = _llm_task_obj.lock()) {
+                    p->sys_pcm_on_data(raw->string());
+                }
             });
             llm_task_obj->audio_flage_ = true;
             llm_task_obj->inputs_.push_back(data);
@@ -581,6 +1120,7 @@ public:
                                              std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
             llm_task_obj->inputs_.push_back(data);
         }
+
         if (ret) {
             error_body["code"]    = -20;
             error_body["message"] = "link false";
@@ -594,7 +1134,6 @@ public:
     void unlink(const std::string &work_id, const std::string &object, const std::string &data) override
     {
         SLOGI("llm_asr::unlink:%s", data.c_str());
-        int ret = 0;
         nlohmann::json error_body;
         int work_id_num = sample_get_work_id_num(work_id);
         if (llm_task_.find(work_id_num) == llm_task_.end()) {
@@ -603,8 +1142,10 @@ public:
             send("None", "None", error_body, work_id);
             return;
         }
+
         auto llm_channel = get_channel(work_id);
         llm_channel->stop_subscriber_work_id(data);
+
         auto llm_task_obj = llm_task_[work_id_num];
         for (auto it = llm_task_obj->inputs_.begin(); it != llm_task_obj->inputs_.end();) {
             if (*it == data) {
@@ -613,19 +1154,23 @@ public:
                 ++it;
             }
         }
+
+        if (data.find("sys") != std::string::npos) {
+            llm_task_obj->audio_flage_ = false;
+        }
+
         send("None", "None", LLM_NO_ERROR, work_id);
     }
 
     void taskinfo(const std::string &work_id, const std::string &object, const std::string &data) override
     {
         SLOGI("llm_asr::taskinfo:%s", data.c_str());
-
         nlohmann::json req_body;
         int work_id_num = sample_get_work_id_num(work_id);
         if (WORK_ID_NONE == work_id_num) {
             std::vector<std::string> task_list;
             std::transform(llm_task_channel_.begin(), llm_task_channel_.end(), std::back_inserter(task_list),
-                           [](const auto task_channel) { return task_channel.second->work_id_; });
+                           [](const auto &task_channel) { return task_channel.second->work_id_; });
             req_body = task_list;
             send("asr.tasklist", req_body, LLM_NO_ERROR, work_id);
         } else {
@@ -669,17 +1214,17 @@ public:
     ~llm_asr()
     {
         while (1) {
-            auto iteam = llm_task_.begin();
-            if (iteam == llm_task_.end()) {
+            auto it = llm_task_.begin();
+            if (it == llm_task_.end()) {
                 break;
             }
-            iteam->second->stop();
-            if (iteam->second->audio_flage_) {
+            it->second->stop();
+            if (it->second->audio_flage_) {
                 unit_call("audio", "cap_stop", "None");
             }
-            get_channel(iteam->first)->stop_subscriber("");
-            iteam->second.reset();
-            llm_task_.erase(iteam->first);
+            get_channel(it->first)->stop_subscriber("");
+            it->second.reset();
+            llm_task_.erase(it->first);
         }
     }
 };

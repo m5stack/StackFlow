@@ -26,7 +26,7 @@ REQUIREMENTS += ['tinyalsa', 'samplerate']
 STATIC_FILES += [AFile('audio.json'), AFile('audio_kit.json')]
 STATIC_FILES += Glob('mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_audio-1.7',
+env['COMPONENTS'].append({'target':'llm_audio-1.8',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

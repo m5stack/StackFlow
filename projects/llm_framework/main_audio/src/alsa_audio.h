@@ -28,6 +28,7 @@ void alsa_play(unsigned int card, unsigned int device, float Volume, int channel
 
 void alsa_close_play();
 int alsa_cap_status();
+int alsa_play_status();
 
 #ifdef __cplusplus
 }

@@ -7,13 +7,15 @@
 #include <string.h>
 
 static struct pcm *g_play_pcm = NULL;
-static int gplayLoopExit      = 0;
-static int gcapLoopExit       = 0;
+static int gplayLoopExit      = 1;
+static int gcapLoopExit       = 1;
 AlsaConfig cap_config;
+AlsaConfig play_config;
 
 void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int channel, int rate, int bit,
                     AUDIOCallback callback)
 {
+    gcapLoopExit = 0;
     struct pcm_config config;
     unsigned int pcm_open_flags;
     struct pcm *pcm;
@@ -25,7 +27,7 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
 
     memset(&config, 0, sizeof(config));
     config.channels          = channel;
-    config.rate              = 48000;  // TODO: 部分USB MIC仅支持48k，暂时固定采集为48k
+    config.rate              = 48000;
     config.period_size       = 120;
     config.period_count      = 4;
     config.format            = PCM_FORMAT_S16_LE;
@@ -59,6 +61,7 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
 
     SRC_STATE *src_state = NULL;
     float *in_float = NULL, *out_float = NULL;
+
     int in_frames  = pcm_get_buffer_size(pcm);
     int out_frames = (int)((float)in_frames * ((float)rate / 48000.0f) + 1);
     int out_bytes  = out_frames * channel * sizeof(short);
@@ -84,6 +87,7 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
             fprintf(stderr, "Error capturing samples - %d (%s)\n", errno, strerror(errno));
             break;
         }
+
         frames_read = ret;
         total_frames_read += frames_read;
 
@@ -106,7 +110,6 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
                 fprintf(stderr, "SRC error: %s\n", src_strerror(error));
                 break;
             }
-            // float转short
             short *out_short = malloc(src_data.output_frames_gen * channel * sizeof(short));
             for (int i = 0; i < src_data.output_frames_gen * channel; ++i) {
                 float sample = out_float[i];
@@ -137,10 +140,12 @@ int alsa_cap_status()
 {
     return gcapLoopExit;
 }
-AlsaConfig play_config;
+
 void alsa_play(unsigned int card, unsigned int device, float Volume, int channel, int rate, int bit, const void *data,
                int size)
 {
+    gplayLoopExit = 0;
+
     struct pcm_config config;
     memset(&config, 0, sizeof(config));
     config.channels          = channel;
@@ -154,29 +159,32 @@ void alsa_play(unsigned int card, unsigned int device, float Volume, int channel
 
     unsigned int pcm_open_flags = PCM_OUT;
 
-    if (!g_play_pcm) {
-        g_play_pcm = pcm_open(card, device, pcm_open_flags, &config);
-        if (!g_play_pcm || !pcm_is_ready(g_play_pcm)) {
-            fprintf(stderr, "Unable to open PCM playback device (%s)\n", pcm_get_error(g_play_pcm));
-            if (g_play_pcm) {
-                pcm_close(g_play_pcm);
-                g_play_pcm = NULL;
-            }
-            return;
+    struct pcm *pcm = pcm_open(card, device, pcm_open_flags, &config);
+    if (!pcm || !pcm_is_ready(pcm)) {
+        fprintf(stderr, "Unable to open PCM playback device (%s)\n", pcm ? pcm_get_error(pcm) : "invalid pcm");
+        if (pcm) {
+            pcm_close(pcm);
         }
+        gplayLoopExit = 2;
+        return;
     }
 
-    int written_frames = pcm_writei(g_play_pcm, data, pcm_bytes_to_frames(g_play_pcm, size));
+    int frames         = pcm_bytes_to_frames(pcm, size);
+    int written_frames = pcm_writei(pcm, data, frames);
     if (written_frames < 0) {
-        fprintf(stderr, "PCM playback error %s\n", pcm_get_error(g_play_pcm));
+        fprintf(stderr, "PCM playback error %s\n", pcm_get_error(pcm));
     }
+    printf("Played %d frames\n", written_frames);
+    pcm_close(pcm);
+    gplayLoopExit = 2;
 }
 
 void alsa_close_play()
 {
     gplayLoopExit = 1;
-    if (g_play_pcm) {
-        pcm_close(g_play_pcm);
-        g_play_pcm = NULL;
-    }
+}
+
+int alsa_play_status()
+{
+    return gplayLoopExit;
 }

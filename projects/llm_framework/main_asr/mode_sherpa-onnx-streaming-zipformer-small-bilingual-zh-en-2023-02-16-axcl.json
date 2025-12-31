@@ -1,0 +1,70 @@
+{
+    "mode": "sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-axcl",
+    "type": "asr",
+    "homepage": "https://huggingface.co/csukuangfj/k2fsa-zipformer-bilingual-zh-en-t",
+    "capabilities": [
+        "Automatic_Speech_Recognition",
+        "Chinese",
+        "English"
+    ],
+    "input_type": [
+        "sys.pcm",
+        "sys.cap.0_0"
+    ],
+    "output_type": [
+        "asr.utf-8",
+        "asr.bool"
+    ],
+    "mode_param": {
+        "model_config.transducer.encoder": "encoder.axmodel",
+        "model_config.transducer.decoder": "decoder.axmodel",
+        "model_config.transducer.joiner": "joiner.axmodel",
+        "model_config.tokens": "tokens.txt",
+        "feat_config.feature_dim": 80,
+        "feat_config.sampling_rate": 16000,
+        "endpoint_config.rule1.min_trailing_silence": 2.4,
+        "endpoint_config.rule2.min_trailing_silence": 1.2,
+        "endpoint_config.rule3.min_utterance_length": 30,
+        "enable_endpoint": true,
+        "awake_delay": 50,
+        "model_config.provider_config.provider": "axcl",
+        "model_config.zipformer_meta.encoder_dims": [
+            256,
+            256,
+            256,
+            256,
+            256
+        ],
+        "model_config.zipformer_meta.attention_dims": [
+            192,
+            192,
+            192,
+            192,
+            192
+        ],
+        "model_config.zipformer_meta.num_encoder_layers": [
+            2,
+            2,
+            2,
+            2,
+            2
+        ],
+        "model_config.zipformer_meta.cnn_module_kernels": [
+            31,
+            31,
+            31,
+            31,
+            31
+        ],
+        "model_config.zipformer_meta.left_context_len": [
+            192,
+            96,
+            48,
+            24,
+            96
+        ],
+        "model_config.zipformer_meta.T": 103,
+        "model_config.zipformer_meta.decode_chunk_len": 96,
+        "model_config.zipformer_meta.context_size": 2
+    }
+}

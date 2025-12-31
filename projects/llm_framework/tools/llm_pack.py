@@ -374,9 +374,9 @@ if __name__ == "__main__":
         # Unit
         'lib-llm':[create_lib_deb,'lib-llm', '1.8', src_folder, revision],
         'llm-sys':[create_bin_deb,'llm-sys', '1.7', src_folder, revision],
-        'llm-audio':[create_bin_deb,'llm-audio', '1.7', src_folder, revision],
+        'llm-audio':[create_bin_deb,'llm-audio', '1.8', src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', '1.9', src_folder, revision],
-        'llm-asr':[create_bin_deb,'llm-asr', '1.7', src_folder, revision],
+        'llm-asr':[create_bin_deb,'llm-asr', '1.8', src_folder, revision],
         'llm-llm':[create_bin_deb,'llm-llm', '1.11', src_folder, revision],
         'llm-tts':[create_bin_deb,'llm-tts', '1.6', src_folder, revision],
         'llm-melotts':[create_bin_deb,'llm-melotts', '1.9', src_folder, revision],
@@ -387,7 +387,7 @@ if __name__ == "__main__":
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', '1.7', src_folder, revision],
         'llm-vad':[create_bin_deb,'llm-vad', '1.8', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.8', src_folder, revision],
-        'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.10', src_folder, revision],
+        'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.11', src_folder, revision],
         'llm-cosy-voice':[create_bin_deb,'llm-cosy-voice', '1.9', src_folder, revision],
         # keyword spotting Audio file
         'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
@@ -397,6 +397,8 @@ if __name__ == "__main__":
         'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23', data_version, src_folder, revision],
         'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
         'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
+        'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-axcl':[create_data_deb,'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-axcl', '0.4', src_folder, revision],
+        'llm-model-sense-voice-small-10s-axcl':[create_data_deb,'llm-model-sense-voice-small-10s-axcl', '0.4', src_folder, revision],
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],

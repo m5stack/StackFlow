@@ -23,7 +23,8 @@ LINK_SEARCH_PATH += [ADir('../static_lib')]
 INCLUDE += [ADir('../static_lib/include/sherpa')]
 
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
-LDFLAGS += ['-l:libsherpa-onnx-core.a']
+
+LDFLAGS += ['-l:libsherpa-onnx-core.a', '-l:libkaldi-native-fbank-core.a', '-l:libkissfft-float.a']
 
 REQUIREMENTS += ['onnxruntime']
 

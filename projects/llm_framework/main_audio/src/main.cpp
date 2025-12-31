@@ -13,6 +13,7 @@
 #include <iostream>
 #include <stdexcept>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
+#include <global_config.h>
 
 int main_exit_flage = 0;
 static void __sigint(int iSigNo)
@@ -92,7 +93,7 @@ private:
         }
         std::lock_guard<std::mutex> guard(ax_play_mtx);
         alsa_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
-                  play_config.bit, audio_data.c_str(), audio_data.length());
+                  play_config.bit, final_data.c_str(), final_data.length());
     }
 
     void hw_cap()
@@ -221,6 +222,7 @@ public:
         AlsaConfig mode_config_;
         try {
             memset(&mode_config_, 0, sizeof(AlsaConfig));
+
             if (object == "audio.play") {
                 CONFIG_AUTO_SET(file_body["play_param"], card);
                 CONFIG_AUTO_SET(file_body["play_param"], device);
@@ -230,6 +232,7 @@ public:
                 CONFIG_AUTO_SET(file_body["play_param"], bit);
                 memcpy(&play_config, &mode_config_, sizeof(AlsaConfig));
             }
+
             if (object == "audio.cap") {
                 CONFIG_AUTO_SET(file_body["cap_param"], card);
                 CONFIG_AUTO_SET(file_body["cap_param"], device);
@@ -349,33 +352,16 @@ public:
     std::string audio_status(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         std::string _rawdata = rawdata->string();
+        auto play_state      = alsa_play_status();
+        auto cap_state       = alsa_cap_status();
         if (_rawdata == "play") {
-            if (alsa_cap_status()) {
-                return std::string("None");
-            } else {
-                return std::string("Runing");
-            }
+            return play_state ? "None" : "Running";
         } else if (_rawdata == "cap") {
-            if (alsa_cap_status()) {
-                return std::string("None");
-            } else {
-                return std::string("Runing");
-            }
+            return cap_state ? "None" : "Running";
         } else {
             std::ostringstream return_val;
-            return_val << "{\"play\":";
-            if (alsa_cap_status()) {
-                return_val << "\"None\"";
-            } else {
-                return_val << "\"Runing\"";
-            }
-            return_val << "\"cap\":";
-            if (alsa_cap_status()) {
-                return_val << "\"None\"";
-            } else {
-                return_val << "\"Runing\"";
-            }
-            return_val << "\"}";
+            return_val << "{\"play\":" << (play_state ? "\"None\"" : "\"Running\"")
+                       << ",\"cap\":" << (cap_state ? "\"None\"" : "\"Running\"") << "}";
             return return_val.str();
         }
     }
