@@ -390,8 +390,8 @@ if __name__ == "__main__":
         'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.10', src_folder, revision],
         'llm-cosy-voice':[create_bin_deb,'llm-cosy-voice', '1.10', src_folder, revision],
         # keyword spotting Audio file
-        'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
-        'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', data_version, src_folder, revision],
+        'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', '0.3', src_folder, revision],
+        'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', '0.3', src_folder, revision],
         # Kaldi model        
         'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17', data_version, src_folder, revision],
         'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23', data_version, src_folder, revision],
