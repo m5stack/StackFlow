@@ -219,7 +219,7 @@ public:
             ALOGE("init vpm axmodel(%s) failed", attr.filename_image_encoder_axmodel.c_str());
             return false;
         }
-        image_encoder.print_info(0);
+        // image_encoder.print_info(0);
         image_encoder.set_auto_sync_after_inference(true);
         image_encoder.set_auto_sync_before_inference(true);
 
@@ -392,9 +392,9 @@ public:
     void Deinit()
     {
         for (int i = 0; i < _attr.axmodel_num; i++) {
-            llama_layers[i].layer.release();
+            llama_layers[i].layer.deinit();
         }
-        llama_post.release();
+        llama_post.deinit();
         embed_selector.Deinit();
 
         for (auto &devid : _attr.dev_ids) axcl_Exit(devid);
@@ -1497,7 +1497,7 @@ public:
             ALOGE("init vpm axmodel(%s) failed", attr.filename_image_encoder_axmodel.c_str());
             return false;
         }
-        image_encoder.print_info(0);
+        // image_encoder.print_info(0);
         image_encoder.set_auto_sync_after_inference(true);
         image_encoder.set_auto_sync_before_inference(true);
 
@@ -1664,10 +1664,10 @@ public:
     void Deinit()
     {
         for (int i = 0; i < _attr.axmodel_num; i++) {
-            llama_layers[i].layer.release();
+            llama_layers[i].layer.deinit();
         }
-        llama_post.release();
-        image_encoder.release();
+        llama_post.deinit();
+        image_encoder.deinit();
         embed_selector.Deinit();
 
         for (auto &devid : _attr.dev_ids) axcl_Exit(devid);

@@ -145,15 +145,15 @@ public:
 
     void Deinit()
     {
-        flow_encoder_28.release();
-        flow_encoder_53.release();
-        flow_encoder_78.release();
-        flow_encoder_50_final.release();
-        flow_estimator_200.release();
-        flow_estimator_250.release();
-        flow_estimator_300.release();
-        hift_p2_50_first.release();
-        hift_p2_58.release();
+        flow_encoder_28.deinit();
+        flow_encoder_53.deinit();
+        flow_encoder_78.deinit();
+        flow_encoder_50_final.deinit();
+        flow_estimator_200.deinit();
+        flow_estimator_250.deinit();
+        flow_estimator_300.deinit();
+        hift_p2_50_first.deinit();
+        hift_p2_58.deinit();
         flow_embed_selector.Deinit();
     }
 
