@@ -12,8 +12,8 @@ menuconfig AX_MSP_ENABLED
         bool "enable ax620e bsp"
         help
             build by AXERA!
-    config AX_650N_MSP_ENABLED
-        bool "enable ax650n bsp"
+    config AX_650C_MSP_ENABLED
+        bool "enable ax650C bsp"
         help
             build by AXERA!
     config AX_520_MSP_ENABLED
@@ -25,17 +25,23 @@ menuconfig AX_MSP_ENABLED
     choice
         prompt "choice common version"
         default MSP_V2_0_0_ENABLED
-        depends on AX_MSP_ENABLED
-    config MSP_V3_0_0_ENABLED
-        bool "enable v3.0.0 bsp"
-        help
-            build by m5stack!
+        depends on AX_MSP_ENABLED && AX_620E_MSP_ENABLED
     config MSP_V2_0_0_ENABLED
         bool "enable v2.0.0 bsp"
         help
             build by m5stack!
     endchoice
-    
+
+    choice
+        prompt "choice common version"
+        default MSP_V3_6_2_ENABLED
+        depends on AX_MSP_ENABLED && AX_650C_MSP_ENABLED
+    config MSP_V3_6_2_ENABLED
+        bool "enable v3.6.2 bsp"
+        help
+            build by m5stack!
+    endchoice
+
     config SAMPLE_COMMON_ENABLED
         bool "Enable sample common"
         default n

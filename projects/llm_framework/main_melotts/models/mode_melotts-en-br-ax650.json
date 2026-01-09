@@ -1,0 +1,31 @@
+{
+    "mode": "melotts-en-br-ax650",
+    "type": "tts",
+    "homepage": "https://github.com/ml-inory/melotts.axera/tree/main/model_convert",
+    "compile_flage": "pulsar2 build --input decoder-en.onnx --config config_decoder_u16_en-br.json --output_dir decoder-br-ax650 --output_name decoder-en-br.axmodel --target_hardware AX650 --npu_mode NPU3 --compiler.check 0",
+    "pulsar_version": "4.0-64a0e58f",
+    "capabilities": [
+        "tts",
+        "English"
+    ],
+    "input_type": [
+        "tts.utf-8"
+    ],
+    "output_type": [
+        "tts.wav",
+        "sys.play.0_1"
+    ],
+    "mode_param": {
+        "encoder": "encoder-en-br.ort",
+        "decoder": "decoder-en-br.axmodel",
+        "gbin": "g-en-br.bin",
+        "tokens": "tokens-en.txt",
+        "lexicon": "lexicon-en.txt",
+        "tagger": "en_tn_tagger.fst",
+        "verbalizer": "en_tn_verbalizer.fst",
+        "spacker_speed": 1.2,
+        "mode_rate": 44100,
+        "audio_rate": 48000,
+        "awake_delay": 1000
+    }
+}

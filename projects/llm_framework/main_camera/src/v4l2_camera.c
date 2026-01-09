@@ -317,7 +317,7 @@ ErrorHandle:
     return -1;
 }
 
-camera_t* camera_open(const char* pdev_name, int width, int height, int fps)
+camera_t* camera_open(const char* pdev_name, int width, int height, int fps, void* config)
 {
     int Ret          = -1;
     camera_t* camera = (camera_t*)malloc(sizeof(camera_t));

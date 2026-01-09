@@ -7,7 +7,8 @@
  * written consent of Axera Semiconductor Co., Ltd.
  *
  **************************************************************************************************/
-
+#include <global_config.h>
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2251,3 +2252,8 @@ EXIT0:
 
     return (0 != nRet) ? -1 : 0;
 }
+#else
+int main(){
+    return 0;
+}
+#endif

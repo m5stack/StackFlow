@@ -13,6 +13,7 @@
 #include <iostream>
 #include <stdexcept>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
+#include <global_config.h>
 
 int main_exit_flage = 0;
 static void __sigint(int iSigNo)
@@ -21,7 +22,11 @@ static void __sigint(int iSigNo)
     main_exit_flage = 1;
 }
 
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 #include "sample_audio.h"
+#else
+#include "alsa_audio.h"
+#endif
 
 #define CONFIG_AUTO_SET(obj, key)             \
     if (config_body.contains(#key))           \
@@ -48,28 +53,72 @@ private:
         self->pub_ctx_->send_data((const char *)data, size);
     }
 
+    static std::string mono_to_stereo_s16le(const std::string &mono_data)
+    {
+        if (mono_data.empty()) return mono_data;
+
+        size_t sample_count = mono_data.size() / 2;
+        std::string stereo_data;
+        stereo_data.reserve(mono_data.size() * 2);
+
+        const char *src = mono_data.data();
+        for (size_t i = 0; i < sample_count; ++i) {
+            stereo_data.append(src + i * 2, 2);
+            stereo_data.append(src + i * 2, 2);
+        }
+        return stereo_data;
+    }
+
     void hw_queue_play(const std::shared_ptr<void> &arg)
     {
         if (audio_clear_flage_) {
             return;
         }
+
         std::shared_ptr<pzmq_data> originalPtr = std::static_pointer_cast<pzmq_data>(arg);
+        std::string audio_data(static_cast<const char *>(originalPtr->data()), originalPtr->size());
+
+        std::string final_data = audio_data;
+        if (play_config.channel == 2) {
+            final_data = mono_to_stereo_s16le(audio_data);
+        }
+
         std::lock_guard<std::mutex> guard(ax_play_mtx);
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
         ax_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
-                play_config.bit, originalPtr->data(), originalPtr->size());
+                play_config.bit, audio_data.c_str(), audio_data.length());
+#else
+        alsa_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
+                  play_config.bit, final_data.c_str(), final_data.length());
+#endif
     }
 
     void hw_play(const std::string &audio_data)
     {
+        std::string final_data = audio_data;
+
+        if (play_config.channel == 2) {
+            final_data = mono_to_stereo_s16le(audio_data);
+        }
         std::lock_guard<std::mutex> guard(ax_play_mtx);
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
         ax_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
                 play_config.bit, audio_data.c_str(), audio_data.length());
+#else
+        alsa_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
+                  play_config.bit, final_data.c_str(), final_data.length());
+#endif
     }
 
     void hw_cap()
     {
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
         ax_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
                      cap_config.bit, llm_audio::on_cap_sample);
+#else
+        alsa_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
+                       cap_config.bit, llm_audio::on_cap_sample);
+#endif
     }
 
     void _play(const std::string &audio_data)
@@ -82,7 +131,11 @@ private:
 
     void _play_stop()
     {
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
         ax_close_play();
+#else
+        alsa_close_play();
+#endif
         if (audio_play_thread_) {
             audio_play_thread_->join();
             audio_play_thread_.reset();
@@ -99,7 +152,12 @@ private:
 
     void _cap_stop()
     {
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
         ax_close_cap();
+
+#else
+        alsa_close_cap();
+#endif
         if (audio_cap_thread_) {
             audio_cap_thread_->join();
             audio_cap_thread_.reset();
@@ -142,8 +200,17 @@ public:
         nlohmann::json error_body;
         std::string base_model_path;
         std::string base_model_config_path;
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+        std::list<std::string> config_file_paths;
+        if (access("/sys/devices/platform/soc/4851000.i2c/i2c-1/1-0043", F_OK) == 0) {
+            config_file_paths = get_config_file_paths(base_model_path, base_model_config_path, "audio_kit");
+        } else {
+            config_file_paths = get_config_file_paths(base_model_path, base_model_config_path, "audio");
+        }
+#else
         std::list<std::string> config_file_paths =
-            get_config_file_paths(base_model_path, base_model_config_path, "audio");
+            get_config_file_paths(base_model_path, base_model_config_path, "audio_pyramid");
+#endif
         try {
             config_body = nlohmann::json::parse(data);
             for (auto file_name : config_file_paths) {
@@ -170,8 +237,10 @@ public:
             send("None", "None", error_body, "audio");
             return -2;
         }
-        AX_AUDIO_SAMPLE_CONFIG_t mode_config_;
+
         try {
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+            AX_AUDIO_SAMPLE_CONFIG_t mode_config_;
             memset(&mode_config_, 0, sizeof(AX_AUDIO_SAMPLE_CONFIG_t));
             if (object == "audio.play") {
                 CONFIG_AUTO_SET(file_body["play_param"], stPoolConfig.MetaSize);
@@ -195,20 +264,7 @@ public:
                 CONFIG_AUTO_SET(file_body["play_param"], stVqeAttr.stAgcCfg.enAgcMode);
                 CONFIG_AUTO_SET(file_body["play_param"], stVqeAttr.stAgcCfg.s16TargetLevel);
                 CONFIG_AUTO_SET(file_body["play_param"], stVqeAttr.stAgcCfg.s16Gain);
-                CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.bEnable);
-                CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.s32GainDb);
-                CONFIG_AUTO_SET(file_body["play_param"], stHpfAttr.s32Freq);
-                CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.bEnable);
-                CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.s32GainDb);
-                CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.s32Samplerate);
-                CONFIG_AUTO_SET(file_body["play_param"], stLpfAttr.s32Freq);
-                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.bEnable);
-                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[0]);
-                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[1]);
-                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[2]);
-                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[3]);
-                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32GainDb[4]);
-                CONFIG_AUTO_SET(file_body["play_param"], stEqAttr.s32Samplerate);
+
                 CONFIG_AUTO_SET(file_body["play_param"], gResample);
                 CONFIG_AUTO_SET(file_body["play_param"], enInSampleRate);
                 CONFIG_AUTO_SET(file_body["play_param"], gInstant);
@@ -221,12 +277,12 @@ public:
                 CONFIG_AUTO_SET(file_body["play_param"], bit);
                 if (config_body.contains("stPoolConfig.PartitionName")) {
                     std::string PartitionName = config_body["stPoolConfig.PartitionName"];
-                    for (int i = 0; i < PartitionName.length(); i++) {
+                    for (int i = 0; i < (int)PartitionName.length(); i++) {
                         mode_config_.stPoolConfig.PartitionName[i] = PartitionName[i];
                     }
-                } else if (file_body["cap_param"].contains("stPoolConfig.PartitionName")) {
-                    std::string PartitionName = file_body["cap_param"]["stPoolConfig.PartitionName"];
-                    for (int i = 0; i < PartitionName.length(); i++) {
+                } else if (file_body["play_param"].contains("stPoolConfig.PartitionName")) {
+                    std::string PartitionName = file_body["play_param"]["stPoolConfig.PartitionName"];
+                    for (int i = 0; i < (int)PartitionName.length(); i++) {
                         mode_config_.stPoolConfig.PartitionName[i] = PartitionName[i];
                     }
                 }
@@ -252,7 +308,6 @@ public:
                         }
                     }
                 }
-
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.U32Depth);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.u32PeriodSize);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistAttr.u32PeriodCount);
@@ -266,21 +321,7 @@ public:
                 CONFIG_AUTO_SET(file_body["cap_param"], aistVqeAttr.stAgcCfg.s16TargetLevel);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistVqeAttr.stAgcCfg.s16Gain);
                 CONFIG_AUTO_SET(file_body["cap_param"], aistVqeAttr.stAecCfg.enAecMode);
-                CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.bEnable);
-                CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32GainDb);
-                CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32Samplerate);
-                CONFIG_AUTO_SET(file_body["cap_param"], stHpfAttr.s32Freq);
-                CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.bEnable);
-                CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.s32GainDb);
-                CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.s32Samplerate);
-                CONFIG_AUTO_SET(file_body["cap_param"], stLpfAttr.s32Freq);
-                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.bEnable);
-                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[0]);
-                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[1]);
-                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[2]);
-                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[3]);
-                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32GainDb[4]);
-                CONFIG_AUTO_SET(file_body["cap_param"], stEqAttr.s32Samplerate);
+
                 CONFIG_AUTO_SET(file_body["cap_param"], gResample);
                 CONFIG_AUTO_SET(file_body["cap_param"], enOutSampleRate);
                 CONFIG_AUTO_SET(file_body["cap_param"], gDbDetection);
@@ -293,12 +334,12 @@ public:
 
                 if (config_body.contains("stPoolConfig.PartitionName")) {
                     std::string PartitionName = config_body["stPoolConfig.PartitionName"];
-                    for (int i = 0; i < PartitionName.length(); i++) {
+                    for (int i = 0; i < (int)PartitionName.length(); i++) {
                         mode_config_.stPoolConfig.PartitionName[i] = PartitionName[i];
                     }
                 } else if (file_body["cap_param"].contains("stPoolConfig.PartitionName")) {
                     std::string PartitionName = file_body["cap_param"]["stPoolConfig.PartitionName"];
-                    for (int i = 0; i < PartitionName.length(); i++) {
+                    for (int i = 0; i < (int)PartitionName.length(); i++) {
                         mode_config_.stPoolConfig.PartitionName[i] = PartitionName[i];
                     }
                 }
@@ -309,6 +350,31 @@ public:
                 }
                 memcpy(&cap_config, &mode_config_, sizeof(AX_AUDIO_SAMPLE_CONFIG_t));
             }
+
+#else
+            AlsaConfig mode_config_;
+            memset(&mode_config_, 0, sizeof(AlsaConfig));
+
+            if (object == "audio.play") {
+                CONFIG_AUTO_SET(file_body["play_param"], card);
+                CONFIG_AUTO_SET(file_body["play_param"], device);
+                CONFIG_AUTO_SET(file_body["play_param"], volume);
+                CONFIG_AUTO_SET(file_body["play_param"], channel);
+                CONFIG_AUTO_SET(file_body["play_param"], rate);
+                CONFIG_AUTO_SET(file_body["play_param"], bit);
+                memcpy(&play_config, &mode_config_, sizeof(AlsaConfig));
+            }
+
+            if (object == "audio.cap") {
+                CONFIG_AUTO_SET(file_body["cap_param"], card);
+                CONFIG_AUTO_SET(file_body["cap_param"], device);
+                CONFIG_AUTO_SET(file_body["cap_param"], volume);
+                CONFIG_AUTO_SET(file_body["cap_param"], channel);
+                CONFIG_AUTO_SET(file_body["cap_param"], rate);
+                CONFIG_AUTO_SET(file_body["cap_param"], bit);
+                memcpy(&cap_config, &mode_config_, sizeof(AlsaConfig));
+            }
+#endif
         } catch (...) {
             error_body["code"]    = -22;
             error_body["message"] = "Parameter format error.";
@@ -419,33 +485,23 @@ public:
     std::string audio_status(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         std::string _rawdata = rawdata->string();
+
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+        auto play_state = ax_play_status();
+        auto cap_state  = ax_cap_status();
+#else
+        auto play_state = alsa_play_status();
+        auto cap_state  = alsa_cap_status();
+#endif
+
         if (_rawdata == "play") {
-            if (ax_play_status()) {
-                return std::string("None");
-            } else {
-                return std::string("Runing");
-            }
+            return play_state ? "None" : "Running";
         } else if (_rawdata == "cap") {
-            if (ax_cap_status()) {
-                return std::string("None");
-            } else {
-                return std::string("Runing");
-            }
+            return cap_state ? "None" : "Running";
         } else {
             std::ostringstream return_val;
-            return_val << "{\"play\":";
-            if (ax_play_status()) {
-                return_val << "\"None\"";
-            } else {
-                return_val << "\"Runing\"";
-            }
-            return_val << "\"cap\":";
-            if (ax_cap_status()) {
-                return_val << "\"None\"";
-            } else {
-                return_val << "\"Runing\"";
-            }
-            return_val << "\"}";
+            return_val << "{\"play\":" << (play_state ? "\"None\"" : "\"Running\"")
+                       << ",\"cap\":" << (cap_state ? "\"None\"" : "\"Running\"") << "}";
             return return_val.str();
         }
     }

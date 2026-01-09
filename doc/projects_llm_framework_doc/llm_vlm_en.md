@@ -15,7 +15,7 @@ Send the following JSON:
   "action": "setup",
   "object": "vlm.setup",
   "data": {
-    "model": "internvl2.5-1B-ax630c",
+    "model": "internvl2.5-1B-364-ax630c",
     "response_format": "vlm.utf-8.stream",
     "input": "vlm.utf-8",
     "enoutput": true,
@@ -29,7 +29,7 @@ Send the following JSON:
 - work_id: Set to `vlm` when configuring the unit.
 - action: The method being called is `setup`.
 - object: Data type being transferred is `vlm.setup`.
-- model: The model used is `internvl2.5-1B-ax630c`, a multimodal model.
+- model: The model used is `internvl2.5-1B-364-ax630c`, a multimodal model.
 - response_format: The output is in `vlm.utf-8.stream`, a UTF-8 stream format.
 - input: The input is `vlm.utf-8`, representing user input.
 - enoutput: Specifies whether to enable user output.
@@ -250,7 +250,7 @@ Example:
   "action": "setup",
   "object": "vlm.setup",
   "data": {
-    "model": "internvl2.5-1B-ax630c",
+    "model": "internvl2.5-1B-364-ax630c",
     "response_format": "vlm.utf-8.stream",
     "input": [
       "vlm.utf-8",
@@ -263,6 +263,38 @@ Example:
   }
 }
 ```
+
+Linking the Output of the llm-camera Unit.
+
+Sending JSON:
+
+```json
+{
+  "request_id": "3",
+  "work_id": "vlm.1003",
+  "action": "link",
+  "object": "work_id",
+  "data": "camera.1000"
+}
+```
+
+Response JSON:
+
+```json
+{
+    "created": 1750992545,
+    "data": "None",
+    "error": {
+        "code": 0,
+        "message": ""
+    },
+    "object": "None",
+    "request_id": "3",
+    "work_id": "vlm.1003"
+}
+```
+
+> **Ensure that the camera is properly configured and ready for operation when performing the link action. If using the AX630C MIPI camera, configure it in AI-ISP disabled mode during the initialization of llm-camera.**
 
 ## unlink
 
@@ -447,7 +479,7 @@ Response JSON:
       "vlm.utf-8",
       "kws.1000"
     ],
-    "model": "internvl2.5-1B-ax630c",
+    "model": "internvl2.5-1B-364-ax630c",
     "response_format": "vlm.utf-8.stream"
   },
   "error": {

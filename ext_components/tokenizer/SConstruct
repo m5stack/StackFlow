@@ -1,0 +1,52 @@
+# component2/SConscript
+Import("env")
+import os
+from pathlib import Path
+
+with open(env["PROJECT_TOOL_S"]) as f:
+    exec(f.read())
+
+_SDK_PATH = os.path.normpath(
+    os.environ.get("SDK_PATH", str(Path(os.getcwd()) / ".." / ".."))
+)
+
+env["GIT_REPO_LISTS"]["tokenizer"] = {
+    "url": "https://github.com/ZHEQIUSHUI/tokenizer.git",
+    "commit": "83f41d4b5b9a135c167d44fcdf2a0c56ebacca6d",
+    "path": str(Path(_SDK_PATH) / "github_source" / "tokenizer"),
+}
+
+if "CONFIG_AX_TOKENIZER_ENABLED" in os.environ:
+    check_component("tokenizer")
+    SRCS = []
+    INCLUDE = []
+    PRIVATE_INCLUDE = []
+    REQUIREMENTS = []
+    STATIC_LIB = []
+    DYNAMIC_LIB = []
+    DEFINITIONS = []
+    DEFINITIONS_PRIVATE = []
+    LDFLAGS = []
+    LINK_SEARCH_PATH = []
+
+    INCLUDE += [
+        os.path.join(env["GIT_REPO_LISTS"]["tokenizer"]["path"], "include"),
+    ]
+    print("AX-TOKENIZER INCLUDE:", INCLUDE)
+
+    env["COMPONENTS"].append(
+        {
+            "target": os.path.basename(env["component_dir"]),
+            "SRCS": SRCS,
+            "INCLUDE": INCLUDE,
+            "PRIVATE_INCLUDE": PRIVATE_INCLUDE,
+            "REQUIREMENTS": REQUIREMENTS,
+            "STATIC_LIB": STATIC_LIB,
+            "DYNAMIC_LIB": DYNAMIC_LIB,
+            "DEFINITIONS": DEFINITIONS,
+            "DEFINITIONS_PRIVATE": DEFINITIONS_PRIVATE,
+            "LDFLAGS": LDFLAGS,
+            "LINK_SEARCH_PATH": LINK_SEARCH_PATH,
+            "REGISTER": "static",
+        }
+    )

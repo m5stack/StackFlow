@@ -23,15 +23,16 @@ LINK_SEARCH_PATH += [ADir('../static_lib')]
 REQUIREMENTS += ['ax_engine', 'ax_interpreter', 'ax_sys']
 REQUIREMENTS += ['samplerate']
 
-INCLUDE += [ADir('../include')]
-INCLUDE += [ADir('src/runner'), ADir('../include/onnxruntime/core/session')]
+INCLUDE += [ADir('../static_lib/include')]
+INCLUDE += [ADir('src/runner'), ADir('../static_lib/include/onnxruntime/core/session')]
+LINK_SEARCH_PATH += [ADir('../static_lib/wetext')]
+REQUIREMENTS += ['glog', 'fst']
 
-LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
-LDFLAGS += ['-l:libcargs.a', '-l:libonnxruntime.a']
+REQUIREMENTS += ['onnxruntime']
 
-STATIC_FILES += Glob('mode_*.json')
+STATIC_FILES += Glob('models/mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_melotts-1.7',
+env['COMPONENTS'].append({'target':'llm_melotts-1.10',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

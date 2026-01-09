@@ -9,8 +9,8 @@
 #include <ax_sys_api.h>
 #include <sys/stat.h>
 #include <fstream>
-
 #include "../../../../SDK/components/utilities/include/sample_log.h"
+#include "thread_safe_list.h"
 
 using namespace StackFlows;
 
@@ -27,13 +27,15 @@ static std::string base_model_config_path_;
 typedef struct {
     std::string depth_anything_model;
     std::string model_type = "detect";
-    std::vector<std::string> cls_name;
-    int img_h            = 640;
-    int img_w            = 640;
-    int cls_num          = 80;
-    float pron_threshold = 0.45f;
-    float nms_threshold  = 0.45;
-} yolo_config;
+    int img_h              = 640;
+    int img_w              = 640;
+    uint32_t npu_type      = 0;
+} depth_anything_config;
+
+typedef struct {
+    cv::Mat inference_src;
+    bool inference_bgr2rgb;
+} inference_async_par;
 
 typedef std::function<void(const std::string &data, bool finish)> task_callback_t;
 
@@ -46,7 +48,7 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
 class llm_task {
 private:
 public:
-    yolo_config mode_config_;
+    depth_anything_config mode_config_;
     std::string model_;
     std::unique_ptr<EngineWrapper> depth_anything_;
     std::string response_format_;
@@ -57,7 +59,8 @@ public:
     static int ax_init_flage_;
     task_callback_t out_callback_;
     std::atomic_bool camera_flage_;
-    std::mutex inference_mtx_;
+    std::unique_ptr<std::thread> inference_run_;
+    thread_safe::list<inference_async_par> async_list_;
 
     bool parse_config(const nlohmann::json &config_body)
     {
@@ -113,10 +116,11 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], img_h);
             CONFIG_AUTO_SET(file_body["mode_param"], img_w);
             CONFIG_AUTO_SET(file_body["mode_param"], model_type);
+            CONFIG_AUTO_SET(file_body["mode_param"], npu_type);
             mode_config_.depth_anything_model = base_model + mode_config_.depth_anything_model;
             depth_anything_                   = std::make_unique<EngineWrapper>();
-            if (0 != depth_anything_->Init(mode_config_.depth_anything_model.c_str())) {
-                SLOGE("Init yolo_model model failed!\n");
+            if (0 != depth_anything_->Init(mode_config_.depth_anything_model.c_str(), 0, mode_config_.npu_type)) {
+                SLOGE("Init depth_anything_model model failed!\n");
                 return -5;
             }
         } catch (...) {
@@ -140,54 +144,63 @@ public:
 
     bool inference_decode(const std::string &msg)
     {
-        if (inference_mtx_.try_lock())
-            std::lock_guard<std::mutex> guard(inference_mtx_, std::adopt_lock);
-        else
-            return true;
         cv::Mat src = cv::imdecode(std::vector<uint8_t>(msg.begin(), msg.end()), cv::IMREAD_COLOR);
         if (src.empty()) return true;
-        return inference(src);
+        return inference_async(src) ? false : true;
     }
 
     bool inference_raw_yuv(const std::string &msg)
     {
-        if (inference_mtx_.try_lock())
-            std::lock_guard<std::mutex> guard(inference_mtx_, std::adopt_lock);
-        else
-            return true;
         if (msg.size() != mode_config_.img_w * mode_config_.img_h * 2) {
             throw std::string("img size error");
         }
         cv::Mat camera_data(mode_config_.img_h, mode_config_.img_w, CV_8UC2, (void *)msg.data());
         cv::Mat rgb;
         cv::cvtColor(camera_data, rgb, cv::COLOR_YUV2RGB_YUYV);
-        return inference(rgb, true);
+        return inference_async(rgb, true) ? false : true;
     }
 
     bool inference_raw_rgb(const std::string &msg)
     {
-        if (inference_mtx_.try_lock())
-            std::lock_guard<std::mutex> guard(inference_mtx_, std::adopt_lock);
-        else
-            return true;
         if (msg.size() != mode_config_.img_w * mode_config_.img_h * 3) {
             throw std::string("img size error");
         }
         cv::Mat camera_data(mode_config_.img_h, mode_config_.img_w, CV_8UC3, (void *)msg.data());
-        return inference(camera_data, false);
+        return inference_async(camera_data, false) ? false : true;
     }
 
     bool inference_raw_bgr(const std::string &msg)
     {
-        if (inference_mtx_.try_lock())
-            std::lock_guard<std::mutex> guard(inference_mtx_, std::adopt_lock);
-        else
-            return true;
         if (msg.size() != mode_config_.img_w * mode_config_.img_h * 3) {
             throw std::string("img size error");
         }
         cv::Mat camera_data(mode_config_.img_h, mode_config_.img_w, CV_8UC3, (void *)msg.data());
-        return inference(camera_data);
+        return inference_async(camera_data) ? false : true;
+    }
+
+    void run()
+    {
+        inference_async_par par;
+        for (;;) {
+            {
+                par = async_list_.get();
+                if (par.inference_src.empty()) break;
+                inference(par.inference_src, par.inference_bgr2rgb);
+            }
+        }
+    }
+
+    int inference_async(cv::Mat &src, bool bgr2rgb = true)
+    {
+        if (async_list_.size() < 3) {
+            inference_async_par par;
+            par.inference_src     = src.clone();
+            par.inference_bgr2rgb = bgr2rgb;
+            async_list_.put(par);
+        } else {
+            SLOGE("inference list is full\n");
+        }
+        return async_list_.size();
     }
 
     bool inference(cv::Mat &src, bool bgr2rgb = true)
@@ -195,7 +208,7 @@ public:
         try {
             int ret = -1;
             std::vector<uint8_t> image(mode_config_.img_w * mode_config_.img_h * 3, 0);
-            common::get_input_data_no_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, bgr2rgb);
+            common::get_input_data_letterbox(src, image, mode_config_.img_h, mode_config_.img_w, bgr2rgb);
             cv::Mat img_mat(mode_config_.img_h, mode_config_.img_w, CV_8UC3, image.data());
             depth_anything_->SetInput((void *)image.data(), 0);
             if (0 != depth_anything_->Run()) {
@@ -206,7 +219,7 @@ public:
             depth_anything_->Post_Process(img_mat, mode_config_.model_type, depth_anything_output);
             if (out_callback_) out_callback_(depth_anything_output, true);
         } catch (...) {
-            SLOGW("yolo_->Run have error!");
+            SLOGW("depth_anything_->Run have error!");
             return true;
         }
         return false;
@@ -219,12 +232,6 @@ public:
             if (0 != ret) {
                 fprintf(stderr, "AX_SYS_Init failed! ret = 0x%x\n", ret);
             }
-            AX_ENGINE_NPU_ATTR_T npu_attr;
-            memset(&npu_attr, 0, sizeof(npu_attr));
-            ret = AX_ENGINE_Init(&npu_attr);
-            if (0 != ret) {
-                fprintf(stderr, "Init ax-engine failed{0x%8x}.\n", ret);
-            }
         }
         ax_init_flage_++;
     }
@@ -234,7 +241,6 @@ public:
         if (ax_init_flage_ > 0) {
             --ax_init_flage_;
             if (!ax_init_flage_) {
-                AX_ENGINE_Deinit();
                 AX_SYS_Deinit();
             }
         }
@@ -243,15 +249,25 @@ public:
     llm_task(const std::string &workid)
     {
         _ax_init();
+        inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
     }
 
     void start()
     {
+        if (!inference_run_) {
+            inference_run_ = std::make_unique<std::thread>(std::bind(&llm_task::run, this));
+        }
     }
 
     void stop()
     {
+        if (inference_run_) {
+            inference_async_par par;
+            async_list_.put(par);
+            inference_run_->join();
+            inference_run_.reset();
         }
+    }
 
     ~llm_task()
     {
@@ -418,10 +434,10 @@ public:
                     if (!input_url.empty()) {
                         std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                         std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
-                        llm_channel->subscriber(
-                            input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                                this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
-                            });
+                        llm_channel->subscriber(input_url, [this, _llm_task_obj, _llm_channel](
+                                                               pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                            this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
+                        });
                     }
                 }
                 llm_task_[work_id_num] = llm_task_obj;
@@ -465,10 +481,11 @@ public:
             if (!input_url.empty()) {
                 std::weak_ptr<llm_task> _llm_task_obj       = llm_task_obj;
                 std::weak_ptr<llm_channel_obj> _llm_channel = llm_channel;
-                llm_channel->subscriber(input_url,
-                                        [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
-                                            this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
-                                        });
+                llm_channel->subscriber(
+                    input_url, [this, _llm_task_obj, _llm_channel](pzmq *_pzmq, const std::shared_ptr<pzmq_data> &raw) {
+                        this->task_camera_data(_llm_task_obj, _llm_channel, raw->string());
+                    });
+                ret = 0;
             }
             llm_task_obj->inputs_.push_back(data);
         }

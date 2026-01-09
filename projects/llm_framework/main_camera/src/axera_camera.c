@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 #include "camera.h"
-#include "axera_camera.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -18,6 +17,9 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/prctl.h>
+#include <global_config.h>
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
+#include "axera_camera.h"
 #include "AXRtspWrapper.h"
 #include "ax_venc_api.h"
 #include "ax_global_type.h"
@@ -29,6 +31,9 @@
 #include "common_vin.h"
 #include "ax_sys_api.h"
 #include "ax_ivps_api.h"
+#endif
+
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
 
 #ifndef ALIGN_UP
 #define ALIGN_UP(x, a) ((((x) + ((a) - 1)) / a) * a)
@@ -115,28 +120,6 @@ AX_VIN_CHN_ATTR_T gSc850slChn0Attr = {
     .tFrameRateCtrl = {AX_INVALID_FRMRATE, AX_INVALID_FRMRATE},
 };
 
-typedef enum {
-    SAMPLE_VIN_NONE                      = -1,
-    SAMPLE_VIN_SINGLE_DUMMY              = 0,
-    SAMPLE_VIN_SINGLE_OS04A10            = 1,
-    SAMPLE_VIN_DOUBLE_OS04A10            = 2,
-    SAMPLE_VIN_SINGLE_SC450AI            = 3,
-    SAMPLE_VIN_DOUBLE_SC450AI            = 4,
-    SAMPLE_VIN_DOUBLE_OS04A10_AND_BT656  = 5,
-    SAMPLE_VIN_SINGLE_S5KJN1SQ03         = 6,
-    SAMPLE_VIN_SINGLE_OS04A10_DCG_HDR    = 7,
-    SAMPLE_VIN_SINGLE_OS04A10_DCG_VS_HDR = 8,
-    SYS_CASE_SINGLE_DVP                  = 20,
-    SYS_CASE_SINGLE_BT601                = 21,
-    SYS_CASE_SINGLE_BT656                = 22,
-    SYS_CASE_SINGLE_BT1120               = 23,
-    SYS_CASE_SINGLE_LVDS                 = 24,
-    SYS_CASE_SINGLE_OS04A10_ONLINE       = 25,
-    SMARTSENS_SC850SL                    = 13,
-    SAMPLE_VIN_SINGLE_SC850SL            = 26,
-    SAMPLE_VIN_BUTT
-} SAMPLE_VIN_CASE_E;
-
 struct axera_camera_index_t {
     char name[48];
     SAMPLE_VIN_CASE_E index;
@@ -156,15 +139,6 @@ struct axera_camera_index_t {
                           {"axera_single_lvds", SYS_CASE_SINGLE_LVDS},
                           {"axera_single_os04a10_online", SYS_CASE_SINGLE_OS04A10_ONLINE},
                           {"axera_single_sc850sl", SAMPLE_VIN_SINGLE_SC850SL}};
-
-typedef struct {
-    SAMPLE_VIN_CASE_E eSysCase;
-    COMMON_VIN_MODE_E eSysMode;
-    AX_SNS_HDR_MODE_E eHdrMode;
-    SAMPLE_LOAD_RAW_NODE_E eLoadRawNode;
-    AX_BOOL bAiispEnable;
-    AX_S32 nDumpFrameNum;
-} SAMPLE_VIN_PARAM_T;
 
 /* comm pool */
 COMMON_SYS_POOL_CFG_T gtSysCommPoolSingleDummySdr[] = {
@@ -1194,11 +1168,13 @@ struct axera_camera_t {
     AX_VIDEO_FRAME_T out_img;
     int Chn;
     AX_VENC_CHN_ATTR_T stVencChnAttr;
+    AX_VENC_CHN_ATTR_T stJPEGVencChnAttr;
     AX_IVPS_PIPELINE_ATTR_T stPipelineAttr;
     AX_RTSP_HANDLE pRtspHandle;
     AX_RTSP_ATTR_T stRtspAttr[MAX_RTSP_MAX_CHANNEL_NUM];
     pthread_t venc_thread_id_;
     int venc_run_;
+    int venc_jpeg_run_;
 } axera_obj = {0};
 
 static int camera_capture_callback_set(struct camera_t *camera, vcamera_frame_get pcallback)
@@ -1448,6 +1424,12 @@ void init_rtsp(AX_VENC_CHN_ATTR_T *stVencChnAttr)
     axera_obj.venc_run_     = 1;
 }
 
+void init_jpeg(AX_VENC_CHN_ATTR_T *stVencChnAttr)
+{
+    axera_obj.stJPEGVencChnAttr = *stVencChnAttr;
+    axera_obj.venc_jpeg_run_    = 1;
+}
+
 static int SAMPLE_IVPS_Init(AX_S32 nGrpId, camera_t *camera)
 {
     AX_S32 s32Ret                          = 0, nChn;
@@ -1611,6 +1593,7 @@ int axera_camera_open_from(camera_t *camera)
     int Ret = -1;
     AX_S32 axRet;
     if (camera == NULL) return -1;
+    axera_config_t *axera_config = (axera_config_t *)camera->custom_config_;
     /* Check whether the camera is already open or in an error state */
     SLOGI("Open camera %s...", camera->dev_name_);
     if (camera->state_ & AX_SENSOR_CAM_OPEN) {
@@ -1629,9 +1612,9 @@ int axera_camera_open_from(camera_t *camera)
         return -10;
     }
 
-    axera_obj.VinParam.eSysMode     = COMMON_VIN_SENSOR;
-    axera_obj.VinParam.eHdrMode     = AX_SNS_LINEAR_MODE;
-    axera_obj.VinParam.bAiispEnable = AX_TRUE;
+    axera_obj.VinParam.eSysMode     = axera_config->VinParam.eSysMode;      // COMMON_VIN_SENSOR;
+    axera_obj.VinParam.eHdrMode     = axera_config->VinParam.eHdrMode;      // AX_SNS_LINEAR_MODE;
+    axera_obj.VinParam.bAiispEnable = axera_config->VinParam.bAiispEnable;  // AX_TRUE;
     // axera_obj.gCams.tChnAttr
     __sample_case_config(&axera_obj.gCams, &axera_obj.VinParam, &axera_obj.tCommonArgs, &axera_obj.tPrivArgs);
     COMMON_SYS_Init(&axera_obj.tCommonArgs);
@@ -1682,7 +1665,7 @@ ErrorHandle:
     return -1;
 }
 
-camera_t *axera_camera_open(const char *pdev_name, int width, int height, int fps)
+camera_t *axera_camera_open(const char *pdev_name, int width, int height, int fps, void *config)
 {
     int Ret          = -1;
     camera_t *camera = (camera_t *)malloc(sizeof(camera_t));
@@ -1698,9 +1681,10 @@ camera_t *axera_camera_open(const char *pdev_name, int width, int height, int fp
     memset(camera->dev_name_, 0, CONFIG_DEVNAME_LEN);
     memcpy(camera->dev_name_, pdev_name, CopyLen);
 
-    camera->width_       = width;
-    camera->height_      = height;
-    camera->capture_fps_ = fps;
+    camera->width_         = width;
+    camera->height_        = height;
+    camera->capture_fps_   = fps;
+    camera->custom_config_ = config;
 
     Ret = axera_camera_open_from(camera);
     if (Ret) {
@@ -1738,3 +1722,4 @@ int axera_camera_close(camera_t *camera)
 
     return 0;
 }
+#endif

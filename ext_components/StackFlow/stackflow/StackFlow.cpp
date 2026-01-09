@@ -117,6 +117,11 @@ int llm_channel_obj::send_raw_to_pub(const std::string &raw)
     return zmq_[-1]->send_data(raw);
 }
 
+int llm_channel_obj::send_raw_to_pub(const char *data, int size)
+{
+    return zmq_[-1]->send_data(data, size);
+}
+
 int llm_channel_obj::send_raw_to_usr(const std::string &raw)
 {
     if (zmq_[-2]) {

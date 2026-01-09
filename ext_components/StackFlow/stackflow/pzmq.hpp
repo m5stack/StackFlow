@@ -127,7 +127,7 @@ public:
         if ((url[0] != 'i') && (url[1] != 'p')) {
             rpc_url_head_.clear();
         }
-        if (mode_ != ZMQ_RPC_FUN) creat(url, raw_call);
+        creat(url, raw_call);
     }
     void set_timeout(int ms)
     {
@@ -179,8 +179,6 @@ public:
         if (zmq_fun_.empty()) {
             std::string url = rpc_url_head_ + rpc_server_;
             mode_           = ZMQ_RPC_FUN;
-            zmq_fun_["list_action"] =
-                std::bind(&pzmq::_rpc_list_action, this, std::placeholders::_1, std::placeholders::_2);
             ret = creat(url);
         }
         zmq_fun_[action] = raw_call;
@@ -330,6 +328,7 @@ public:
     inline int creat_rep(const std::string &url, const msg_callback_fun &raw_call)
     {
         int ret     = zmq_bind(zmq_socket_, url.c_str());
+        zmq_fun_["list_action"] = std::bind(&pzmq::_rpc_list_action, this, std::placeholders::_1, std::placeholders::_2);
         flage_      = false;
         zmq_thread_ = std::make_unique<std::thread>(std::bind(&pzmq::zmq_event_loop, this, raw_call));
         return ret;
@@ -382,7 +381,7 @@ public:
                     std::unique_lock<std::mutex> lock(zmq_fun_mtx_);
                     retval = zmq_fun_.at(msg_ptr->string())(this, msg1_ptr);
                 } catch (...) {
-                    retval = "NotAction";
+                    retval = msg_ptr->string() + " NotAction";
                 }
                 zmq_send(zmq_socket_, retval.c_str(), retval.length(), 0);
                 msg1_ptr.reset();
@@ -394,6 +393,8 @@ public:
     }
     void close_zmq()
     {
+        int linger = 1000;
+        zmq_setsockopt(zmq_socket_, ZMQ_LINGER, &linger, sizeof(linger));
         zmq_close(zmq_socket_);
         zmq_ctx_destroy(zmq_ctx_);
         if ((mode_ == ZMQ_PUB) || (mode_ == ZMQ_PULL) || (mode_ == ZMQ_RPC_FUN)) {

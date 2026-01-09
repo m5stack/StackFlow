@@ -5,7 +5,11 @@ with open(env['PROJECT_TOOL_S']) as f:
     exec(f.read())
 
 # SRCS = append_srcs_dir(ADir('src'))
-SRCS = Glob('src/*.c*')
+if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
+    SRCS = [AFile('src/sample_audio.c'), AFile('src/main.cpp')]
+else:
+    SRCS = [AFile('src/alsa_audio.c'), AFile('src/main.cpp')]
+
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
 REQUIREMENTS = ['pthread', 'utilities', 'ax_msp', 'eventpp', 'StackFlow', 'single_header_libs']
@@ -20,16 +24,15 @@ STATIC_FILES = []
 
 DEFINITIONS += ['-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
-# INCLUDE += [ADir('../include'), ADir('../include/cppzmq'), ADir('../include/libzmq')]
 LINK_SEARCH_PATH += [ADir('../static_lib')]
+REQUIREMENTS += ['ax_sys', 'ax_audio', 'ax_audio_3a', 'tinyalsa', 'fdk-aac', 'opus', 'samplerate']
+if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
+    REQUIREMENTS += ['ax_interpreter', 'ax_fdk', 'ax_opus']
 
-REQUIREMENTS += ['ax_sys', 'ax_interpreter', 'ax_audio', 'ax_audio_3a', 'ax_fdk', 'ax_opus']
-REQUIREMENTS += ['tinyalsa', 'opus', 'samplerate', 'fdk-aac']
-
-STATIC_FILES += [AFile('audio.json')]
+STATIC_FILES += [AFile('audio.json'), AFile('audio_kit.json'), AFile('audio_pyramid.json')]
 STATIC_FILES += Glob('mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_audio-1.6',
+env['COMPONENTS'].append({'target':'llm_audio-1.8',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

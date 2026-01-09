@@ -13,7 +13,9 @@
         "image.jpeg.base64"
     ],
     "cap_param": {
-        "None": "None"
+        "VinParam.eSysMode": 1,
+        "VinParam.eHdrMode": 1,
+        "VinParam.bAiispEnable": 1
     },
     "jpeg_config_param": {
         "stVencAttr.enType": 26,

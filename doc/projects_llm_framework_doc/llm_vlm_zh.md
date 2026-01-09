@@ -15,7 +15,7 @@
   "action": "setup",
   "object": "vlm.setup",
   "data": {
-    "model": "internvl2.5-1B-ax630c",
+    "model": "internvl2.5-1B-364-ax630c",
     "response_format": "vlm.utf-8.stream",
     "input": "vlm.utf-8",
     "enoutput": true,
@@ -29,7 +29,7 @@
 - work_id：配置单元时，为 `vlm`。
 - action：调用的方法为 `setup`。
 - object：传输的数据类型为 `vlm.setup`。
-- model：使用的模型为 `internvl2.5-1B-ax630c` 多模态模型。
+- model：使用的模型为 `internvl2.5-1B-364-ax630c` 多模态模型。
 - response_format：返回结果为 `vlm.utf-8.stream`, utf-8 的流式输出。
 - input：输入的为 `vlm.utf-8`,代表的是从用户输入。
 - enoutput：是否起用用户结果输出。
@@ -248,7 +248,7 @@ error::code 为 0 表示执行成功。
   "action": "setup",
   "object": "vlm.setup",
   "data": {
-    "model": "internvl2.5-1B-ax630c",
+    "model": "internvl2.5-1B-364-ax630c",
     "response_format": "vlm.utf-8.stream",
     "input": [
       "vlm.utf-8",
@@ -261,6 +261,38 @@ error::code 为 0 表示执行成功。
   }
 }
 ```
+
+链接 llm-camera 单元的输出。
+
+发送 json：
+
+```json
+{
+  "request_id": "3",
+  "work_id": "vlm.1003",
+  "action": "link",
+  "object": "work_id",
+  "data": "camera.1000"
+}
+```
+
+响应 json：
+
+```json
+{
+    "created": 1750992545,
+    "data": "None",
+    "error": {
+        "code": 0,
+        "message": ""
+    },
+    "object": "None",
+    "request_id": "3",
+    "work_id": "vlm.1003"
+}
+```
+
+> **link 时必须保证 camera 此时已经配置好进入工作状态。当同时使用 AX630C MIPI 摄像头，需要在 llm-camera 初始化的时候配置为 AI-ISP 关闭模式。**
 
 ## unlink
 
@@ -445,7 +477,7 @@ error::code 为 0 表示执行成功。
       "vlm.utf-8",
       "kws.1000"
     ],
-    "model": "internvl2.5-1B-ax630c",
+    "model": "internvl2.5-1B-364-ax630c",
     "response_format": "vlm.utf-8.stream"
   },
   "error": {

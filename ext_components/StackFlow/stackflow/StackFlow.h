@@ -106,6 +106,7 @@ public:
     void stop_subscriber(const std::string &zmq_url);
     int check_zmq_errno(void *ctx, void *com, int code);
     int send_raw_to_pub(const std::string &raw);
+    int send_raw_to_pub(const char *data, int size);
     int send_raw_to_usr(const std::string &raw);
     template <typename T, typename U>
     int output_data(const std::string &object, const T &data, const U &error_msg)

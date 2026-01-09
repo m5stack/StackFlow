@@ -1,0 +1,31 @@
+{
+    "mode": "sense-voice-small-10s-ax650",
+    "type": "asr",
+    "homepage": "https://huggingface.co/M5Stack/SenseVoiceSmall-axmodel",
+    "compile_flage": "pulsar2 build --input model-10-seconds.onnx --config config_sensevoice_main_u16.json --output_dir sensevoice-axmodel --output_name model-10-seconds.axmodel --target_hardware AX650 --compiler.check 0",
+    "pulsar_version": "5.0-patch1-fd447d0d",
+    "capabilities": [
+        "Chinese",
+        "English",
+        "Cantonese",
+        "Japanese",
+        "Korean"
+    ],
+    "input_type": [
+        "sys.pcm",
+        "sys.cap.0_0"
+    ],
+    "output_type": [
+        "asr.utf-8"
+    ],
+    "mode_param": {
+        "model_config.sense_voice.model": "model.axmodel",
+        "model_config.sense_voice.use_itn": true,
+        "model_config.tokens": "tokens.txt",
+        "silero_vad.model": "silero_vad.ort",
+        "model_config.provider": "axera",
+        "silence_timeout": 2000,
+        "awake_delay": 50
+    },
+    "mode_param_bak": {}
+}

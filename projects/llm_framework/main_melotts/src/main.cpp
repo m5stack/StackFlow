@@ -9,7 +9,6 @@
 #include "Lexicon.hpp"
 #include <ax_sys_api.h>
 #include "AudioFile.h"
-#include "Lexicon.hpp"
 
 #include <signal.h>
 #include <sys/stat.h>
@@ -23,6 +22,7 @@
 #include <samplerate.h>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
 #include "subprocess.h"
+#include <global_config.h>
 
 using namespace StackFlows;
 
@@ -44,6 +44,8 @@ typedef struct {
     std::string tokens;
     std::string gbin;
     std::string sentence;
+    std::string tagger;
+    std::string verbalizer;
     float spacker_speed = 1.0;
     int mode_rate       = 44100;
     int audio_rate      = 16000;
@@ -86,6 +88,7 @@ public:
     task_callback_t out_callback_;
     bool enaudio_;
     int awake_delay_ = 1000;
+    bool cap_;
     std::string tts_string_stream_buff;
 
     bool parse_config(const nlohmann::json &config_body)
@@ -169,22 +172,34 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], length_scale);
             CONFIG_AUTO_SET(file_body["mode_param"], noise_scale_w);
             CONFIG_AUTO_SET(file_body["mode_param"], sdp_ratio);
-            mode_config_.tokens  = base_model + mode_config_.tokens;
-            mode_config_.gbin    = base_model + mode_config_.gbin;
-            mode_config_.encoder = base_model + mode_config_.encoder;
-            mode_config_.decoder = base_model + mode_config_.decoder;
-            mode_config_.lexicon = base_model + mode_config_.lexicon;
+            CONFIG_AUTO_SET(file_body["mode_param"], tagger);
+            CONFIG_AUTO_SET(file_body["mode_param"], verbalizer);
+            mode_config_.tokens     = base_model + mode_config_.tokens;
+            mode_config_.gbin       = base_model + mode_config_.gbin;
+            mode_config_.encoder    = base_model + mode_config_.encoder;
+            mode_config_.decoder    = base_model + mode_config_.decoder;
+            mode_config_.lexicon    = base_model + mode_config_.lexicon;
+            mode_config_.tagger     = base_model + mode_config_.tagger;
+            mode_config_.verbalizer = base_model + mode_config_.verbalizer;
             if (config_body.contains("awake_delay"))
                 awake_delay_ = config_body["awake_delay"].get<int>();
             else if (file_body["mode_param"].contains("awake_delay"))
                 awake_delay_ = file_body["mode_param"]["awake_delay"];
-            // Load lexicon
-            lexicon_ = std::make_unique<Lexicon>(mode_config_.lexicon, mode_config_.tokens);
-            // Read g.bin
+
+            if (!std::filesystem::exists(mode_config_.tagger) ||
+                !std::filesystem::is_regular_file(mode_config_.tagger) ||
+                !std::filesystem::exists(mode_config_.verbalizer) ||
+                !std::filesystem::is_regular_file(mode_config_.verbalizer)) {
+                SLOGW("Either tagger or verbalizer file does not exist, using alternative lexicon.");
+                lexicon_ = std::make_unique<Lexicon>(mode_config_.lexicon, mode_config_.tokens);
+            } else {
+                lexicon_ = std::make_unique<Lexicon>(mode_config_.lexicon, mode_config_.tokens, mode_config_.tagger,
+                                                     mode_config_.verbalizer);
+            }
             g_matrix.resize(256, 0);
             FILE *fp = fopen(mode_config_.gbin.c_str(), "rb");
             if (!fp) {
-                printf("Open %s failed!\n", mode_config_.gbin.c_str());
+                SLOGE("Open %s failed!", mode_config_.gbin.c_str());
                 return -3;
             }
             fread(g_matrix.data(), sizeof(float), g_matrix.size(), fp);
@@ -192,11 +207,11 @@ public:
             encoder_ = std::make_unique<OnnxWrapper>();
             decoder_ = std::make_unique<EngineWrapper>();
             if (0 != encoder_->Init(mode_config_.encoder)) {
-                printf("encoder init failed!\n");
+                SLOGE("encoder init failed!");
                 return -4;
             }
             if (0 != decoder_->Init(mode_config_.decoder.c_str())) {
-                printf("Init decoder model failed!\n");
+                SLOGE("Init decoder model failed!");
                 return -5;
             }
         } catch (...) {
@@ -242,18 +257,46 @@ public:
     {
         try {
             std::vector<int16_t> wav_pcm_data;
+#if !defined(CONFIG_AX_620E_MSP_ENABLED) && !defined(CONFIG_AX_620Q_MSP_ENABLED)
+            std::string initial_status = unit_call("audio", "audio_status", "sys");
+            if (!cap_ && initial_status.find("\"cap\":\"Running\"") != std::string::npos) {
+                unit_call("audio", "cap_stop_all", "sys");
+                cap_ = true;
+            }
+#endif
             if (msg_str.empty()) {
-                SLOGI("empty");
                 if (out_callback_) {
                     std::string output = wav_pcm_data.empty() ? std::string()
                                                               : std::string((char *)wav_pcm_data.data(),
                                                                             wav_pcm_data.size() * sizeof(int16_t));
                     out_callback_(output, finish);
+#if !defined(CONFIG_AX_620E_MSP_ENABLED) && !defined(CONFIG_AX_620Q_MSP_ENABLED)
+                    int none_count           = 0;
+                    const int max_iterations = 100;
+
+                    for (int i = 0; i < max_iterations; ++i) {
+                        std::string current_status = unit_call("audio", "audio_status", "sys");
+                        if (current_status.find("\"play\":\"None\"") != std::string::npos) {
+                            none_count++;
+                        } else {
+                            none_count = 0;
+                        }
+                        if (none_count >= 5) {
+                            break;
+                        }
+
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
+
+                    if (cap_) {
+                        unit_call("audio", "cap", "sys");
+                        cap_ = false;
+                    }
+#endif
                 }
                 return false;
             }
 
-            // Convert text to phonemes and tones
             std::vector<int> phones_bef, tones_bef;
             lexicon_->convert(msg_str, phones_bef, tones_bef);
             auto phones   = intersperse(phones_bef, 0);
@@ -261,7 +304,6 @@ public:
             int phone_len = phones.size();
             std::vector<int> langids(phone_len, 3);
 
-            // Run the encoder to generate hidden representations
             auto encoder_output =
                 encoder_->Run(phones, tones, langids, g_matrix, mode_config_.noise_scale, mode_config_.noise_scale_w,
                               mode_config_.get_length_scale(), mode_config_.sdp_ratio);
@@ -270,245 +312,137 @@ public:
             auto zp_info   = encoder_output.at(0).GetTensorTypeAndShapeInfo();
             auto zp_shape  = zp_info.GetShape();
 
-            // Calculate decoder parameters
             int zp_size         = decoder_->GetInputSize(0) / sizeof(float);
             int dec_len         = zp_size / zp_shape[1];
             int audio_slice_len = decoder_->GetOutputSize(0) / sizeof(float);
 
-            const int pad_frames        = 24;
-            const int samples_per_frame = 512;
+            const int overlap_size = 1024;
+            const int fade_size    = 512;
 
-            const int effective_frames = dec_len - 2 * pad_frames;
+            int dec_slice_num = static_cast<int>(std::ceil(static_cast<double>(zp_shape[2]) / dec_len));
 
-            int dec_slice_num =
-                static_cast<int>(std::ceil(static_cast<double>(zp_shape[2]) / static_cast<double>(effective_frames)));
-
-            // SOLA parameters setup
-            const int sola_buffer_frame = pad_frames * samples_per_frame;                  // Overlap buffer length
-            const int sola_search_frame = pad_frames * samples_per_frame;                  // Search window length
-            const int block_frame       = (dec_len - 2 * pad_frames) * samples_per_frame;  // Effective block length
-
-            // Create fade-in/fade-out windows for smooth transitions
-            std::vector<float> fade_in_window(sola_buffer_frame);
-            std::vector<float> fade_out_window(sola_buffer_frame);
-
-            for (int i = 0; i < sola_buffer_frame; i++) {
-                fade_in_window[i]  = static_cast<float>(i) / sola_buffer_frame;
-                fade_out_window[i] = 1.0f - fade_in_window[i];
+            std::vector<float> fade_in(fade_size);
+            std::vector<float> fade_out(fade_size);
+            for (int i = 0; i < fade_size; i++) {
+                float t     = static_cast<float>(i) / fade_size;
+                fade_in[i]  = t;
+                fade_out[i] = 1.0f - t;
             }
 
-            // Initialize SOLA buffer
-            std::vector<float> sola_buffer(sola_buffer_frame, 0.0f);
-            bool first_frame = true;
-
             std::vector<float> pcmlist;
+            std::vector<float> previous_tail;
 
-            // Main decoding loop - process each slice
             for (int i = 0; i < dec_slice_num; i++) {
-                // Calculate start position for current batch input
-                int input_start = i * effective_frames;
-                // Consider forward padding, but ensure non-negative
-                if (i > 0) {
-                    input_start -= pad_frames;
-                }
-                input_start = std::max(0, input_start);
+                int input_start = i * dec_len;
+                int actual_size = std::min(dec_len, static_cast<int>(zp_shape[2] - input_start));
 
-                // Actual input length
-                int actual_len = std::min(dec_len, static_cast<int>(zp_shape[2] - input_start));
-
-                // Calculate effective output range (frame level)
-                int output_start_frame, output_end_frame;
-
-                if (i == 0) {
-                    // First frame: skip padding at beginning
-                    output_start_frame = 0;
-                    output_end_frame   = effective_frames - 1;
-                } else if (i == dec_slice_num - 1) {
-                    // Last frame: calculate from current segment start
-                    output_start_frame = i * effective_frames;
-                    // Last frame extends to encoder's maximum output length
-                    output_end_frame = static_cast<int>(zp_shape[2]) - 1;
-                } else {
-                    // Middle frames: standard calculation
-                    output_start_frame = i * effective_frames;
-                    output_end_frame   = (i + 1) * effective_frames - 1;
-                }
-                // Prepare decoder input, initialize all to zero
                 std::vector<float> zp(zp_size, 0);
-
-                // Copy data to decoder input
                 for (int n = 0; n < zp_shape[1]; n++) {
-                    int copy_size = std::min(actual_len, static_cast<int>(zp_shape[2] - input_start));
-                    if (copy_size > 0) {
+                    if (actual_size > 0) {
                         memcpy(zp.data() + n * dec_len, zp_data + n * zp_shape[2] + input_start,
-                               sizeof(float) * copy_size);
+                               sizeof(float) * actual_size);
                     }
                 }
 
-                // Run decoder
-                std::vector<float> decoder_output(audio_slice_len);
                 decoder_->SetInput(zp.data(), 0);
                 decoder_->SetInput(g_matrix.data(), 1);
 
                 if (0 != decoder_->Run()) {
-                    SLOGI("Inference #%d: decoding failed", i + 1);
+                    SLOGE("Decoder run failed at slice %d", i);
                     throw std::string("decoder_ RunSync error");
                 }
 
+                std::vector<float> decoder_output(audio_slice_len);
                 decoder_->GetOutput(decoder_output.data(), 0);
 
-                // === SOLA Processing Logic ===
-                if (first_frame) {
-                    // Special handling for first frame - should not skip initial content
-                    // First frame starts directly from decoder output without skipping
-                    int audio_start = 0;  // Start from beginning, don't skip pad_frames
+                if (i == 0) {
+                    int main_part_size = static_cast<int>(decoder_output.size()) - overlap_size;
+                    main_part_size     = std::max(0, main_part_size);
 
-                    // Calculate data length for first frame
-                    // First frame should preserve complete decoder output, only reserving sola_buffer_frame at the end
-                    // for next frame alignment
-                    int audio_len = decoder_output.size() - sola_buffer_frame;
+                    pcmlist.insert(pcmlist.end(), decoder_output.begin(), decoder_output.begin() + main_part_size);
 
-                    // Boundary check
-                    audio_len = std::max(0, audio_len);  // Ensure non-negative
-
-                    // Add first frame data
-                    if (audio_len > 0) {
-                        pcmlist.insert(pcmlist.end(), decoder_output.begin() + audio_start,
-                                       decoder_output.begin() + audio_start + audio_len);
+                    if (decoder_output.size() > main_part_size) {
+                        previous_tail.assign(decoder_output.begin() + main_part_size, decoder_output.end());
                     }
-
-                    // Save sola_buffer_frame length from the end to SOLA buffer for next frame alignment
-                    int buffer_start = audio_len;
-
-                    // Ensure sufficient data is available for copying
-                    if (buffer_start + sola_buffer_frame <= decoder_output.size()) {
-                        std::copy(decoder_output.begin() + buffer_start,
-                                  decoder_output.begin() + buffer_start + sola_buffer_frame, sola_buffer.begin());
-                    } else {
-                        // Possible case: first frame data is shorter than sola_buffer_frame
-                        int available = static_cast<int>(decoder_output.size() - buffer_start);
-                        if (available > 0) {
-                            std::copy(decoder_output.begin() + buffer_start, decoder_output.end(), sola_buffer.begin());
-                            // Fill with zeros
-                            std::fill(sola_buffer.begin() + available, sola_buffer.end(), 0.0f);
-                        } else {
-                            // Completely insufficient data, fill all with zeros
-                            std::fill(sola_buffer.begin(), sola_buffer.end(), 0.0f);
-                        }
-                    }
-
-                    first_frame = false;
 
                 } else {
-                    // Non-first frame: SOLA alignment required
-                    int audio_start = pad_frames * samples_per_frame;
-
-                    // 1. Prepare search window - beginning portion of current frame
-                    std::vector<float> search_window(sola_buffer_frame + sola_search_frame);
-                    std::copy(decoder_output.begin() + audio_start,
-                              decoder_output.begin() + audio_start + search_window.size(), search_window.begin());
-
-                    // 2. Find best alignment point (calculate cross-correlation)
-                    int best_offset        = 0;
-                    float best_correlation = -1.0;
-
-                    for (int offset = 0; offset <= sola_search_frame; offset++) {
-                        float correlation = 0.0;
-                        float energy      = 0.0;
-
-                        for (int j = 0; j < sola_buffer_frame; j++) {
-                            correlation += sola_buffer[j] * search_window[j + offset];
-                            energy += search_window[j + offset] * search_window[j + offset];
-                        }
-
-                        // Normalize correlation (avoid division by zero)
-                        float normalized_correlation = (energy > 1e-8) ? correlation / std::sqrt(energy) : 0.0f;
-
-                        if (normalized_correlation > best_correlation) {
-                            best_correlation = normalized_correlation;
-                            best_offset      = offset;
-                        }
+                    if (previous_tail.empty()) {
+                        pcmlist.insert(pcmlist.end(), decoder_output.begin(), decoder_output.end());
+                        continue;
                     }
 
-                    // 3. Apply alignment offset
-                    int aligned_start = audio_start + best_offset;
+                    int blend_size = std::min(
+                        {fade_size, static_cast<int>(previous_tail.size()), static_cast<int>(decoder_output.size())});
 
-                    // 4. Smooth transition processing (crossfade in alignment region)
-                    std::vector<float> crossfade_region(sola_buffer_frame);
-
-                    for (int j = 0; j < sola_buffer_frame; j++) {
-                        // Apply fade-in/fade-out window functions
-                        crossfade_region[j] =
-                            decoder_output[aligned_start + j] * fade_in_window[j] + sola_buffer[j] * fade_out_window[j];
+                    std::vector<float> blended_region(blend_size);
+                    for (int j = 0; j < blend_size; j++) {
+                        blended_region[j] = previous_tail[j] * fade_out[j * fade_size / blend_size] +
+                                            decoder_output[j] * fade_in[j * fade_size / blend_size];
                     }
 
-                    // 5. Add crossfade region to output
-                    pcmlist.insert(pcmlist.end(), crossfade_region.begin(), crossfade_region.end());
+                    pcmlist.insert(pcmlist.end(), blended_region.begin(), blended_region.end());
 
-                    int remaining_start = aligned_start + sola_buffer_frame;
+                    if (static_cast<int>(previous_tail.size()) > blend_size) {
+                        pcmlist.insert(pcmlist.end(), previous_tail.begin() + blend_size, previous_tail.end());
+                    }
+
+                    int current_remaining_start = blend_size;
+                    int current_remaining_size  = static_cast<int>(decoder_output.size()) - current_remaining_start;
 
                     if (i == dec_slice_num - 1) {
-                        int total_expected_samples = audio_len * samples_per_frame / 512;
-
-                        int processed_samples = static_cast<int>(pcmlist.size());
-
-                        int remaining_needed = total_expected_samples - processed_samples;
-                        remaining_needed     = std::max(0, remaining_needed);
-
-                        int remaining_len =
-                            std::min(remaining_needed, static_cast<int>(decoder_output.size() - remaining_start));
-
-                        if (remaining_len > 0) {
-                            pcmlist.insert(pcmlist.end(), decoder_output.begin() + remaining_start,
-                                           decoder_output.begin() + remaining_start + remaining_len);
-                        }
-
-                    } else {
-                        int remaining_len = (dec_len - 2 * pad_frames) * samples_per_frame - sola_buffer_frame;
-
-                        remaining_len =
-                            std::min(remaining_len, static_cast<int>(decoder_output.size() - remaining_start));
-
-                        if (remaining_len > 0) {
-                            pcmlist.insert(pcmlist.end(), decoder_output.begin() + remaining_start,
-                                           decoder_output.begin() + remaining_start + remaining_len);
-                        }
-
-                        int buffer_start = remaining_start + remaining_len;
-
-                        if (buffer_start + sola_buffer_frame <= decoder_output.size()) {
-                            std::copy(decoder_output.begin() + buffer_start,
-                                      decoder_output.begin() + buffer_start + sola_buffer_frame, sola_buffer.begin());
-                        } else {
-                            int avail = static_cast<int>(decoder_output.size() - buffer_start);
-                            if (avail > 0) {
-                                std::copy(decoder_output.begin() + buffer_start, decoder_output.end(),
-                                          sola_buffer.begin());
-                            }
-                            std::fill(sola_buffer.begin() + avail, sola_buffer.end(), 0.0f);
-                        }
+                        int total_expected     = audio_len;
+                        int current_total      = static_cast<int>(pcmlist.size());
+                        current_remaining_size = std::min(current_remaining_size, total_expected - current_total);
                     }
+
+                    if (current_remaining_size > overlap_size && i < dec_slice_num - 1) {
+                        int main_part_size = current_remaining_size - overlap_size;
+
+                        pcmlist.insert(pcmlist.end(), decoder_output.begin() + current_remaining_start,
+                                       decoder_output.begin() + current_remaining_start + main_part_size);
+
+                        previous_tail.assign(decoder_output.begin() + current_remaining_start + main_part_size,
+                                             decoder_output.begin() + current_remaining_start + current_remaining_size);
+                    } else {
+                        if (current_remaining_size > 0) {
+                            pcmlist.insert(pcmlist.end(), decoder_output.begin() + current_remaining_start,
+                                           decoder_output.begin() + current_remaining_start + current_remaining_size);
+                        }
+                        previous_tail.clear();
+                    }
+                }
+
+                if (static_cast<int>(pcmlist.size()) >= audio_len) {
+                    break;
                 }
             }
 
-            if (pcmlist.size() > audio_len) {
+            if (static_cast<int>(pcmlist.size()) > audio_len) {
                 pcmlist.resize(audio_len);
             }
 
-            // Post-processing: resample and convert to int16
+            float max_val  = 0.0f;
+            int clip_count = 0;
+            for (float sample : pcmlist) {
+                max_val = std::max(max_val, std::abs(sample));
+                if (std::abs(sample) > 0.95f) clip_count++;
+            }
+
             double src_ratio =
                 static_cast<double>(mode_config_.audio_rate) / static_cast<double>(mode_config_.mode_rate);
-            std::vector<float> tmp_pcm((pcmlist.size() * src_ratio + 1));
+            std::vector<float> tmp_pcm(static_cast<size_t>(pcmlist.size() * src_ratio + 1));
             int len;
-
             resample_audio(pcmlist.data(), pcmlist.size(), tmp_pcm.data(), &len, src_ratio);
 
-            // Convert to 16-bit PCM
             wav_pcm_data.reserve(len);
-            std::transform(tmp_pcm.begin(), tmp_pcm.begin() + len, std::back_inserter(wav_pcm_data),
-                           [](const auto val) { return static_cast<int16_t>(val * INT16_MAX); });
+            for (int i = 0; i < len; i++) {
+                float val = tmp_pcm[i];
+                if (std::abs(val) > 0.95f) {
+                    val = val > 0 ? 0.95f : -0.95f;
+                }
+                wav_pcm_data.push_back(static_cast<int16_t>(val * INT16_MAX));
+            }
 
-            // Call the output callback function with the result
             if (out_callback_) {
                 out_callback_(
                     std::string(reinterpret_cast<char *>(wav_pcm_data.data()), wav_pcm_data.size() * sizeof(int16_t)),
@@ -516,10 +450,10 @@ public:
             }
 
         } catch (const std::exception &e) {
-            SLOGI("TTS processing exception: %s", e.what());
+            SLOGE("Exception: %s", e.what());
             return true;
         } catch (...) {
-            SLOGI("TTS processing encountered an unknown exception");
+            SLOGE("Unknown exception occurred");
             return true;
         }
         return false;
@@ -626,7 +560,11 @@ public:
             llm_channel->send(llm_task_obj->response_format_, base64_data, LLM_NO_ERROR);
         }
         if (llm_task_obj->response_format_.find("sys") != std::string::npos) {
+#if defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)
             unit_call("audio", "queue_play", data);
+#else
+            unit_call("audio", "play_raw", data);
+#endif
         }
     }
 
