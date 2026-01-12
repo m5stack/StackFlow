@@ -28,6 +28,7 @@ STATIC_FILES += [AFile('../static_lib/sherpa/ncnn/libsherpa-ncnn-core.so'),
                  AFile('../static_lib/wetext/libfst.so.16'),
                  AFile('../static_lib/libonnxruntime.so.1'),
                  AFile('../static_lib/libonnxruntime.so.1.14.0'),
+                 AFile('../static_lib/libtinyalsa.so.2'),
                  AFile('../static_lib/libzmq.so.5')
                  ]
 
