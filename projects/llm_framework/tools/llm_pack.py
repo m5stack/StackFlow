@@ -383,21 +383,23 @@ if __name__ == "__main__":
         'llm-camera':[create_bin_deb,'llm-camera', '1.9', src_folder, revision, 'lib-llm'],
         'llm-vlm':[create_bin_deb,'llm-vlm', '1.12', src_folder, revision],
         'llm-yolo':[create_bin_deb,'llm-yolo', '1.9', src_folder, revision],
-        'llm-skel':[create_bin_deb,'llm-skel', version, src_folder, revision],
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', '1.7', src_folder, revision],
         'llm-vad':[create_bin_deb,'llm-vad', '1.8', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.8', src_folder, revision],
         'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.11', src_folder, revision],
         'llm-cosy-voice':[create_bin_deb,'llm-cosy-voice', '1.10', src_folder, revision],
         # keyword spotting Audio file
-        'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', data_version, src_folder, revision],
-        'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', data_version, src_folder, revision],
+        'llm-model-audio-en-us':[create_data_deb,'llm-model-audio-en-us', '0.3', src_folder, revision],
+        'llm-model-audio-zh-cn':[create_data_deb,'llm-model-audio-zh-cn', '0.3', src_folder, revision],
         # Kaldi model        
         'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-20M-2023-02-17', data_version, src_folder, revision],
         'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23':[create_data_deb,'llm-model-sherpa-ncnn-streaming-zipformer-zh-14M-2023-02-23', data_version, src_folder, revision],
         'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
         'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01':[create_data_deb,'llm-model-sherpa-onnx-kws-zipformer-wenetspeech-3.3M-2024-01-01', '0.3', src_folder, revision],
         'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-axcl':[create_data_deb,'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-axcl', '0.4', src_folder, revision],
+        # KWS model
+        ## AXCL
+        'llm-model-kws-axcl':[create_data_deb,'llm-model-kws-axcl', '0.4', src_folder, revision],
         'llm-model-sense-voice-small-10s-axcl':[create_data_deb,'llm-model-sense-voice-small-10s-axcl', '0.4', src_folder, revision],
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
@@ -405,128 +407,43 @@ if __name__ == "__main__":
         # VAD model
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.4', src_folder, revision],
         # MeloTTS model
-        ## AX630C
-        'llm-model-melotts-zh-cn':[create_data_deb,'llm-model-melotts-zh-cn', '0.6', src_folder, revision],
-        'llm-model-melotts-en-au':[create_data_deb,'llm-model-melotts-en-au', '0.6', src_folder, revision],
-        'llm-model-melotts-en-br':[create_data_deb,'llm-model-melotts-en-br', '0.6', src_folder, revision],
-        'llm-model-melotts-en-default':[create_data_deb,'llm-model-melotts-en-default', '0.6', src_folder, revision],
-        'llm-model-melotts-en-india':[create_data_deb,'llm-model-melotts-en-india', '0.6', src_folder, revision],
-        'llm-model-melotts-en-us':[create_data_deb,'llm-model-melotts-en-us', '0.6', src_folder, revision],
-        'llm-model-melotts-ja-jp':[create_data_deb,'llm-model-melotts-ja-jp', '0.6', src_folder, revision],
-        'llm-model-melotts-es-es':[create_data_deb,'llm-model-melotts-es-es', '0.5', src_folder, revision],
-        ## AX650
-        'llm-model-melotts-zh-cn-ax650':[create_data_deb,'llm-model-melotts-zh-cn-ax650', '0.6', src_folder, revision],
-        'llm-model-melotts-en-au-ax650':[create_data_deb,'llm-model-melotts-en-au-ax650', '0.6', src_folder, revision],
-        'llm-model-melotts-en-br-ax650':[create_data_deb,'llm-model-melotts-en-br-ax650', '0.6', src_folder, revision],
-        'llm-model-melotts-en-default-ax650':[create_data_deb,'llm-model-melotts-en-default-ax650', '0.6', src_folder, revision],
-        'llm-model-melotts-en-india-ax650':[create_data_deb,'llm-model-melotts-en-india-ax650', '0.6', src_folder, revision],
-        'llm-model-melotts-en-us-ax650':[create_data_deb,'llm-model-melotts-en-us-ax650', '0.6', src_folder, revision],
-        'llm-model-melotts-ja-jp-ax650':[create_data_deb,'llm-model-melotts-ja-jp-ax650', '0.6', src_folder, revision],
-        'llm-model-melotts-es-es-ax650':[create_data_deb,'llm-model-melotts-es-es-ax650', '0.5', src_folder, revision],
         ## AXCL
-        'llm-model-melotts-zh-cn-axcl':[create_data_deb,'llm-model-melotts-zh-cn-axcl', '0.6', src_folder, revision],
-        'llm-model-melotts-en-au-axcl':[create_data_deb,'llm-model-melotts-en-au-axcl', '0.6', src_folder, revision],
-        'llm-model-melotts-en-br-axcl':[create_data_deb,'llm-model-melotts-en-br-axcl', '0.6', src_folder, revision],
-        'llm-model-melotts-en-default-axcl':[create_data_deb,'llm-model-melotts-en-default-axcl', '0.6', src_folder, revision],
-        'llm-model-melotts-en-india-axcl':[create_data_deb,'llm-model-melotts-en-india-axcl', '0.6', src_folder, revision],
-        'llm-model-melotts-en-us-axcl':[create_data_deb,'llm-model-melotts-en-us-axcl', '0.6', src_folder, revision],
-        'llm-model-melotts-ja-jp-axcl':[create_data_deb,'llm-model-melotts-ja-jp-axcl', '0.6', src_folder, revision],
-        'llm-model-melotts-es-es-axcl':[create_data_deb,'llm-model-melotts-es-es-axcl', '0.5', src_folder, revision],
+        'llm-model-melotts-zh-cn-axcl':[create_data_deb,'llm-model-melotts-zh-cn-axcl', '0.7', src_folder, revision],
+        'llm-model-melotts-en-au-axcl':[create_data_deb,'llm-model-melotts-en-au-axcl', '0.7', src_folder, revision],
+        'llm-model-melotts-en-br-axcl':[create_data_deb,'llm-model-melotts-en-br-axcl', '0.7', src_folder, revision],
+        'llm-model-melotts-en-default-axcl':[create_data_deb,'llm-model-melotts-en-default-axcl', '0.7', src_folder, revision],
+        'llm-model-melotts-en-india-axcl':[create_data_deb,'llm-model-melotts-en-india-axcl', '0.7', src_folder, revision],
+        'llm-model-melotts-en-us-axcl':[create_data_deb,'llm-model-melotts-en-us-axcl', '0.7', src_folder, revision],
+        'llm-model-melotts-ja-jp-axcl':[create_data_deb,'llm-model-melotts-ja-jp-axcl', '0.7', src_folder, revision],
+        'llm-model-melotts-es-es-axcl':[create_data_deb,'llm-model-melotts-es-es-axcl', '0.6', src_folder, revision],
         # CosyVoice2 model
         ## AXCL
         'llm-model-CosyVoice2-0.5B-axcl':[create_data_deb,'llm-model-CosyVoice2-0.5B-axcl', '0.6', src_folder, revision],
         # Yolo model
-        ## AX630C
-        'llm-model-yolo11n':[create_data_deb,'llm-model-yolo11n', data_version, src_folder, revision],
-        'llm-model-yolo11n-pose':[create_data_deb,'llm-model-yolo11n-pose', '0.3', src_folder, revision],
-        'llm-model-yolo11n-hand-pose':[create_data_deb,'llm-model-yolo11n-hand-pose', '0.3', src_folder, revision],
-        'llm-model-yolo11n-seg':[create_data_deb,'llm-model-yolo11n-seg', '0.3', src_folder, revision],
-        'llm-model-yolo11n-npu1':[create_data_deb,'llm-model-yolo11n-npu1', '0.4', src_folder, revision],
-        'llm-model-yolo11n-pose-npu1':[create_data_deb,'llm-model-yolo11n-pose-npu1', '0.4', src_folder, revision],
-        'llm-model-yolo11n-hand-pose-npu1':[create_data_deb,'llm-model-yolo11n-hand-pose-npu1', '0.4', src_folder, revision],
-        'llm-model-yolo11n-seg-npu1':[create_data_deb,'llm-model-yolo11n-seg-npu1', '0.4', src_folder, revision],
-        ## AX650
-        'llm-model-yolo11n-ax650':[create_data_deb,'llm-model-yolo11n-ax650', '0.4', src_folder, revision],
-        'llm-model-yolo11n-pose-ax650':[create_data_deb,'llm-model-yolo11n-pose-ax650', '0.4', src_folder, revision],
-        'llm-model-yolo11n-hand-pose-ax650':[create_data_deb,'llm-model-yolo11n-hand-pose-ax650', '0.4', src_folder, revision],
-        'llm-model-yolo11n-seg-ax650':[create_data_deb,'llm-model-yolo11n-seg-ax650', '0.4', src_folder, revision],
         ## AXCL
         'llm-model-yolo11n-axcl':[create_data_deb,'llm-model-yolo11n-axcl', '0.4', src_folder, revision],
         'llm-model-yolo11n-pose-axcl':[create_data_deb,'llm-model-yolo11n-pose-axcl', '0.4', src_folder, revision],
         'llm-model-yolo11n-hand-pose-axcl':[create_data_deb,'llm-model-yolo11n-hand-pose-axcl', '0.4', src_folder, revision],
         'llm-model-yolo11n-seg-axcl':[create_data_deb,'llm-model-yolo11n-seg-axcl', '0.4', src_folder, revision],
         # DepthAnything model
-        ## AX630C
-        'llm-model-depth-anything-ax630c':[create_data_deb,'llm-model-depth-anything-ax630c', '0.4', src_folder, revision],
-        'llm-model-depth-anything-npu1-ax630c':[create_data_deb,'llm-model-depth-anything-npu1-ax630c', '0.4', src_folder, revision],
-        ## AX650
-        'llm-model-depth-anything-ax650':[create_data_deb,'llm-model-depth-anything-ax650', '0.4', src_folder, revision],
         ## AXCL
         'llm-model-depth-anything-axcl':[create_data_deb,'llm-model-depth-anything-axcl', '0.4', src_folder, revision],
         # Whisper model
-        ## AX630C
-        'llm-model-whisper-tiny':[create_data_deb,'llm-model-whisper-tiny', '0.4', src_folder, revision],
-        'llm-model-whisper-base':[create_data_deb,'llm-model-whisper-base', '0.4', src_folder, revision],
-        'llm-model-whisper-small':[create_data_deb,'llm-model-whisper-small', '0.4', src_folder, revision],
-        ## AX650
-        'llm-model-whisper-tiny-ax650':[create_data_deb,'llm-model-whisper-tiny-ax650', '0.4', src_folder, revision],
-        'llm-model-whisper-base-ax650':[create_data_deb,'llm-model-whisper-base-ax650', '0.4', src_folder, revision],
-        'llm-model-whisper-small-ax650':[create_data_deb,'llm-model-whisper-small-ax650', '0.4', src_folder, revision],
         ## AXCL
         'llm-model-whisper-tiny-axcl':[create_data_deb,'llm-model-whisper-tiny-axcl', '0.4', src_folder, revision],
         'llm-model-whisper-base-axcl':[create_data_deb,'llm-model-whisper-base-axcl', '0.4', src_folder, revision],
         'llm-model-whisper-small-axcl':[create_data_deb,'llm-model-whisper-small-axcl', '0.4', src_folder, revision],
         # Qwen model
-        ## AX630C
-        'llm-model-qwen2.5-0.5B-prefill-20e':[create_data_deb,'llm-model-qwen2.5-0.5B-prefill-20e', data_version, src_folder, revision],
-        'llm-model-qwen2.5-0.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-0.5B-p256-ax630c', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-0.5B-Int4-ax630c':[create_data_deb,'llm-model-qwen2.5-0.5B-Int4-ax630c', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-HA-0.5B-ctx-ax630c':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-ax630c', '0.5', src_folder, revision],
-        'llm-model-qwen2.5-1.5B-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-ax630c', '0.3', src_folder, revision],
-        'llm-model-qwen2.5-1.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-p256-ax630c', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-1.5B-Int4-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-Int4-ax630c', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-coder-0.5B-ax630c':[create_data_deb,'llm-model-qwen2.5-coder-0.5B-ax630c', data_version, src_folder, revision],
-        'llm-model-qwen3-0.6B-ax630c':[create_data_deb,'llm-model-qwen3-0.6B-ax630c', '0.4', src_folder, revision],
-        ## AX650
-        'llm-model-qwen2.5-0.5B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-0.5B-Int4-ax650', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-HA-0.5B-ctx-ax650':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-ax650', '0.5', src_folder, revision],
-        'llm-model-qwen2.5-1.5B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-1.5B-Int4-ax650', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-3B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-3B-Int4-ax650', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-7B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-7B-Int4-ax650', '0.4', src_folder, revision],
         ## AXCL
         'llm-model-qwen2.5-HA-0.5B-ctx-axcl':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-axcl', '0.5', src_folder, revision],
         'llm-model-qwen2.5-7B-Int4-ctx-axcl':[create_data_deb,'llm-model-qwen2.5-7B-Int4-ctx-axcl', '0.5', src_folder, revision],
         'llm-model-qwen3-1.7B-Int8-ctx-axcl':[create_data_deb,'llm-model-qwen3-1.7B-Int8-ctx-axcl', '0.5', src_folder, revision],
         'llm-model-qwen3-vl-2B-axcl':[create_data_deb,'llm-model-qwen3-vl-2B-axcl', '0.5', src_folder, revision],
+        'llm-model-qwen3-vl-2B-Int4-axcl':[create_data_deb,'llm-model-qwen3-vl-2B-Int4-axcl', '0.5', src_folder, revision],
         'llm-model-qwen3-vl-4B-Int4-axcl':[create_data_deb,'llm-model-qwen3-vl-4B-Int4-axcl', '0.5', src_folder, revision],
-        # Llama model
-        'llm-model-llama3.2-1B-prefill-ax630c':[create_data_deb,'llm-model-llama3.2-1B-prefill-ax630c', data_version, src_folder, revision],
-        'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],
-        'llm-model-openbuddy-llama3.2-1B-ax630c':[create_data_deb,'llm-model-openbuddy-llama3.2-1B-ax630c', data_version, src_folder, revision],
         # InternVL model
-        ## AX630C
-        'llm-model-internvl2.5-1B-ax630c':[create_data_deb,'llm-model-internvl2.5-1B-ax630c', '0.4', src_folder, revision],
-        'llm-model-internvl2.5-1B-364-ax630c':[create_data_deb,'llm-model-internvl2.5-1B-364-ax630c', '0.4', src_folder, revision],
-        ## AX650
-        'llm-model-internvl3-1B-448-ax650':[create_data_deb,'llm-model-internvl3-1B-448-ax650', '0.6', src_folder, revision],
         ## AXCL
         'llm-model-internvl3-1B-448-axcl':[create_data_deb,'llm-model-internvl3-1B-448-axcl', '0.7', src_folder, revision],
-        # DeepSeek model
-        ## AX630C
-        'llm-model-deepseek-r1-1.5B-ax630c':[create_data_deb,'llm-model-deepseek-r1-1.5B-ax630c', '0.3', src_folder, revision],
-        'llm-model-deepseek-r1-1.5B-p256-ax630c':[create_data_deb,'llm-model-deepseek-r1-1.5B-p256-ax630c', '0.4', src_folder, revision],
-        ## AX650
-        'llm-model-deepseek-r1-1.5B-Int4-ax650':[create_data_deb,'llm-model-deepseek-r1-1.5B-Int4-ax650', '0.4', src_folder, revision],
-        'llm-model-deepseek-r1-7B-Int4-ax650':[create_data_deb,'llm-model-deepseek-r1-7B-Int4-ax650', '0.4', src_folder, revision],
-        ## AXCL
-        # Smolvlm model
-        ## AX630C
-        'llm-model-smolvlm-256M-ax630c':[create_data_deb,'llm-model-smolvlm-256M-ax630c', '0.4', src_folder, revision],
-        'llm-model-smolvlm-256M-ax650':[create_data_deb,'llm-model-smolvlm-256M-ax650', '0.4', src_folder, revision],
-        ## AX650
-        'llm-model-smolvlm-500M-ax630c':[create_data_deb,'llm-model-smolvlm-500M-ax630c', '0.4', src_folder, revision],
-        # 'llm-model-qwen2-0.5B-prefill-20e':[create_data_deb,'llm-model-qwen2-0.5B-prefill-20e', data_version, src_folder, revision],
-        # 'llm-model-qwen2-1.5B-prefill-20e':[create_data_deb,'llm-model-qwen2-1.5B-prefill-20e', data_version, src_folder, revision]
     }
     exit_flage = 0
     for taskname in Tasks:

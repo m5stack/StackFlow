@@ -25,7 +25,8 @@ INCLUDE += [ADir('../static_lib/include/sherpa'),
             ADir('../static_lib/include/sherpa/sherpa-ncnn'),
             ADir('../static_lib/include/sherpa/sherpa-onnx'),
             ADir('../static_lib/include/sherpa/sherpa-onnx/openfst-src'),
-            ADir('../static_lib/include/sherpa/sherpa-onnx/onnxruntime-src')]
+            ADir('../static_lib/include/sherpa/sherpa-onnx/onnxruntime-src'),
+            ADir('../static_lib/eigen-src')]
 
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/ncnn')]
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]

@@ -17,7 +17,7 @@
         "device": 1,
         "volume": 0.5,
         "channel": 1,
-        "rate": 16000,
+        "rate": 48000,
         "bit": 16,
         "stPoolConfig.MetaSize": 8192,
         "stPoolConfig.BlkSize": 32768,

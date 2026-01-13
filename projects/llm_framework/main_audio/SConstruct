@@ -23,7 +23,7 @@ LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 REQUIREMENTS += ['tinyalsa', 'samplerate']
 
-STATIC_FILES += [AFile('audio.json'), AFile('audio_kit.json')]
+STATIC_FILES += [AFile('audio.json')]
 STATIC_FILES += Glob('mode_*.json')
 
 env['COMPONENTS'].append({'target':'llm_audio-1.8',
