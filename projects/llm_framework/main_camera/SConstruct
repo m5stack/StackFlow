@@ -41,7 +41,7 @@ SRCS += Glob(os.path.join(env["MSP_PATH"], 'sample/rtsp/*.c*') )
 # INCLUDE.append(ADir('ax_sample'))
 # SRCS += Glob('ax_sample/*.c*')
 
-REQUIREMENTS += ['ax_sys', 'ax_interpreter', 'ax_engine']
+# REQUIREMENTS += ['ax_sys', 'ax_interpreter', 'ax_engine']
 if 'CONFIG_AX_620E_MSP_ENABLED' in os.environ:
     REQUIREMENTS += ['ax_ae', 'ax_vo', 'ax_skel', 'ax_venc', 'ax_mipi', 'ax_ives', 'ax_ivps', 'ax_proton', 'ax_audio', 'tinyalsa']
     REQUIREMENTS += ['ax_audio_3a','samplerate', 'ax_fdk', 'fdk-aac', 'ax_awb', 'ax_af', 'ax_nt_stream', 'ax_nt_ctrl']
@@ -68,7 +68,7 @@ STATIC_LIB += static_file * 4
 STATIC_FILES += [AFile('camera.json')]
 STATIC_FILES += Glob('mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_camera-1.9',
+env['COMPONENTS'].append({'target':'llm_camera-1.10',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,

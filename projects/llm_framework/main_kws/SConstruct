@@ -4,7 +4,7 @@ Import('env')
 with open(env['PROJECT_TOOL_S']) as f:
     exec(f.read())
 
-SRCS = Glob('src/*.c*')
+SRCS = append_srcs_dir(ADir('src'))
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
 REQUIREMENTS = ['pthread', 'dl', 'utilities', 'eventpp', 'StackFlow', 'single_header_libs', 'axcl']
@@ -36,18 +36,21 @@ LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-
 REQUIREMENTS += ['axcl_rt', 'axcl_pkg', 'axcl_comm', 'spdlog', 'axcl_token', 'axcl_pcie_msg', 'axcl_pcie_dma', 'utilities']
 LINK_SEARCH_PATH += [ADir('../static_lib')]
 
-INCLUDE += [ADir('../static_lib/include/sherpa'),
-            ADir('../static_lib/include/sherpa/sherpa-onnx'),
+INCLUDE += [ADir('src/runner'),
+            ADir('../static_lib/include/sherpa'),
             ADir('../static_lib/include/sherpa/fbank'),
+            ADir('../static_lib/include/sherpa/sherpa-onnx'),
             ADir('../static_lib/include/sherpa/sherpa-onnx/onnxruntime-src'),
-            ADir('../static_lib/include/sherpa/sherpa-onnx/openfst-src'),
-            ADir('../static_lib/eigen-src')]
+            ADir('../static_lib/eigen-src'),
+            ADir('../static_lib/include/sherpa/sherpa-onnx/openfst-src')
+            ]
 
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
+REQUIREMENTS += ['onnxruntime']
+
 LDFLAGS += ['-l:libsherpa-onnx-core.a', '-l:libkaldi-native-fbank-core.a', '-l:libkissfft-float.a',
             '-l:libkaldi-decoder-core.a', '-l:libssentencepiece_core.a']
 
-REQUIREMENTS += ['onnxruntime']
 
 STATIC_FILES += [os.path.join(python_venv, 'sherpa-onnx')]
 STATIC_FILES += Glob('llm-kws_text2token.py')
