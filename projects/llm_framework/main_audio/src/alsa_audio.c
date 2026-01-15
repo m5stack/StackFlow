@@ -24,9 +24,12 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
     unsigned int frames_read;
     unsigned int total_frames_read;
     unsigned int bytes_per_frame;
-
     memset(&config, 0, sizeof(config));
-    config.channels          = channel;
+
+    int in_channels  = channel;
+    int out_channels = 1;
+
+    config.channels          = in_channels;
     config.rate              = 48000;
     config.period_size       = 120;
     config.period_count      = 4;
@@ -53,7 +56,7 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
     }
 
     if (1) {
-        printf("Capturing sample: %u ch, %u hz, %u bit\n", channel, rate, pcm_format_to_bits(PCM_FORMAT_S16_LE));
+        printf("Capturing sample: %u ch, %u hz, %u bit\n", out_channels, rate, pcm_format_to_bits(PCM_FORMAT_S16_LE));
     }
 
     bytes_per_frame   = pcm_frames_to_bytes(pcm, 1);
@@ -64,12 +67,11 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
 
     int in_frames  = pcm_get_buffer_size(pcm);
     int out_frames = (int)((float)in_frames * ((float)rate / 48000.0f) + 1);
-    int out_bytes  = out_frames * channel * sizeof(short);
 
     if (rate != 48000) {
-        src_state = src_new(SRC_SINC_FASTEST, channel, NULL);
-        in_float  = malloc(in_frames * channel * sizeof(float));
-        out_float = malloc(out_frames * channel * sizeof(float));
+        src_state = src_new(SRC_SINC_FASTEST, 1, NULL);
+        in_float  = malloc(in_frames * sizeof(float));
+        out_float = malloc(out_frames * sizeof(float));
         if (!src_state || !in_float || !out_float) {
             fprintf(stderr, "Unable to allocate resample buffers\n");
             free(buffer);
@@ -92,12 +94,24 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
         total_frames_read += frames_read;
 
         if (rate == 48000) {
-            callback(buffer, frames_read * bytes_per_frame);
+            if (in_channels == 1) {
+                callback(buffer, frames_read * bytes_per_frame);
+            } else {
+                short *in   = (short *)buffer;
+                short *mono = (short *)malloc(frames_read * sizeof(short));
+                if (!mono) break;
+                for (unsigned int f = 0; f < frames_read; ++f) {
+                    mono[f] = in[f * in_channels + 0];
+                }
+                callback((const char *)mono, frames_read * sizeof(short));
+                free(mono);
+            }
         } else {
             short *in_short = (short *)buffer;
-            for (int i = 0; i < frames_read * channel; ++i) {
-                in_float[i] = in_short[i] / 32768.0f;
+            for (unsigned int f = 0; f < frames_read; ++f) {
+                in_float[f] = in_short[f * in_channels + 0] / 32768.0f;
             }
+
             SRC_DATA src_data;
             src_data.data_in       = in_float;
             src_data.input_frames  = frames_read;
@@ -105,19 +119,24 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
             src_data.output_frames = out_frames;
             src_data.src_ratio     = (double)rate / 48000.0;
             src_data.end_of_input  = 0;
-            int error              = src_process(src_state, &src_data);
+
+            int error = src_process(src_state, &src_data);
             if (error) {
                 fprintf(stderr, "SRC error: %s\n", src_strerror(error));
                 break;
             }
-            short *out_short = malloc(src_data.output_frames_gen * channel * sizeof(short));
-            for (int i = 0; i < src_data.output_frames_gen * channel; ++i) {
+
+            short *out_short = malloc(src_data.output_frames_gen * sizeof(short));
+            if (!out_short) break;
+
+            for (long i = 0; i < src_data.output_frames_gen; ++i) {
                 float sample = out_float[i];
                 if (sample > 1.0f) sample = 1.0f;
                 if (sample < -1.0f) sample = -1.0f;
                 out_short[i] = (short)(sample * 32767.0f);
             }
-            callback((const char *)out_short, src_data.output_frames_gen * channel * sizeof(short));
+
+            callback((const char *)out_short, src_data.output_frames_gen * sizeof(short));
             free(out_short);
         }
     }
@@ -127,6 +146,7 @@ void alsa_cap_start(unsigned int card, unsigned int device, float Volume, int ch
         free(out_float);
         src_delete(src_state);
     }
+
     free(buffer);
     pcm_close(pcm);
 }
