@@ -401,7 +401,7 @@ if __name__ == "__main__":
         'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-ax650':[create_data_deb,'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-ax650', '0.4', src_folder, revision],
         # KWS model
         ## AX630C
-        'llm-model-kws':[create_data_deb,'llm-model-kws', '0.4', src_folder, revision],
+        'llm-model-kws-ax630c':[create_data_deb,'llm-model-kws-ax630c', '0.4', src_folder, revision],
         ## AX650
         'llm-model-kws-ax650':[create_data_deb,'llm-model-kws-ax650', '0.4', src_folder, revision],
         # ASR model
