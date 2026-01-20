@@ -241,7 +241,7 @@ def create_data_deb(package_name, version, src_folder, revision='m5stack1', depe
     shutil.rmtree(deb_folder)
     return package_name + " creat success!"
 
-def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.8)'):
+def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.8), llm-sys'):
     bin_files = glob.glob(os.path.join(src_folder, package_name.replace("-", "_") + "-*"))
     version_info = "0"
     if bin_files:
@@ -373,7 +373,7 @@ if __name__ == "__main__":
     Tasks = {
         # Unit
         'lib-llm':[create_lib_deb,'lib-llm', '1.9', src_folder, revision],
-        'llm-sys':[create_bin_deb,'llm-sys', '1.6', src_folder, revision],
+        'llm-sys':[create_bin_deb,'llm-sys', '1.6', src_folder, revision, 'lib-llm (>= 1.8)'],
         'llm-audio':[create_bin_deb,'llm-audio', '1.8', src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', '1.10', src_folder, revision],
         'llm-asr':[create_bin_deb,'llm-asr', '1.8', src_folder, revision],
