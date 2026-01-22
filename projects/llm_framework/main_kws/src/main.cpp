@@ -41,8 +41,8 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
 
 typedef struct mode_config_axera {
     int chunk_size            = 32;
-    float threshold           = 0.9f;
-    int min_continuous_frames = 5;
+    float threshold           = 0.6f;
+    int min_continuous_frames = 2;
     int REFRACTORY_TIME_MS    = 2000;
     int RESAMPLE_RATE         = 16000;
     int FEAT_DIM              = 80;
@@ -83,6 +83,9 @@ private:
     long long frame_index_global_   = 0;
     int last_btn_204_state          = -1;
 
+    std::atomic<long long> last_manual_trigger_ms_{0};
+    static constexpr long long MANUAL_TRIGGER_INTERVAL_MS = 2000;
+
 public:
     inline const std::string &model() const
     {
@@ -106,6 +109,12 @@ public:
     }
 
     friend class llm_kws;
+
+    static long long now_ms()
+    {
+        using namespace std::chrono;
+        return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+    }
 
     bool parse_config(const nlohmann::json &config_body)
     {
@@ -540,6 +549,15 @@ public:
 
     void trigger_wakeup()
     {
+        long long now  = now_ms();
+        long long last = last_manual_trigger_ms_.load();
+
+        if (now - last < MANUAL_TRIGGER_INTERVAL_MS) {
+            return;
+        }
+
+        last_manual_trigger_ms_.store(now);
+
         if (enwake_audio_ && (!wake_wav_file_.empty()) && play_awake_wav) {
             play_awake_wav(wake_wav_file_);
         }
@@ -698,7 +716,15 @@ public:
             }
         }
         if (post != 0) {
+#if !defined(CONFIG_AX_620E_MSP_ENABLED) && !defined(CONFIG_AX_620Q_MSP_ENABLED)
+            unit_call("audio", "cap_stop_all", "sys");
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+#endif
             unit_call("audio", "play_raw", std::string((char *)(wav_data.data() + post), size - post));
+#if !defined(CONFIG_AX_620E_MSP_ENABLED) && !defined(CONFIG_AX_620Q_MSP_ENABLED)
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            unit_call("audio", "cap", "None");
+#endif
         }
     }
 
