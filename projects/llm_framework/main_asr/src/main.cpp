@@ -772,7 +772,10 @@ public:
         const std::string *next_data = &data;
         if (finish) {
             if (!llm_task_obj->is_using_itn()) {
-                tmp_msg1  = data + ".";
+                if (tmp_msg1.empty())
+                    tmp_msg1 = data;
+                else
+                    tmp_msg1 = data + ".";
                 next_data = &tmp_msg1;
             }
         }

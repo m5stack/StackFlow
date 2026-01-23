@@ -376,7 +376,7 @@ if __name__ == "__main__":
         'llm-sys':[create_bin_deb,'llm-sys', '1.6', src_folder, revision, 'lib-llm (>= 1.8)'],
         'llm-audio':[create_bin_deb,'llm-audio', '1.9', src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', '1.11', src_folder, revision],
-        'llm-asr':[create_bin_deb,'llm-asr', '1.9', src_folder, revision],
+        'llm-asr':[create_bin_deb,'llm-asr', '1.10', src_folder, revision],
         'llm-llm':[create_bin_deb,'llm-llm', '1.12', src_folder, revision],
         'llm-tts':[create_bin_deb,'llm-tts', '1.6', src_folder, revision],
         'llm-melotts':[create_bin_deb,'llm-melotts', '1.11', src_folder, revision],
