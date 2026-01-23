@@ -543,7 +543,7 @@ public:
         bool is_endpoint = ncnn_recognizer_->IsEndpoint(ncnn_stream_.get());
         if (is_endpoint) {
             ncnn_stream_->Finalize();
-            if ((!lower_text.empty()) && out_callback_) {
+            if (out_callback_) {
                 out_callback_(lower_text, true);
             }
             ncnn_stream_.reset();
@@ -638,7 +638,7 @@ public:
             }
 
             if (silence_ms_accum_ >= silence_timeout) {
-                if (!pending_text_.empty() && out_callback_) {
+                if (out_callback_) {
                     out_callback_(pending_text_, true);
                 }
                 pending_text_.clear();
@@ -689,7 +689,7 @@ public:
         bool is_endpoint = onnx_online_recognizer_->IsEndpoint(online_stream.get());
 
         if (is_endpoint) {
-            if ((!lower_text.empty()) && out_callback_) {
+            if (out_callback_) {
                 out_callback_(lower_text, true);
             }
             online_stream.reset();
