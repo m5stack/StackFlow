@@ -530,6 +530,9 @@ public:
 
     void trigger()
     {
+        if (enwake_audio_ && (!wake_wav_file_.empty()) && play_awake_wav) {
+            play_awake_wav(wake_wav_file_);
+        }
         if (out_callback_) out_callback_("", true);
     }
 
@@ -637,7 +640,11 @@ public:
             }
         }
         if (post != 0) {
+            unit_call("audio", "cap_stop_all", "sys");
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
             unit_call("audio", "play_raw", std::string((char *)(wav_data.data() + post), size - post));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            unit_call("audio", "cap", "None");
         }
     }
 

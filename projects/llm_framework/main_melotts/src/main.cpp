@@ -267,7 +267,11 @@ public:
             }
 
             std::vector<int> phones_bef, tones_bef;
-            lexicon_->convert(msg_str, phones_bef, tones_bef);
+            std::string clean = msg_str;
+            for (char &c : clean) {
+                if (c == '\r' || c == '\n' || c == '\t') c = ' ';
+            }
+            lexicon_->convert(clean, phones_bef, tones_bef);
             auto phones   = intersperse(phones_bef, 0);
             auto tones    = intersperse(tones_bef, 0);
             int phone_len = phones.size();
@@ -567,9 +571,8 @@ public:
                     error_body["message"] = "Model run failed.";
                     llm_channel->send("None", "None", error_body, llm_channel->work_id_);
                 }
-            } else {
-                llm_task_obj->TTS("", true);
             }
+            llm_task_obj->TTS("", true);
         }
     }
 
@@ -587,10 +590,6 @@ public:
             llm_task_obj->tts_string_stream_buff.clear();
             if (llm_task_obj->response_format_.find("sys") != std::string::npos) {
                 unit_call("audio", "queue_play_stop", data);
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(llm_task_obj->awake_delay_));
-            if (llm_task_obj->response_format_.find("sys") != std::string::npos) {
-                unit_call("audio", "play_stop", data);
             }
             llm_channel->subscriber_work_id(
                 llm_task_obj->superior_id_,

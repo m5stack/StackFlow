@@ -13,12 +13,11 @@
 #include <iostream>
 #include <stdexcept>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
-#include <global_config.h>
 
 int main_exit_flage = 0;
 static void __sigint(int iSigNo)
 {
-    SLOGW("llm_sys will be exit!");
+    SLOGW("llm_audio will be exit!");
     main_exit_flage = 1;
 }
 
@@ -43,6 +42,14 @@ private:
     std::unique_ptr<std::thread> audio_play_thread_;
     std::unique_ptr<std::thread> audio_cap_thread_;
     std::mutex ax_play_mtx;
+    struct PlayItem {
+        uint64_t gen;
+        std::shared_ptr<pzmq_data> data;
+    };
+
+    std::atomic<uint64_t> play_gen_{0};
+    std::atomic<int> play_pending_{0};
+    std::atomic_bool play_running_{false};
 
     static void on_cap_sample(const char *data, int size)
     {
@@ -67,21 +74,33 @@ private:
 
     void hw_queue_play(const std::shared_ptr<void> &arg)
     {
-        if (audio_clear_flage_) {
+        auto item              = std::static_pointer_cast<PlayItem>(arg);
+        const uint64_t cur_gen = play_gen_.load(std::memory_order_relaxed);
+
+        if (item->gen != cur_gen) {
             return;
         }
 
-        std::shared_ptr<pzmq_data> originalPtr = std::static_pointer_cast<pzmq_data>(arg);
-        std::string audio_data(static_cast<const char *>(originalPtr->data()), originalPtr->size());
+        auto pending_guard = std::unique_ptr<void, std::function<void(void *)>>(
+            (void *)1, [&](void *) { play_pending_.fetch_sub(1, std::memory_order_relaxed); });
 
+        if (audio_clear_flage_.load(std::memory_order_relaxed)) {
+            return;
+        }
+
+        std::string audio_data((const char *)item->data->data(), item->data->size());
         std::string final_data = audio_data;
         if (play_config.channel == 2) {
             final_data = mono_to_stereo_s16le(audio_data);
         }
 
-        std::lock_guard<std::mutex> guard(ax_play_mtx);
-        alsa_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
-                  play_config.bit, final_data.c_str(), final_data.length());
+        play_running_.store(true, std::memory_order_relaxed);
+        {
+            std::lock_guard<std::mutex> guard(ax_play_mtx);
+            alsa_play(play_config.card, play_config.device, play_config.volume, play_config.channel, play_config.rate,
+                      play_config.bit, final_data.c_str(), final_data.length());
+        }
+        play_running_.store(false, std::memory_order_relaxed);
     }
 
     void hw_play(const std::string &audio_data)
@@ -98,13 +117,8 @@ private:
 
     void hw_cap()
     {
-#if (defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)) && !defined(CONFIG_AXCL_ENABLED)
-        ax_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
-                     cap_config.bit, llm_audio::on_cap_sample);
-#else
         alsa_cap_start(cap_config.card, cap_config.device, cap_config.volume, cap_config.channel, cap_config.rate,
                        cap_config.bit, llm_audio::on_cap_sample);
-#endif
     }
 
     void _play(const std::string &audio_data)
@@ -134,12 +148,7 @@ private:
 
     void _cap_stop()
     {
-#if (defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)) && !defined(CONFIG_AXCL_ENABLED)
-        ax_close_cap();
-
-#else
         alsa_close_cap();
-#endif
         if (audio_cap_thread_) {
             audio_cap_thread_->join();
             audio_cap_thread_.reset();
@@ -174,6 +183,8 @@ public:
             "cap_stop", std::bind(&llm_audio::cap_stop, this, std::placeholders::_1, std::placeholders::_2));
         rpc_ctx_->register_rpc_action(
             "cap_stop_all", std::bind(&llm_audio::cap_stop_all, this, std::placeholders::_1, std::placeholders::_2));
+        rpc_ctx_->register_rpc_action(
+            "queue_status", std::bind(&llm_audio::queue_status, this, std::placeholders::_1, std::placeholders::_2));
     }
     int setup(const std::string &work_id, const std::string &object, const std::string &data) override
     {
@@ -182,17 +193,8 @@ public:
         nlohmann::json error_body;
         std::string base_model_path;
         std::string base_model_config_path;
-#if (defined(CONFIG_AX_620E_MSP_ENABLED) || defined(CONFIG_AX_620Q_MSP_ENABLED)) && !defined(CONFIG_AXCL_ENABLED)
-        std::list<std::string> config_file_paths;
-        if (access("/sys/devices/platform/soc/4851000.i2c/i2c-1/1-0043", F_OK) == 0) {
-            config_file_paths = get_config_file_paths(base_model_path, base_model_config_path, "audio_kit");
-        } else {
-            config_file_paths = get_config_file_paths(base_model_path, base_model_config_path, "audio");
-        }
-#else
         std::list<std::string> config_file_paths =
             get_config_file_paths(base_model_path, base_model_config_path, "audio");
-#endif
         try {
             config_body = nlohmann::json::parse(data);
             for (auto file_name : config_file_paths) {
@@ -345,7 +347,11 @@ public:
     std::string enqueue_play(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
         audio_clear_flage_ = false;
-        event_queue_.enqueue(EVENT_QUEUE_PLAY, rawdata);
+        auto item          = std::make_shared<PlayItem>();
+        item->gen          = play_gen_.load(std::memory_order_relaxed);
+        item->data         = rawdata;
+        play_pending_.fetch_add(1, std::memory_order_relaxed);
+        event_queue_.enqueue(EVENT_QUEUE_PLAY, item);
         return LLM_NONE;
     }
 
@@ -374,7 +380,9 @@ public:
 
     std::string queue_play_stop(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
     {
-        audio_clear_flage_ = true;
+        play_gen_.fetch_add(1, std::memory_order_relaxed);
+        audio_clear_flage_.store(true, std::memory_order_relaxed);
+        alsa_close_play();
         return LLM_NONE;
     }
 
@@ -403,6 +411,19 @@ public:
         cap_status_ = 0;
         _cap_stop();
         return LLM_NONE;
+    }
+
+    std::string queue_status(pzmq *_pzmq, const std::shared_ptr<pzmq_data> &rawdata)
+    {
+        int pending  = play_pending_.load(std::memory_order_relaxed);
+        bool running = play_running_.load(std::memory_order_relaxed);
+
+        int hw = alsa_play_status();
+
+        std::ostringstream os;
+        os << "{\"pending\":" << pending << ",\"running\":" << (running ? "true" : "false") << ",\"hw_status\":" << hw
+           << "}";
+        return os.str();
     }
 
     ~llm_audio()
