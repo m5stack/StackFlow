@@ -378,7 +378,7 @@ if __name__ == "__main__":
         'llm-kws':[create_bin_deb,'llm-kws', '1.11', src_folder, revision],
         'llm-asr':[create_bin_deb,'llm-asr', '1.10', src_folder, revision],
         'llm-llm':[create_bin_deb,'llm-llm', '1.12', src_folder, revision],
-        'llm-tts':[create_bin_deb,'llm-tts', '1.6', src_folder, revision],
+        'llm-tts':[create_bin_deb,'llm-tts', '1.7', src_folder, revision],
         'llm-melotts':[create_bin_deb,'llm-melotts', '1.11', src_folder, revision],
         'llm-camera':[create_bin_deb,'llm-camera', '1.9', src_folder, revision, 'lib-llm'],
         'llm-vlm':[create_bin_deb,'llm-vlm', '1.11', src_folder, revision],
@@ -412,6 +412,7 @@ if __name__ == "__main__":
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
+        'llm-model-kokoro-ax650':[create_data_deb,'llm-model-kokoro-ax650', '0.4', src_folder, revision],
         # VAD model
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.4', src_folder, revision],
         # MeloTTS model

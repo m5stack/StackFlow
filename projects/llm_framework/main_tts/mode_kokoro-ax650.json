@@ -1,0 +1,33 @@
+{
+    "mode": "kokoro-ax650",
+    "type": "tts",
+    "homepage": "https://huggingface.co/AXERA-TECH/kokoro.axera",
+    "capabilities": [
+        "tts",
+        "Chinese",
+        "English"
+    ],
+    "input_type": [
+        "tts.utf-8"
+    ],
+    "output_type": [
+        "tts.wav",
+        "sys.play.0_1"
+    ],
+    "mode_param": {
+        "axmodel_dir": "./models",
+        "lang": "z",
+        "voice_path": "./voices",
+        "voice_name": "zf_xiaoxiao",
+        "vocab_path": "./vocab.txt",
+        "espeak_data_path": "./espeak-ng-data",
+        "dict_dir": "./dict",
+        "spacker_speed": 1.0,
+        "max_len": 96,
+        "mode_rate": 24000,
+        "audio_rate": 48000,
+        "speed": 1.0,
+        "pause": 0.0,
+        "fade_out": 0.0
+    }
+}

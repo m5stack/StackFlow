@@ -8,7 +8,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = Glob('src/*.c*')
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['pthread', 'utilities', 'gomp', 'eventpp', 'StackFlow']
+REQUIREMENTS = ['pthread', 'utilities', 'ax_msp', 'gomp', 'eventpp', 'StackFlow']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = []
@@ -20,14 +20,18 @@ STATIC_FILES = []
 DEFINITIONS += ['-O3', '-fopenmp', '-std=c++17']
 LDFLAGS+=['-Wl,-rpath=/opt/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib', '-Wl,-rpath=/usr/local/m5stack/lib/gcc-10.3', '-Wl,-rpath=/opt/lib', '-Wl,-rpath=/opt/usr/lib', '-Wl,-rpath=./']
 LINK_SEARCH_PATH += [ADir('../static_lib')]
-REQUIREMENTS += ['tts']
+REQUIREMENTS += ['ax_engine', 'ax_interpreter', 'ax_sys']
+REQUIREMENTS += ['samplerate']
+REQUIREMENTS += ['tts', 'kokoro', 'libkokoro_backend']
 
 
 INCLUDE += [ADir('src/runner/eigen-3.4.0'), ADir('src/runner/src/tn/header'), ADir('src/runner/include'), ADir('src/runner/src/header')]
 
+REQUIREMENTS += ['onnxruntime']
+
 STATIC_FILES += Glob('mode_*.json')
 
-env['COMPONENTS'].append({'target':'llm_tts-1.6',
+env['COMPONENTS'].append({'target':'llm_tts-1.7',
                           'SRCS':SRCS,
                           'INCLUDE':INCLUDE,
                           'PRIVATE_INCLUDE':PRIVATE_INCLUDE,
