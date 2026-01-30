@@ -555,6 +555,59 @@ public:
 
     void sys_pcm_on_data_onnx(const std::string &raw)
     {
+        if (delay_audio_frame_ == 0) {
+            if (raw.size() < sizeof(int16_t)) return;
+
+            const int16_t *pcm16 = reinterpret_cast<const int16_t *>(raw.data());
+            size_t n16           = raw.size() / sizeof(int16_t);
+
+            std::vector<float> samples;
+            samples.reserve(n16);
+            for (size_t i = 0; i < n16; ++i) {
+                samples.push_back(static_cast<float>(pcm16[i]) / 32768.0f);
+            }
+
+            int32_t window_size = vad_config_.silero_vad.window_size;
+            size_t i            = 0;
+
+            while (i < samples.size()) {
+                if (i + window_size <= samples.size()) {
+                    vad_->AcceptWaveform(samples.data() + i, window_size);
+                } else {
+                    vad_->Flush();
+                }
+                i += window_size;
+
+                while (!vad_->Empty()) {
+                    const auto &segment = vad_->Front();
+                    float duration      = segment.samples.size() / static_cast<float>(kSampleRate);
+                    if (duration < 0.1f) {
+                        vad_->Pop();
+                        continue;
+                    }
+
+                    auto s = onnx_recognizer_->CreateStream();
+                    s->AcceptWaveform(kSampleRate, segment.samples.data(), segment.samples.size());
+                    onnx_recognizer_->DecodeStream(s.get());
+                    const auto &result = s->GetResult();
+
+                    if (!result.text.empty()) {
+                        if (out_callback_) out_callback_(result.text, false);
+
+                        if (!pending_text_.empty()) pending_text_ += " ";
+                        pending_text_ += result.text;
+                    }
+
+                    vad_->Pop();
+                }
+            }
+
+            if (out_callback_) out_callback_(pending_text_, true);
+            pending_text_.clear();
+
+            return;
+        }
+
         if (raw.size() >= sizeof(int16_t)) {
             const int16_t *pcm16 = reinterpret_cast<const int16_t *>(raw.data());
             size_t n16           = raw.size() / sizeof(int16_t);
@@ -578,7 +631,6 @@ public:
         while (buffer_read_i16(pcmdata, &audio_val, 1)) {
             floatSamples.push_back(static_cast<float>(audio_val) / 32768.0f);
         }
-
         buffer_resize(pcmdata, 0);
         count = 0;
 
@@ -600,7 +652,6 @@ public:
                 for (int16_t s : pre_roll_pcm_) {
                     pre.push_back(static_cast<float>(s) / 32768.0f);
                 }
-
                 std::vector<float> merged;
                 merged.reserve(pre.size() + segment.samples.size());
                 merged.insert(merged.end(), pre.begin(), pre.end());
@@ -619,7 +670,6 @@ public:
             if (!result.text.empty() && out_callback_) {
                 out_callback_(result.text, false);
             }
-
             if (!result.text.empty()) {
                 if (!pending_text_.empty()) pending_text_ += " ";
                 pending_text_ += result.text;
@@ -629,25 +679,20 @@ public:
             offline_stream_.reset();
         }
 
-        {
-            float chunk_ms = (delay_audio_frame_ + 1) * 10.0f;
-            if (detected) {
-                silence_ms_accum_ = 0.0f;
-            } else {
-                silence_ms_accum_ += chunk_ms;
-            }
+        float chunk_ms = (delay_audio_frame_ + 1) * 10.0f;
+        if (detected)
+            silence_ms_accum_ = 0.0f;
+        else
+            silence_ms_accum_ += chunk_ms;
 
-            if (silence_ms_accum_ >= silence_timeout) {
-                if (out_callback_) {
-                    out_callback_(pending_text_, true);
-                }
-                pending_text_.clear();
+        if (silence_ms_accum_ >= silence_timeout) {
+            if (out_callback_) out_callback_(pending_text_, true);
+            pending_text_.clear();
 
-                if (ensleep_) {
-                    if (pause) pause();
-                }
-                silence_ms_accum_ = 0.0f;
+            if (ensleep_) {
+                if (pause) pause();
             }
+            silence_ms_accum_ = 0.0f;
         }
     }
 
