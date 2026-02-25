@@ -850,9 +850,9 @@ public:
             std::string user_msg    = sample_unescapeString(data);
             nlohmann::json btn_json = nlohmann::json::parse(user_msg);
 
-            if (btn_json.contains("code") && btn_json.contains("vale")) {
+            if (btn_json.contains("code") && (btn_json.contains("vale") || btn_json.contains("value"))) {
                 int current_code = btn_json["code"];
-                int current_vale = btn_json["vale"];
+                int current_vale = btn_json.contains("vale") ? btn_json["vale"] : btn_json["value"];
 
                 if (current_vale == 204) {
                     int last_code = llm_task_obj->get_btn_204_state();
