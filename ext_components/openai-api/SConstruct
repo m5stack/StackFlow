@@ -10,14 +10,14 @@ _SDK_PATH = os.path.normpath(
     os.environ.get("SDK_PATH", str(Path(os.getcwd()) / ".." / ".."))
 )
 
-env["GIT_REPO_LISTS"]["tokenizer"] = {
-    "url": "https://github.com/ZHEQIUSHUI/tokenizer.git",
-    "commit": "109a37cf70d1891e0dc41c39261dabb70d8a4fce",
-    "path": str(Path(_SDK_PATH) / "github_source" / "tokenizer"),
+env["GIT_REPO_LISTS"]["openai-api"] = {
+    "url": "https://github.com/ZHEQIUSHUI/openai-api.cpp.git",
+    "commit": "127f3e75054a733ca1b903ff1f8ec600b90cb6b0",
+    "path": str(Path(_SDK_PATH) / "github_source" / "openai-api.cpp"),
 }
 
-if "CONFIG_AX_TOKENIZER_ENABLED" in os.environ:
-    check_component("tokenizer")
+if "CONFIG_AX_OPENAI_API_ENABLED" in os.environ:
+    check_component("openai-api")
     SRCS = []
     INCLUDE = []
     PRIVATE_INCLUDE = []
@@ -30,7 +30,7 @@ if "CONFIG_AX_TOKENIZER_ENABLED" in os.environ:
     LINK_SEARCH_PATH = []
 
     INCLUDE += [
-        os.path.join(env["GIT_REPO_LISTS"]["tokenizer"]["path"], "include"),
+        os.path.join(env["GIT_REPO_LISTS"]["openai-api"]["path"], "include"),
     ]
 
     env["COMPONENTS"].append(

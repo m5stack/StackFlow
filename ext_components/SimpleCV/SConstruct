@@ -10,14 +10,14 @@ _SDK_PATH = os.path.normpath(
     os.environ.get("SDK_PATH", str(Path(os.getcwd()) / ".." / ".."))
 )
 
-env["GIT_REPO_LISTS"]["tokenizer"] = {
-    "url": "https://github.com/ZHEQIUSHUI/tokenizer.git",
-    "commit": "109a37cf70d1891e0dc41c39261dabb70d8a4fce",
-    "path": str(Path(_SDK_PATH) / "github_source" / "tokenizer"),
+env["GIT_REPO_LISTS"]["SimpleCV"] = {
+    "url": "https://github.com/ZHEQIUSHUI/SimpleCV.git",
+    "commit": "7729953c7c75ffaea441f70e0a9eb62790f3eb2b",
+    "path": str(Path(_SDK_PATH) / "github_source" / "SimpleCV"),
 }
 
-if "CONFIG_AX_TOKENIZER_ENABLED" in os.environ:
-    check_component("tokenizer")
+if "CONFIG_AX_SIMPLECV_ENABLED" in os.environ:
+    check_component("SimpleCV")
     SRCS = []
     INCLUDE = []
     PRIVATE_INCLUDE = []
@@ -30,7 +30,7 @@ if "CONFIG_AX_TOKENIZER_ENABLED" in os.environ:
     LINK_SEARCH_PATH = []
 
     INCLUDE += [
-        os.path.join(env["GIT_REPO_LISTS"]["tokenizer"]["path"], "include"),
+        os.path.join(env["GIT_REPO_LISTS"]["SimpleCV"]["path"], "include"),
     ]
 
     env["COMPONENTS"].append(

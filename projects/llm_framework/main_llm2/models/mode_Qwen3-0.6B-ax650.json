@@ -1,0 +1,34 @@
+{
+    "mode": "Qwen3-0.6B-ax650",
+    "type": "llm",
+    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3-0.6B",
+    "capabilities": [
+        "text_generation",
+        "chat"
+    ],
+    "input_type": [
+        "llm.utf-8",
+        "llm.utf-8.stream",
+        "llm.chat_completion",
+        "llm.chat_completion.stream"
+    ],
+    "output_type": [
+        "llm.utf-8",
+        "llm.utf-8.stream"
+    ],
+    "mode_param": {
+        "system_prompt": "you are a helpful assistant.",
+        "model_name": "Qwen3-0.6B-ax650",
+        "template_filename_axmodel": "qwen3_p128_l%d_together.axmodel",
+        "axmodel_num": 28,
+        "filename_post_axmodel": "qwen3_post.axmodel",
+        "post_config_path": "post_config.json",
+        "tokenizer_type": "Qwen3",
+        "url_tokenizer_model": "qwen3_tokenizer.txt",
+        "filename_tokens_embed": "model.embed_tokens.weight.bfloat16.bin",
+        "tokens_embed_num": 151936,
+        "tokens_embed_size": 1024,
+        "b_use_mmap_load_embed": true,
+        "b_use_mmap_load_layer": true
+    }
+}
