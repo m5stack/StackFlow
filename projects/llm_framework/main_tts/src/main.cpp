@@ -6,7 +6,7 @@
 #include "StackFlow.h"
 #include "utils.h"
 #include "SynthesizerTrn.h"
-#include "Kokoro.h"
+#include "sherpa-onnx/csrc/offline-tts.h"
 #include <ax_sys_api.h>
 #include <ax_engine_api.h>
 #include <signal.h>
@@ -31,24 +31,6 @@ static void __sigint(int iSigNo)
 static std::string base_model_path_;
 static std::string base_model_config_path_;
 
-typedef struct {
-    std::string axmodel_dir;
-    std::string lang;
-    std::string voice_path;
-    std::string voice_name;
-    std::string vocab_path;
-    std::string espeak_data_path;
-    std::string dict_dir;
-    float spacker_speed = 1.0;
-    int max_len         = 96;
-    int mode_rate       = 44100;
-    int audio_rate      = 16000;
-    float speed         = 1.0f;
-    float pause         = 0.0f;
-    float fade_out      = 0.0f;
-
-} kokoro_config;
-
 struct SynthesizerTrn_config {
     int spacker_role    = 0;
     float spacker_speed = 1.0;
@@ -63,11 +45,11 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
     else if (obj.contains(#key))              \
         mode_config_.key = obj[#key];
 
-#define CONFIG_KOKORO_AUTO_SET(obj, key)             \
-    if (config_body.contains(#key))                  \
-        mode_kokoro_config_.key = config_body[#key]; \
-    else if (obj.contains(#key))                     \
-        mode_kokoro_config_.key = obj[#key];
+#define CONFIG_AUTO_SET_SHERPA(obj, key)        \
+    if (config_body.contains(#key))             \
+        sherpa_config_.key = config_body[#key]; \
+    else if (obj.contains(#key))                \
+        sherpa_config_.key = obj[#key];
 
 class llm_task {
 private:
@@ -75,12 +57,14 @@ private:
     int modelSize;
 
 public:
-    kokoro_config mode_kokoro_config_;
     std::unique_ptr<SynthesizerTrn> synthesizer_;
-    std::unique_ptr<kokoro::Kokoro> kokoro_;
+    std::unique_ptr<sherpa_onnx::OfflineTts> sherpa_tts_;
     std::string model_type_;
     std::string model_;
     SynthesizerTrn_config mode_config_;
+    sherpa_onnx::OfflineTtsConfig sherpa_config_;
+    sherpa_onnx::GenerationConfig gen_config_;
+    sherpa_onnx::GeneratedAudio audio_;
     std::string response_format_;
     std::vector<std::string> inputs_;
     bool enoutput_;
@@ -91,6 +75,7 @@ public:
     task_callback_t out_callback_;
     bool enaudio_;
     int awake_delay_ = 1000;
+    int audio_rate   = 48000;
 
     bool parse_config(const nlohmann::json &config_body)
     {
@@ -102,7 +87,7 @@ public:
             if (model_.rfind("single-speaker", 0) == 0) {
                 model_type_ = "summer_tts";
             } else {
-                model_type_ = "kokoro_tts";
+                model_type_ = "sherpa-onnx";
             }
 
             if (config_body.contains("enaudio")) enaudio_ = config_body.at("enaudio");
@@ -199,33 +184,95 @@ public:
             }
             std::string base_model = base_model_path_ + model_ + "/";
             SLOGI("base_model %s", base_model.c_str());
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], axmodel_dir);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], lang);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], voice_path);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], voice_name);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], vocab_path);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], espeak_data_path);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], dict_dir);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], spacker_speed);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], max_len);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], mode_rate);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], audio_rate);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], speed);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], pause);
-            CONFIG_KOKORO_AUTO_SET(file_body["mode_param"], fade_out);
-            mode_kokoro_config_.axmodel_dir      = base_model + mode_kokoro_config_.axmodel_dir;
-            mode_kokoro_config_.voice_path       = base_model + mode_kokoro_config_.voice_path;
-            mode_kokoro_config_.vocab_path       = base_model + mode_kokoro_config_.vocab_path;
-            mode_kokoro_config_.espeak_data_path = base_model + mode_kokoro_config_.espeak_data_path;
-            mode_kokoro_config_.dict_dir         = base_model + mode_kokoro_config_.dict_dir;
-            kokoro_                              = std::make_unique<kokoro::Kokoro>();
-            if (!kokoro_->init(mode_kokoro_config_.axmodel_dir, mode_kokoro_config_.max_len, mode_kokoro_config_.lang,
-                               mode_kokoro_config_.voice_path, mode_kokoro_config_.voice_name,
-                               mode_kokoro_config_.vocab_path, mode_kokoro_config_.espeak_data_path,
-                               mode_kokoro_config_.dict_dir)) {
-                SLOGE("encoder init failed!");
-                return -4;
+
+            const nlohmann::json &mode_param = file_body["mode_param"];
+
+            // 1. model.kokoro.model
+            {
+                std::string model_paths;
+                const nlohmann::json *param_ptr = nullptr;
+                if (config_body.contains("model.kokoro.model")) {
+                    param_ptr = &config_body["model.kokoro.model"];
+                } else if (mode_param.contains("model.kokoro.model")) {
+                    param_ptr = &mode_param["model.kokoro.model"];
+                }
+                if (param_ptr) {
+                    if (param_ptr->is_array()) {
+                        for (size_t i = 0; i < param_ptr->size(); ++i) {
+                            if (i > 0) model_paths += ",";
+                            model_paths += base_model + (*param_ptr)[i].get<std::string>();
+                        }
+                    } else if (param_ptr->is_string()) {
+                        model_paths = base_model + param_ptr->get<std::string>();
+                    }
+                }
+                sherpa_config_.model.kokoro.model = model_paths;
             }
+
+            // 2. model.kokoro.lexicon
+            {
+                std::string lexicon_paths;
+                const nlohmann::json *param_ptr = nullptr;
+                if (config_body.contains("model.kokoro.lexicon")) {
+                    param_ptr = &config_body["model.kokoro.lexicon"];
+                } else if (mode_param.contains("model.kokoro.lexicon")) {
+                    param_ptr = &mode_param["model.kokoro.lexicon"];
+                }
+                if (param_ptr) {
+                    if (param_ptr->is_array()) {
+                        for (size_t i = 0; i < param_ptr->size(); ++i) {
+                            if (i > 0) lexicon_paths += ",";
+                            lexicon_paths += base_model + (*param_ptr)[i].get<std::string>();
+                        }
+                    } else if (param_ptr->is_string()) {
+                        lexicon_paths = base_model + param_ptr->get<std::string>();
+                    }
+                }
+                sherpa_config_.model.kokoro.lexicon = lexicon_paths;
+            }
+
+            // 3. rule_fsts
+            {
+                std::string rule_fsts_paths;
+                const nlohmann::json *param_ptr = nullptr;
+                if (config_body.contains("rule_fsts")) {
+                    param_ptr = &config_body["rule_fsts"];
+                } else if (mode_param.contains("rule_fsts")) {
+                    param_ptr = &mode_param["rule_fsts"];
+                }
+                if (param_ptr) {
+                    if (param_ptr->is_array()) {
+                        for (size_t i = 0; i < param_ptr->size(); ++i) {
+                            if (i > 0) rule_fsts_paths += ",";
+                            rule_fsts_paths += base_model + (*param_ptr)[i].get<std::string>();
+                        }
+                    } else if (param_ptr->is_string()) {
+                        rule_fsts_paths = base_model + param_ptr->get<std::string>();
+                    }
+                }
+                sherpa_config_.rule_fsts = rule_fsts_paths;
+            }
+
+            CONFIG_AUTO_SET_SHERPA(mode_param, model.kokoro.voices);
+            CONFIG_AUTO_SET_SHERPA(mode_param, model.kokoro.tokens);
+            CONFIG_AUTO_SET_SHERPA(mode_param, model.kokoro.data_dir);
+            CONFIG_AUTO_SET_SHERPA(mode_param, model.kokoro.length_scale);
+            CONFIG_AUTO_SET_SHERPA(mode_param, model.kokoro.lang);
+            CONFIG_AUTO_SET_SHERPA(mode_param, model.num_threads);
+            CONFIG_AUTO_SET_SHERPA(mode_param, model.debug);
+            CONFIG_AUTO_SET_SHERPA(mode_param, model.provider);
+            CONFIG_AUTO_SET_SHERPA(mode_param, rule_fars);
+            CONFIG_AUTO_SET_SHERPA(mode_param, max_num_sentences);
+            CONFIG_AUTO_SET_SHERPA(mode_param, silence_scale);
+
+            if (!sherpa_config_.model.kokoro.voices.empty())
+                sherpa_config_.model.kokoro.voices = base_model + sherpa_config_.model.kokoro.voices;
+            if (!sherpa_config_.model.kokoro.tokens.empty())
+                sherpa_config_.model.kokoro.tokens = base_model + sherpa_config_.model.kokoro.tokens;
+            if (!sherpa_config_.model.kokoro.data_dir.empty())
+                sherpa_config_.model.kokoro.data_dir = base_model + sherpa_config_.model.kokoro.data_dir;
+
+            sherpa_tts_ = std::make_unique<sherpa_onnx::OfflineTts>(sherpa_config_);
         } catch (...) {
             SLOGE("config false");
             return -6;
@@ -242,7 +289,7 @@ public:
             SLOGI("load summer tts model");
             return load_summer_tts_model(config_body);
         } else {
-            SLOGI("load kokoro tts model");
+            SLOGI("load TTS model");
             return load_kokoro_tts_model(config_body);
         }
     }
@@ -284,6 +331,12 @@ public:
         src_delete(src_state);
     }
 
+    static int32_t AudioCallback(const float * /*samples*/, int32_t n, float progress)
+    {
+        printf("sample=%d, progress=%f\n", n, progress);
+        return 1;
+    }
+
     bool TTS(const std::string &msg, bool finish)
     {
         SLOGI("TTS msg:%s", msg.c_str());
@@ -310,31 +363,27 @@ public:
             free(rawData);
             return false;
 
-        } else if (model_type_ == "kokoro_tts") {
-            std::vector<float> audio;
-            int src_rate = mode_kokoro_config_.mode_rate;
-            int dst_rate = mode_kokoro_config_.audio_rate;
-
-            if (!kokoro_->tts(msg, mode_kokoro_config_.voice_name, mode_kokoro_config_.speed, src_rate,
-                              mode_kokoro_config_.fade_out, mode_kokoro_config_.pause, audio)) {
-                SLOGE("kokoro tts run failed!");
+        } else if (model_type_ == "sherpa-onnx") {
+            audio_ = sherpa_tts_->Generate(msg, gen_config_.sid, gen_config_.speed, AudioCallback);
+            if (0) {
+                SLOGE("TTS run failed!");
                 return true;
             }
 
-            if (audio.empty()) {
+            if (audio_.samples.empty()) {
                 if (out_callback_) {
                     out_callback_(std::string(), finish);
                 }
-                SLOGE("kokoro tts audio empty!");
+                SLOGE("TTS audio empty!");
                 return false;
             }
 
             std::vector<float> resampled_pcm;
-            const float *pcm_ptr = audio.data();
-            int pcm_len          = static_cast<int>(audio.size());
+            const float *pcm_ptr = audio_.samples.data();
+            int pcm_len          = static_cast<int>(audio_.samples.size());
 
-            if (src_rate != dst_rate) {
-                double ratio = static_cast<double>(dst_rate) / static_cast<double>(src_rate);
+            if (audio_.sample_rate != audio_rate) {
+                double ratio = static_cast<double>(audio_rate) / static_cast<double>(audio_.sample_rate);
 
                 int max_dst_len = static_cast<int>(pcm_len * ratio) + 1;
                 resampled_pcm.resize(max_dst_len);
@@ -421,7 +470,7 @@ public:
     ~llm_task()
     {
         stop();
-        if (kokoro_) kokoro_.reset();
+        if (sherpa_tts_) sherpa_tts_.reset();
         _ax_deinit();
     }
 };

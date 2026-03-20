@@ -1,0 +1,5 @@
+menuconfig SHERPA_NCNN_ENABLED
+    bool "Enable sherpa-ncnn support"
+    default n
+    help
+        enable sherpa-ncnn support

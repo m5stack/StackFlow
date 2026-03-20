@@ -7,7 +7,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = append_srcs_dir(ADir('src'))
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['pthread', 'dl', 'utilities', 'ax_msp', 'eventpp', 'StackFlow', 'single_header_libs']
+REQUIREMENTS = ['pthread', 'dl', 'utilities', 'ax_msp', 'eventpp', 'StackFlow', 'single_header_libs', 'eigen']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = []
