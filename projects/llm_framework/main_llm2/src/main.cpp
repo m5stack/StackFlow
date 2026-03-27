@@ -15,7 +15,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <base64.h>
+#include <chrono>
+#include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <stdexcept>
 #include <semaphore.h>
 #include "../../../../SDK/components/utilities/include/sample_log.h"
@@ -40,6 +43,12 @@ static std::string base_model_path_;
 static std::string base_model_config_path_;
 
 typedef std::function<void(const std::string &data, bool finish)> task_callback_t;
+
+typedef struct {
+    std::string prompt;
+    std::vector<std::string> image_paths;
+    std::vector<std::string> temp_files;
+} inference_async_par;
 
 #define CONFIG_AUTO_SET(obj, key)             \
     if (config_body.contains(#key))           \
@@ -75,7 +84,63 @@ public:
     bool enstream_;
 
     std::unique_ptr<std::thread> inference_run_;
-    thread_safe::list<std::string> async_list_;
+    thread_safe::list<inference_async_par> async_list_;
+    std::mutex pending_media_mutex_;
+    std::vector<std::string> pending_image_paths_;
+    std::vector<std::string> pending_temp_files_;
+
+    static std::string save_image_to_tempfile(const std::string &image_bytes)
+    {
+        if (image_bytes.empty()) {
+            return {};
+        }
+
+        std::filesystem::path tmpdir;
+        try {
+            tmpdir = std::filesystem::temp_directory_path() / "stackflow_llm2_images";
+        } catch (...) {
+            tmpdir = std::filesystem::current_path() / "tmp" / "stackflow_llm2_images";
+        }
+
+        std::error_code ec;
+        std::filesystem::create_directories(tmpdir, ec);
+        if (ec) {
+            SLOGE("create temp dir failed: %s", ec.message().c_str());
+            return {};
+        }
+
+        const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+        const auto path = tmpdir / ("img_" + std::to_string(now) + "_" + std::to_string(getpid()) + ".jpg");
+
+        std::ofstream ofs(path, std::ios::binary);
+        if (!ofs.is_open()) {
+            SLOGE("open temp image failed: %s", path.string().c_str());
+            return {};
+        }
+
+        ofs.write(image_bytes.data(), static_cast<std::streamsize>(image_bytes.size()));
+        ofs.close();
+        return path.string();
+    }
+
+    static void cleanup_temp_files(const std::vector<std::string> &files)
+    {
+        for (const auto &file : files) {
+            std::error_code ec;
+            std::filesystem::remove(file, ec);
+        }
+    }
+
+    void cleanup_pending_media()
+    {
+        std::vector<std::string> temp_files;
+        {
+            std::lock_guard<std::mutex> lock(pending_media_mutex_);
+            pending_image_paths_.clear();
+            temp_files.swap(pending_temp_files_);
+        }
+        cleanup_temp_files(temp_files);
+    }
 
     void set_output(task_callback_t out_callback)
     {
@@ -180,6 +245,35 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], vision_fps);
             CONFIG_AUTO_SET(file_body["mode_param"], vision_tokens_per_second);
 
+            const auto parse_vlm_type = [&](const nlohmann::json &obj, const char *key) -> bool {
+                if (!obj.contains(key)) {
+                    return false;
+                }
+
+                const auto &value = obj[key];
+                std::optional<VLMType> parsed;
+                if (value.is_number_integer()) {
+                    parsed = VLMTypeFromInt(value.get<int>());
+                } else if (value.is_string()) {
+                    parsed = VLMTypeFromString(value.get<std::string>());
+                } else {
+                    SLOGE("%s must be int or string. choices: %s", key, VLMTypeChoices().c_str());
+                    throw std::runtime_error("invalid vlm_type");
+                }
+
+                if (!parsed.has_value()) {
+                    SLOGE("invalid %s value. choices: %s", key, VLMTypeChoices().c_str());
+                    throw std::runtime_error("invalid vlm_type");
+                }
+
+                mode_config_.vlm_type = *parsed;
+                return true;
+            };
+
+            if (!parse_vlm_type(config_body, "vlm_type") && !parse_vlm_type(config_body, "VLM_TYPE")) {
+                parse_vlm_type(file_body["mode_param"], "vlm_type") || parse_vlm_type(file_body["mode_param"], "VLM_TYPE");
+            }
+
             mode_config_.template_filename_axmodel      = base_model + mode_config_.template_filename_axmodel;
             mode_config_.filename_post_axmodel          = base_model + mode_config_.filename_post_axmodel;
             mode_config_.filename_tokens_embed          = base_model + mode_config_.filename_tokens_embed;
@@ -208,21 +302,39 @@ public:
 
     void run()
     {
-        std::string par;
         for (;;) {
-            {
-                par = async_list_.get();
-                if (par.empty()) break;
-                inference(par);
-            }
+            auto par = async_list_.get();
+            if (par.prompt.empty() && par.image_paths.empty()) break;
+            inference(par);
         }
+    }
+
+    bool stage_image(const std::string &image_bytes)
+    {
+        const std::string temp_file = save_image_to_tempfile(image_bytes);
+        if (temp_file.empty()) {
+            return false;
+        }
+
+        std::lock_guard<std::mutex> lock(pending_media_mutex_);
+        pending_image_paths_.push_back(temp_file);
+        pending_temp_files_.push_back(temp_file);
+        return true;
     }
 
     int inference_async(const std::string &msg)
     {
         if (msg.empty()) return -1;
         if (async_list_.size() < 3) {
-            std::string par = msg;
+            inference_async_par par;
+            par.prompt = msg;
+            {
+                std::lock_guard<std::mutex> lock(pending_media_mutex_);
+                par.image_paths = std::move(pending_image_paths_);
+                par.temp_files  = std::move(pending_temp_files_);
+                pending_image_paths_.clear();
+                pending_temp_files_.clear();
+            }
             async_list_.put(par);
         } else {
             SLOGE("inference list is full\n");
@@ -230,7 +342,7 @@ public:
         return async_list_.size();
     }
 
-    void inference(const std::string &msg)
+    void inference(const inference_async_par &request)
     {
         try {
             if (lLaMa_) {
@@ -239,8 +351,17 @@ public:
                     history.push_back({SYSTEM, TEXT, mode_config_.system_prompt});
                 }
 
-                history.push_back({USER, TEXT, msg});
-                history = lLaMa_->Run(history);
+                Content user{USER, request.image_paths.empty() ? TEXT : IMAGE, request.prompt};
+                history.push_back(user);
+
+                if (!request.image_paths.empty()) {
+                    std::vector<MediaInputs> media_inputs;
+                    media_inputs.push_back({history.size() - 1, request.image_paths});
+                    history = lLaMa_->Run(history, media_inputs);
+                } else {
+                    history = lLaMa_->Run(history);
+                }
+
                 std::string out;
                 if (!history.empty() && history.back().role == ASSISTANT) {
                     out = history.back().data;
@@ -251,6 +372,8 @@ public:
         } catch (...) {
             SLOGW("lLaMa_->Run have error!");
         }
+
+        cleanup_temp_files(request.temp_files);
     }
 
     bool pause()
@@ -266,6 +389,7 @@ public:
             waitpid(tokenizer_pid_, nullptr, 0);
             tokenizer_pid_ = -1;
         }
+        cleanup_pending_media();
         if (lLaMa_) lLaMa_->Deinit();
         if (lLaMa_) lLaMa_.reset();
         return true;
@@ -325,12 +449,13 @@ public:
     void stop()
     {
         if (inference_run_) {
-            std::string par;
+            inference_async_par par;
             async_list_.put(par);
             if (lLaMa_) lLaMa_->Stop();
             inference_run_->join();
             inference_run_.reset();
         }
+        cleanup_pending_media();
     }
 
     ~llm_task()
@@ -343,6 +468,7 @@ public:
         if (lLaMa_) {
             lLaMa_->Deinit();
         }
+        cleanup_pending_media();
         _ax_deinit();
     }
 };
@@ -357,7 +483,7 @@ private:
     std::unordered_map<int, std::shared_ptr<llm_task>> llm_task_;
 
 public:
-    llm_llm() : StackFlow("llm")
+    llm_llm() : StackFlow("llm2")
     {
     }
 
@@ -457,6 +583,14 @@ public:
                 return;
             }
             next_data = &tmp_msg2;
+        }
+        if (object.find("jpeg") != std::string::npos) {
+            if (!llm_task_obj->stage_image(*next_data)) {
+                error_body["code"]    = -26;
+                error_body["message"] = "Image staging failed.";
+                send("None", "None", error_body, unit_name_);
+            }
+            return;
         }
         llm_task_obj->inference_async(sample_unescapeString(*next_data));
     }
