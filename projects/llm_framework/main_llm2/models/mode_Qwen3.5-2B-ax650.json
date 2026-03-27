@@ -1,0 +1,48 @@
+{
+    "mode": "Qwen3.5-2B-ax650",
+    "type": "llm",
+    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3.5-2B-AX650-C128-P1152-CTX2047",
+    "capabilities": [
+        "text_generation",
+        "chat"
+    ],
+    "input_type": [
+        "llm.utf-8",
+        "llm.utf-8.stream",
+        "llm.chat_completion",
+        "llm.chat_completion.stream"
+    ],
+    "output_type": [
+        "llm.utf-8",
+        "llm.utf-8.stream"
+    ],
+    "mode_param": {
+        "system_prompt": "you are a helpful assistant.",
+        "model_name": "AXERA-TECH/Qwen3.5-2B",
+        "url_tokenizer_model": "qwen3_5_tokenizer.txt",
+        "tokenizer_type": "Qwen3_5VL",
+        "post_config_path": "post_config.json",
+        "template_filename_axmodel": "qwen3_5_text_p128_l%d_together.axmodel",
+        "axmodel_num": 24,
+        "full_attention_interval": 4,
+        "filename_post_axmodel": "qwen3_5_text_post.axmodel",
+        "filename_tokens_embed": "model.embed_tokens.weight.bfloat16.bin",
+        "tokens_embed_num": 248320,
+        "tokens_embed_size": 2048,
+        "b_use_mmap_load_embed": true,
+        "b_use_mmap_load_layer": true,
+        "vlm_type": "Qwen3VL",
+        "filename_image_encoder_axmodel": "qwen3_5_vision.axmodel",
+        "vision_patch_size": 16,
+        "vision_width": 384,
+        "vision_height": 384,
+        "vision_temporal_patch_size": 2,
+        "vision_spatial_merge_size": 2,
+        "vision_fps": 1,
+        "vision_tokens_per_second": 1,
+        "vision_cache_dir": "vision_cache",
+        "devices": [
+            0
+        ]
+    }
+}

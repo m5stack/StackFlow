@@ -146,6 +146,7 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], b_bos);
             CONFIG_AUTO_SET(file_body["mode_param"], b_eos);
 
+            CONFIG_AUTO_SET(file_body["mode_param"], full_attention_interval);
             CONFIG_AUTO_SET(file_body["mode_param"], filename_tokens_embed);
             CONFIG_AUTO_SET(file_body["mode_param"], tokens_embed_num);
             CONFIG_AUTO_SET(file_body["mode_param"], tokens_embed_size);
@@ -168,6 +169,16 @@ public:
             CONFIG_AUTO_SET(file_body["mode_param"], kv_cache_num);
             CONFIG_AUTO_SET(file_body["mode_param"], kv_cache_size);
             CONFIG_AUTO_SET(file_body["mode_param"], b_use_mmap_load_layer);
+
+            CONFIG_AUTO_SET(file_body["mode_param"], vision_cache_dir);
+
+            CONFIG_AUTO_SET(file_body["mode_param"], vision_width);
+            CONFIG_AUTO_SET(file_body["mode_param"], vision_height);
+            CONFIG_AUTO_SET(file_body["mode_param"], vision_temporal_patch_size);
+            CONFIG_AUTO_SET(file_body["mode_param"], vision_spatial_merge_size);
+            CONFIG_AUTO_SET(file_body["mode_param"], vision_patch_size);
+            CONFIG_AUTO_SET(file_body["mode_param"], vision_fps);
+            CONFIG_AUTO_SET(file_body["mode_param"], vision_tokens_per_second);
 
             mode_config_.template_filename_axmodel      = base_model + mode_config_.template_filename_axmodel;
             mode_config_.filename_post_axmodel          = base_model + mode_config_.filename_post_axmodel;

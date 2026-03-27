@@ -12,7 +12,7 @@ _SDK_PATH = os.path.normpath(
 
 env["GIT_REPO_LISTS"]["openai-api"] = {
     "url": "https://github.com/ZHEQIUSHUI/openai-api.cpp.git",
-    "commit": "127f3e75054a733ca1b903ff1f8ec600b90cb6b0",
+    "commit": "3d4be086e95cee55bfd8e983b20f0758b6f82182",
     "path": str(Path(_SDK_PATH) / "github_source" / "openai-api.cpp"),
 }
 
