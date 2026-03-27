@@ -1,0 +1,51 @@
+# component2/SConscript
+Import("env")
+import os
+from pathlib import Path
+
+with open(env["PROJECT_TOOL_S"]) as f:
+    exec(f.read())
+
+_SDK_PATH = os.path.normpath(
+    os.environ.get("SDK_PATH", str(Path(os.getcwd()) / ".." / ".."))
+)
+
+env["GIT_REPO_LISTS"]["kaldi-decoder"] = {
+    "url": "https://github.com/k2-fsa/kaldi-decoder.git",
+    "commit": "52bf99ec828d8cc8ab6a92be8484284b52682777",
+    "path": str(Path(_SDK_PATH) / "github_source" / "kaldi-decoder"),
+}
+
+if "CONFIG_EIGEN_ENABLED" in os.environ:
+    check_component("kaldi-decoder")
+    SRCS = []
+    INCLUDE = []
+    PRIVATE_INCLUDE = []
+    REQUIREMENTS = []
+    STATIC_LIB = []
+    DYNAMIC_LIB = []
+    DEFINITIONS = []
+    DEFINITIONS_PRIVATE = []
+    LDFLAGS = []
+    LINK_SEARCH_PATH = []
+
+    INCLUDE += [
+        os.path.join(env["GIT_REPO_LISTS"]["kaldi-decoder"]["path"]),
+    ]
+
+    env["COMPONENTS"].append(
+        {
+            "target": os.path.basename(env["component_dir"]),
+            "SRCS": SRCS,
+            "INCLUDE": INCLUDE,
+            "PRIVATE_INCLUDE": PRIVATE_INCLUDE,
+            "REQUIREMENTS": REQUIREMENTS,
+            "STATIC_LIB": STATIC_LIB,
+            "DYNAMIC_LIB": DYNAMIC_LIB,
+            "DEFINITIONS": DEFINITIONS,
+            "DEFINITIONS_PRIVATE": DEFINITIONS_PRIVATE,
+            "LDFLAGS": LDFLAGS,
+            "LINK_SEARCH_PATH": LINK_SEARCH_PATH,
+            "REGISTER": "static",
+        }
+    )

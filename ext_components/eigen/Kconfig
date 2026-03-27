@@ -1,0 +1,5 @@
+menuconfig EIGEN_ENABLED
+    bool "Enable eigen support"
+    default n
+    help
+        enable eigen support

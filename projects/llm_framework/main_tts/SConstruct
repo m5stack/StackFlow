@@ -8,7 +8,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = Glob('src/*.c*')
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['pthread', 'utilities', 'gomp', 'eventpp', 'StackFlow']
+REQUIREMENTS = ['pthread', 'utilities', 'gomp', 'eventpp', 'StackFlow', 'eigen', 'sherpa-onnx']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = []

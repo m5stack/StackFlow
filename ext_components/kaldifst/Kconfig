@@ -1,0 +1,5 @@
+menuconfig KALDIFST_ENABLED
+    bool "Enable kaldifst support"
+    default n
+    help
+        enable kaldifst support

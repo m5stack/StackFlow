@@ -7,7 +7,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = Glob('src/*.c*')
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['pthread', 'utilities', 'eventpp', 'StackFlow', 'single_header_libs', 'axcl']
+REQUIREMENTS = ['pthread', 'utilities', 'eventpp', 'StackFlow', 'single_header_libs', 'axcl', 'eigen', 'sherpa-onnx', 'sherpa-ncnn', 'kaldi-decoder', 'kaldifst']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = []
@@ -23,7 +23,6 @@ LINK_SEARCH_PATH += [ADir('../static_lib')]
 
 INCLUDE += [ADir('../static_lib/include/sherpa'), 
             ADir('../static_lib/include/sherpa/sherpa-ncnn'),
-            ADir('../static_lib/include/sherpa/sherpa-onnx'),
             ADir('../static_lib/include/sherpa/sherpa-onnx/openfst-src'),
             ADir('../static_lib/include/sherpa/sherpa-onnx/onnxruntime-src'),
             ADir('../static_lib/eigen-src')]

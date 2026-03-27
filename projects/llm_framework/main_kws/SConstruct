@@ -7,7 +7,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = append_srcs_dir(ADir('src'))
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['pthread', 'dl', 'utilities', 'eventpp', 'StackFlow', 'single_header_libs', 'axcl']
+REQUIREMENTS = ['pthread', 'dl', 'utilities', 'eventpp', 'StackFlow', 'single_header_libs', 'axcl', 'eigen']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = []
@@ -41,7 +41,6 @@ INCLUDE += [ADir('src/runner'),
             ADir('../static_lib/include/sherpa/fbank'),
             ADir('../static_lib/include/sherpa/sherpa-onnx'),
             ADir('../static_lib/include/sherpa/sherpa-onnx/onnxruntime-src'),
-            ADir('../static_lib/eigen-src'),
             ADir('../static_lib/include/sherpa/sherpa-onnx/openfst-src')
             ]
 
