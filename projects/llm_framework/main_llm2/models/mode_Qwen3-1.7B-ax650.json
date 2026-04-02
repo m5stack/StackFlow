@@ -1,7 +1,7 @@
 {
-    "mode": "Qwen3-0.6B-ax650",
+    "mode": "Qwen3-1.7B-ax650",
     "type": "llm",
-    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3-0.6B",
+    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3-1.7B",
     "capabilities": [
         "text_generation",
         "chat"
@@ -18,7 +18,7 @@
     ],
     "mode_param": {
         "system_prompt": "you are a helpful assistant.",
-        "model_name": "AXERA-TECH/Qwen3-0.6B",
+        "model_name": "AXERA-TECH/Qwen3-1.7B",
         "url_tokenizer_model": "qwen3_tokenizer.txt",
         "tokenizer_type": "Qwen3",
         "post_config_path": "post_config.json",
@@ -27,7 +27,7 @@
         "filename_post_axmodel": "qwen3_post.axmodel",
         "filename_tokens_embed": "model.embed_tokens.weight.bfloat16.bin",
         "tokens_embed_num": 151936,
-        "tokens_embed_size": 1024,
+        "tokens_embed_size": 2048,
         "b_use_mmap_load_embed": true,
         "b_use_mmap_load_layer": true,
         "devices": [

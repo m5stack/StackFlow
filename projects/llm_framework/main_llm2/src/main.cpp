@@ -5,6 +5,7 @@
  */
 #include "StackFlow.h"
 #include "runner/LLM.hpp"
+#include "runner/LLMPostprocess.hpp"
 
 #include <ax_sys_api.h>
 #include <ax_engine_api.h>
@@ -48,6 +49,8 @@ typedef struct {
     std::string prompt;
     std::vector<std::string> image_paths;
     std::vector<std::string> temp_files;
+    nlohmann::json sampling_config;
+    bool has_sampling_override = false;
 } inference_async_par;
 
 #define CONFIG_AUTO_SET(obj, key)             \
@@ -334,7 +337,33 @@ public:
         if (msg.empty()) return -1;
         if (async_list_.size() < 3) {
             inference_async_par par;
-            par.prompt = msg;
+            try {
+                auto request_body = nlohmann::json::parse(msg);
+                if (request_body.is_object()) {
+                    if (request_body.contains("prompt") && request_body["prompt"].is_string()) {
+                        par.prompt = request_body["prompt"].get<std::string>();
+                    } else if (request_body.contains("input") && request_body["input"].is_string()) {
+                        par.prompt = request_body["input"].get<std::string>();
+                    } else {
+                        par.prompt = msg;
+                    }
+
+                    const bool has_temperature =
+                        request_body.contains("temperature") || request_body.contains("enable_temperature");
+                    const bool has_top_p =
+                        request_body.contains("top_p") || request_body.contains("enable_top_p_sampling");
+                    const bool has_top_k =
+                        request_body.contains("top_k") || request_body.contains("enable_top_k_sampling");
+                    par.has_sampling_override = has_temperature || has_top_p || has_top_k;
+                    if (par.has_sampling_override) {
+                        par.sampling_config = std::move(request_body);
+                    }
+                } else {
+                    par.prompt = msg;
+                }
+            } catch (...) {
+                par.prompt = msg;
+            }
             {
                 std::lock_guard<std::mutex> lock(pending_media_mutex_);
                 par.image_paths = std::move(pending_image_paths_);
@@ -353,6 +382,13 @@ public:
     {
         try {
             if (lLaMa_) {
+                if (auto *postprocess = lLaMa_->getPostprocess()) {
+                    postprocess->reset_to_defaults();
+                    if (request.has_sampling_override) {
+                        postprocess->apply_request_config(request.sampling_config);
+                    }
+                }
+
                 std::vector<Content> history;
                 if (!mode_config_.system_prompt.empty()) {
                     history.push_back({SYSTEM, TEXT, mode_config_.system_prompt});
