@@ -442,6 +442,13 @@ if __name__ == "__main__":
         'llm-model-qwen3-vl-2B-axcl':[create_data_deb,'llm-model-qwen3-vl-2B-axcl', '0.5', src_folder, revision],
         'llm-model-qwen3-vl-2B-Int4-axcl':[create_data_deb,'llm-model-qwen3-vl-2B-Int4-axcl', '0.5', src_folder, revision],
         'llm-model-qwen3-vl-4B-Int4-axcl':[create_data_deb,'llm-model-qwen3-vl-4B-Int4-axcl', '0.5', src_folder, revision],
+        'llm-model-Qwen3-0.6B-axcl':[create_data_deb,'llm-model-Qwen3-0.6B-axcl', '0.5', src_folder, revision],
+        'llm-model-Qwen3-1.7B-axcl':[create_data_deb,'llm-model-Qwen3-1.7B-axcl', '0.5', src_folder, revision],
+        'llm-model-Qwen3.5-0.8B-axcl':[create_data_deb,'llm-model-Qwen3.5-0.8B-axcl', '0.6', src_folder, revision],
+        'llm-model-Qwen3.5-0.8B-Int4-axcl':[create_data_deb,'llm-model-Qwen3.5-0.8B-Int4-axcl', '0.6', src_folder, revision],
+        'llm-model-Qwen3.5-2B-axcl':[create_data_deb,'llm-model-Qwen3.5-2B-axcl', '0.6', src_folder, revision],
+        'llm-model-Qwen3.5-2B-Int4-axcl':[create_data_deb,'llm-model-Qwen3.5-2B-Int4-axcl', '0.6', src_folder, revision],
+        'llm-model-Qwen3.5-4B-Int4-axcl':[create_data_deb,'llm-model-Qwen3.5-4B-Int4-axcl', '0.6', src_folder, revision],
         # InternVL model
         ## AXCL
         'llm-model-internvl3-1B-448-axcl':[create_data_deb,'llm-model-internvl3-1B-448-axcl', '0.7', src_folder, revision],

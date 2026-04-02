@@ -1,7 +1,7 @@
 {
-    "mode": "Qwen3.5-2B-axcl",
+    "mode": "Qwen3.5-0.8B-axcl",
     "type": "llm",
-    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3.5-2B-AX650-C128-P1152-CTX2047",
+    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3.5-0.8B-AX650-C128-P1152-CTX2047",
     "capabilities": [
         "text_generation",
         "chat"
@@ -18,7 +18,7 @@
     ],
     "mode_param": {
         "system_prompt": "you are a helpful assistant.",
-        "model_name": "AXERA-TECH/Qwen3.5-2B",
+        "model_name": "AXERA-TECH/Qwen3.5-0.8B",
         "url_tokenizer_model": "qwen3_5_tokenizer.txt",
         "tokenizer_type": "Qwen3_5VL",
         "post_config_path": "post_config.json",
@@ -28,7 +28,7 @@
         "filename_post_axmodel": "qwen3_5_text_post.axmodel",
         "filename_tokens_embed": "model.embed_tokens.weight.bfloat16.bin",
         "tokens_embed_num": 248320,
-        "tokens_embed_size": 2048,
+        "tokens_embed_size": 1024,
         "b_use_mmap_load_embed": true,
         "b_use_mmap_load_layer": true,
         "vlm_type": "Qwen3VL",

@@ -1,7 +1,7 @@
 {
-    "mode": "Qwen3.5-2B-axcl",
+    "mode": "Qwen3.5-2B-Int4-axcl",
     "type": "llm",
-    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3.5-2B-AX650-C128-P1152-CTX2047",
+    "homepage": "https://huggingface.co/AXERA-TECH/Qwen3.5-2B-AX650-GPTQ-Int4-C128-P1152-CTX2047",
     "capabilities": [
         "text_generation",
         "chat"
