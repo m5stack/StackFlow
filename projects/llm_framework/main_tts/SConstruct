@@ -8,7 +8,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = Glob('src/*.c*')
 INCLUDE = [ADir('include'), ADir('.')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['pthread', 'utilities', 'gomp', 'eventpp', 'StackFlow', 'eigen', 'sherpa-onnx']
+REQUIREMENTS = ['pthread', 'utilities', 'gomp', 'ax_msp', 'axcl', 'eventpp', 'StackFlow', 'eigen', 'sherpa-onnx']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = []
@@ -24,7 +24,7 @@ REQUIREMENTS += ['tts']
 
 
 INCLUDE += [ADir('src/runner/eigen-3.4.0'), ADir('src/runner/src/tn/header'), ADir('src/runner/include'), ADir('src/runner/src/header')]
-
+STATIC_LIB += [AFile('../static_lib/libsamplerate.a')]
 STATIC_FILES += Glob('mode_*.json')
 
 env['COMPONENTS'].append({'target':'llm_tts-1.6',

@@ -12,7 +12,7 @@ _SDK_PATH = os.path.normpath(
 
 env["GIT_REPO_LISTS"]["tokenizer"] = {
     "url": "https://github.com/ZHEQIUSHUI/tokenizer.git",
-    "commit": "109a37cf70d1891e0dc41c39261dabb70d8a4fce",
+    "commit": "9b6621a14bb759e86d2729632a59289f5744f297",
     "path": str(Path(_SDK_PATH) / "github_source" / "tokenizer"),
 }
 
