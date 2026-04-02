@@ -109,7 +109,7 @@ public:
             return {};
         }
 
-        const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+        const auto now  = std::chrono::steady_clock::now().time_since_epoch().count();
         const auto path = tmpdir / ("img_" + std::to_string(now) + "_" + std::to_string(getpid()) + ".jpg");
 
         std::ofstream ofs(path, std::ios::binary);
@@ -153,7 +153,10 @@ public:
             model_           = config_body.at("model");
             response_format_ = config_body.at("response_format");
             enoutput_        = config_body.at("enoutput");
-            prompt_          = config_body.at("prompt");
+
+            if (config_body.contains("prompt")) {
+                mode_config_.system_prompt = config_body.at("prompt").get<std::string>();
+            }
 
             if (config_body.contains("input")) {
                 if (config_body["input"].is_string()) {
@@ -200,6 +203,9 @@ public:
             SLOGI("base_model %s", base_model.c_str());
 
             CONFIG_AUTO_SET(file_body["mode_param"], system_prompt);
+            if (!config_body.contains("system_prompt") && config_body.contains("prompt")) {
+                mode_config_.system_prompt = config_body.at("prompt").get<std::string>();
+            }
 
             CONFIG_AUTO_SET(file_body["mode_param"], template_filename_axmodel);
             CONFIG_AUTO_SET(file_body["mode_param"], axmodel_num);
@@ -271,7 +277,8 @@ public:
             };
 
             if (!parse_vlm_type(config_body, "vlm_type") && !parse_vlm_type(config_body, "VLM_TYPE")) {
-                parse_vlm_type(file_body["mode_param"], "vlm_type") || parse_vlm_type(file_body["mode_param"], "VLM_TYPE");
+                parse_vlm_type(file_body["mode_param"], "vlm_type") ||
+                    parse_vlm_type(file_body["mode_param"], "VLM_TYPE");
             }
 
             mode_config_.template_filename_axmodel      = base_model + mode_config_.template_filename_axmodel;
