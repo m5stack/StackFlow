@@ -372,7 +372,7 @@ if __name__ == "__main__":
     # cpu_count = 50
     Tasks = {
         # Unit
-        'lib-llm':[create_lib_deb,'lib-llm', '1.9', src_folder, revision],
+        'lib-llm':[create_lib_deb,'lib-llm', '1.10', src_folder, revision],
         'llm-sys':[create_bin_deb,'llm-sys', '1.6', src_folder, revision, 'lib-llm (>= 1.8)'],
         'llm-audio':[create_bin_deb,'llm-audio', '1.9', src_folder, revision],
         'llm-kws':[create_bin_deb,'llm-kws', '1.12', src_folder, revision],
@@ -413,7 +413,7 @@ if __name__ == "__main__":
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
-        'llm-model-kokoro-ax650':[create_data_deb,'llm-model-kokoro-ax650', '0.4', src_folder, revision],
+        'llm-model-kokoro-1.0-ax650':[create_data_deb,'llm-model-kokoro-1.0-ax650', '0.4', src_folder, revision],
         # VAD model
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.4', src_folder, revision],
         # MeloTTS model

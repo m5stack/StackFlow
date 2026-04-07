@@ -16,10 +16,14 @@
     ],
     "mode_param": {
         "model.kokoro.model": [
-            "kokoro_part1.axmodel",
-            "kokoro_part2.axmodel",
-            "kokoro_part3.axmodel",
-            "kokoro_part4.onnx"
+            "encoder_token_128.axmodel",
+            "duration_predictor.onnx",
+            "text_encoder_token_128_frame_198.axmodel",
+            "f0n_shared_frame_198.axmodel",
+            "f0n_head_frame_198.axmodel",
+            "decoder_front_198.axmodel",
+            "vocoder_core.axmodel",
+            "vocoder_tail.onnx"
         ],
         "model.kokoro.voices": "voices.bin",
         "model.kokoro.tokens": "tokens.txt",
@@ -30,7 +34,7 @@
         "model.kokoro.data_dir": "espeak-ng-data",
         "model.kokoro.length_scale": 1.0,
         "model.num_threads": 8,
-        "model.debug": true,
+        "model.debug": false,
         "model.provider": "axera",
         "rule_fsts": [
             "date-zh.fst",
