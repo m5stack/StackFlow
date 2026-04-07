@@ -50,6 +50,12 @@ typedef std::function<void(const std::string &data, bool finish)> task_callback_
     else if (obj.contains(#key))                \
         sherpa_config_.key = obj[#key];
 
+#define CONFIG_GEN_SET(obj, key)             \
+    if (config_body.contains(#key))          \
+        gen_config_.key = config_body[#key]; \
+    else if (obj.contains(#key))             \
+        gen_config_.key = obj[#key];
+
 class llm_task {
 private:
     float *dataW = NULL;
@@ -263,6 +269,13 @@ public:
             CONFIG_AUTO_SET_SHERPA(mode_param, rule_fars);
             CONFIG_AUTO_SET_SHERPA(mode_param, max_num_sentences);
             CONFIG_AUTO_SET_SHERPA(mode_param, silence_scale);
+
+            CONFIG_GEN_SET(mode_param, silence_scale);
+            CONFIG_GEN_SET(mode_param, speed);
+            CONFIG_GEN_SET(mode_param, sid);
+            CONFIG_GEN_SET(mode_param, reference_sample_rate);
+            CONFIG_GEN_SET(mode_param, reference_text);
+            CONFIG_GEN_SET(mode_param, num_steps);
 
             if (!sherpa_config_.model.kokoro.voices.empty())
                 sherpa_config_.model.kokoro.voices = base_model + sherpa_config_.model.kokoro.voices;

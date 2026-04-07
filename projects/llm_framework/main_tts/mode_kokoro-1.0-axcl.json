@@ -1,0 +1,47 @@
+{
+    "mode": "kokoro-1.0-axcl",
+    "type": "tts",
+    "homepage": "https://huggingface.co/AXERA-TECH/kokoro.axera",
+    "capabilities": [
+        "tts",
+        "Chinese",
+        "English"
+    ],
+    "input_type": [
+        "tts.utf-8"
+    ],
+    "output_type": [
+        "tts.wav",
+        "sys.play.0_1"
+    ],
+    "mode_param": {
+        "model.kokoro.model": [
+            "encoder_token_128.axmodel",
+            "duration_predictor.onnx",
+            "text_encoder_token_128_frame_198.axmodel",
+            "f0n_shared_frame_198.axmodel",
+            "f0n_head_frame_198.axmodel",
+            "decoder_front_198.axmodel",
+            "vocoder_core.axmodel",
+            "vocoder_tail.onnx"
+        ],
+        "model.kokoro.voices": "voices.bin",
+        "model.kokoro.tokens": "tokens.txt",
+        "model.kokoro.lexicon": [
+            "lexicon-us-en.txt",
+            "lexicon-zh.txt"
+        ],
+        "model.kokoro.data_dir": "espeak-ng-data",
+        "model.kokoro.length_scale": 1.0,
+        "model.num_threads": 8,
+        "model.debug": false,
+        "model.provider": "axcl",
+        "rule_fsts": [
+            "date-zh.fst",
+            "number-zh.fst"
+        ],
+        "rule_fars": "",
+        "max_num_sentences": 1,
+        "silence_scale": 0.2
+    }
+}

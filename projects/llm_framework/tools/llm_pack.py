@@ -405,6 +405,7 @@ if __name__ == "__main__":
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
+        'llm-model-kokoro-1.0-axcl':[create_data_deb,'llm-model-kokoro-1.0-axcl', '0.4', src_folder, revision],
         # VAD model
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.4', src_folder, revision],
         # MeloTTS model
