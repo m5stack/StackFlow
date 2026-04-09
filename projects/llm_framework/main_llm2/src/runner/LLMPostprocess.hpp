@@ -234,8 +234,65 @@ private:
     bool enable_top_k_sampling = false;
     int top_k = 1;
 
+    bool default_enable_temperature = false;
+    float default_temperature = 1.0f;
+
+    bool default_enable_repetition_penalty = false;
+    float default_repetition_penalty = 1.0f;
+    int default_penalty_window = 20;
+
+    bool default_enable_diversity_penalty = false;
+    std::vector<int> default_common_phrases;
+    float default_diversity_penalty = 1.0f;
+
+    bool default_enable_top_p_sampling = false;
+    float default_top_p = 1.0f;
+
+    bool default_enable_top_k_sampling = false;
+    int default_top_k = 1;
+
+    void save_defaults()
+    {
+        default_enable_temperature = enable_temperature;
+        default_temperature = temperature;
+
+        default_enable_repetition_penalty = enable_repetition_penalty;
+        default_repetition_penalty = repetition_penalty;
+        default_penalty_window = penalty_window;
+
+        default_enable_diversity_penalty = enable_diversity_penalty;
+        default_common_phrases = common_phrases;
+        default_diversity_penalty = diversity_penalty;
+
+        default_enable_top_p_sampling = enable_top_p_sampling;
+        default_top_p = top_p;
+
+        default_enable_top_k_sampling = enable_top_k_sampling;
+        default_top_k = top_k;
+    }
+
 public:
     LLMPostprocess() {}
+
+    void reset_to_defaults()
+    {
+        enable_temperature = default_enable_temperature;
+        temperature = default_temperature;
+
+        enable_repetition_penalty = default_enable_repetition_penalty;
+        repetition_penalty = default_repetition_penalty;
+        penalty_window = default_penalty_window;
+
+        enable_diversity_penalty = default_enable_diversity_penalty;
+        common_phrases = default_common_phrases;
+        diversity_penalty = default_diversity_penalty;
+
+        enable_top_p_sampling = default_enable_top_p_sampling;
+        top_p = default_top_p;
+
+        enable_top_k_sampling = default_enable_top_k_sampling;
+        top_k = default_top_k;
+    }
 
     void set_temperature(bool enable, float temperature)
     {
@@ -306,7 +363,51 @@ public:
             ALOGW("Both top_p and top_k enabled; prefer top_p and disable top_k");
             enable_top_k_sampling = false;
         }
+        save_defaults();
         return true;
+    }
+
+    void apply_request_config(const nlohmann::json &config)
+    {
+        if (config.contains("enable_temperature") && config["enable_temperature"].is_boolean())
+        {
+            enable_temperature = config["enable_temperature"].get<bool>();
+        }
+        if (config.contains("temperature") && config["temperature"].is_number())
+        {
+            temperature = config["temperature"].get<float>();
+            if (temperature <= 0.0f) temperature = 1.0f;
+            enable_temperature = true;
+        }
+
+        if (config.contains("enable_top_p_sampling") && config["enable_top_p_sampling"].is_boolean())
+        {
+            enable_top_p_sampling = config["enable_top_p_sampling"].get<bool>();
+        }
+        if (config.contains("top_p") && config["top_p"].is_number())
+        {
+            top_p = config["top_p"].get<float>();
+            if (top_p <= 0.0f) top_p = 0.9f;
+            if (top_p > 1.0f) top_p = 1.0f;
+            enable_top_p_sampling = true;
+        }
+
+        if (config.contains("enable_top_k_sampling") && config["enable_top_k_sampling"].is_boolean())
+        {
+            enable_top_k_sampling = config["enable_top_k_sampling"].get<bool>();
+        }
+        if (config.contains("top_k") && config["top_k"].is_number_integer())
+        {
+            top_k = config["top_k"].get<int>();
+            if (top_k < 1) top_k = 1;
+            enable_top_k_sampling = true;
+        }
+
+        if (enable_top_p_sampling && enable_top_k_sampling)
+        {
+            ALOGW("Both top_p and top_k enabled in request override; prefer top_p and disable top_k");
+            enable_top_k_sampling = false;
+        }
     }
 
     int apply(std::vector<float> &logits, const std::vector<int> &history)
