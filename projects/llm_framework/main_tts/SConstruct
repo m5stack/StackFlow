@@ -31,10 +31,9 @@ INCLUDE += [ADir('src/runner/eigen-3.4.0'),
             ]
 
 LINK_SEARCH_PATH += [ADir('../static_lib/sherpa/onnx')]
-REQUIREMENTS += ['onnxruntime']
 
 
-LDFLAGS += [
+LDFLAGS += ['-l:libonnxruntime.so.1.23.2',
             '-l:libsherpa-onnx-core.a',
             '-l:libkaldi-native-fbank-core.a',
             '-l:libkissfft-float.a',
