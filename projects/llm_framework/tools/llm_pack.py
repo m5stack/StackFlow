@@ -410,6 +410,7 @@ if __name__ == "__main__":
         'llm-model-sense-voice-small-10s':[create_data_deb,'llm-model-sense-voice-small-10s', '0.4', src_folder, revision],
         ## AX650
         'llm-model-sense-voice-small-10s-ax650':[create_data_deb,'llm-model-sense-voice-small-10s-ax650', '0.4', src_folder, revision],
+        'llm-model-fire-red-asr-ctc-10s-ax650':[create_data_deb,'llm-model-fire-red-asr-ctc-10s-ax650', '0.4', src_folder, revision],
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],

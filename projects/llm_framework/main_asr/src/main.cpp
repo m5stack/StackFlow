@@ -280,6 +280,7 @@ public:
         ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.canary.tgt_lang);
         ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.canary.use_pnc);
         ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.omnilingual.model);
+        ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.fire_red_asr_ctc.model);
         ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.telespeech_ctc);
         ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.tokens);
         ONNX_ASR_CONFIG_AUTO_SET(file_body["mode_param"], model_config.num_threads);
@@ -333,9 +334,14 @@ public:
         else if (file_body["mode_param"].contains("silence_timeout"))
             silence_timeout = file_body["mode_param"]["silence_timeout"];
 
-        onnx_asr_config_.model_config.sense_voice.model = base_model + onnx_asr_config_.model_config.sense_voice.model;
-        onnx_asr_config_.model_config.tokens            = base_model + onnx_asr_config_.model_config.tokens;
-        vad_config_.silero_vad.model                    = base_model + vad_config_.silero_vad.model;
+        if (!onnx_asr_config_.model_config.sense_voice.model.empty())
+            onnx_asr_config_.model_config.sense_voice.model =
+                base_model + onnx_asr_config_.model_config.sense_voice.model;
+        if (!onnx_asr_config_.model_config.fire_red_asr_ctc.model.empty())
+            onnx_asr_config_.model_config.fire_red_asr_ctc.model =
+                base_model + onnx_asr_config_.model_config.fire_red_asr_ctc.model;
+        onnx_asr_config_.model_config.tokens = base_model + onnx_asr_config_.model_config.tokens;
+        vad_config_.silero_vad.model         = base_model + vad_config_.silero_vad.model;
 
         onnx_recognizer_ = std::make_unique<sherpa_onnx::OfflineRecognizer>(onnx_asr_config_);
         vad_             = std::make_unique<sherpa_onnx::VoiceActivityDetector>(vad_config_);
@@ -1118,7 +1124,7 @@ public:
             ret                    = llm_channel->subscriber_work_id(
                 data,
                 std::bind(&llm_asr::kws_awake, this, std::weak_ptr<llm_task>(llm_task_obj),
-                                             std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
+                          std::weak_ptr<llm_channel_obj>(llm_channel), std::placeholders::_1, std::placeholders::_2));
             llm_task_obj->inputs_.push_back(data);
         }
 
