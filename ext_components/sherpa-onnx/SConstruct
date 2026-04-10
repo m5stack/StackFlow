@@ -12,7 +12,7 @@ _SDK_PATH = os.path.normpath(
 
 env["GIT_REPO_LISTS"]["sherpa-onnx"] = {
     "url": "https://github.com/Abandon-ht/sherpa-onnx.git",
-    "commit": "2d08532b0ddbe96817242324d826442ba4d3a8a4",
+    "commit": "61b3273fcfcaa39b45f644f232d0e5963a9b5f21",
     "path": str(Path(_SDK_PATH) / "github_source" / "sherpa-onnx"),
 }
 

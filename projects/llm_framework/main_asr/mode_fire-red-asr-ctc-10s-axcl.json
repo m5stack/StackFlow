@@ -1,0 +1,26 @@
+{
+    "mode": "fire-red-asr-ctc-10s-axcl",
+    "type": "asr",
+    "homepage": "https://huggingface.co/Abandon-ht/FireRedASR2.axera",
+    "pulsar_version": "5.1-patch1-cd6c30b4",
+    "capabilities": [
+        "Chinese",
+        "English"
+    ],
+    "input_type": [
+        "sys.pcm",
+        "sys.cap.0_0"
+    ],
+    "output_type": [
+        "asr.utf-8"
+    ],
+    "mode_param": {
+        "model_config.fire_red_asr_ctc.model": "model-10s.axmodel",
+        "model_config.tokens": "tokens.txt",
+        "silero_vad.model": "silero_vad.ort",
+        "model_config.provider": "axcl",
+        "silence_timeout": 2000,
+        "awake_delay": 50
+    },
+    "mode_param_bak": {}
+}

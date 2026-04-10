@@ -372,20 +372,20 @@ if __name__ == "__main__":
     # cpu_count = 50
     Tasks = {
         # Unit
-        'lib-llm':[create_lib_deb,'lib-llm', '1.9', src_folder, revision],
+        'lib-llm':[create_lib_deb,'lib-llm', '1.10', src_folder, revision],
         'llm-sys':[create_bin_deb,'llm-sys', '1.7', src_folder, revision],
         'llm-audio':[create_bin_deb,'llm-audio', '1.9', src_folder, revision],
-        'llm-kws':[create_bin_deb,'llm-kws', '1.10', src_folder, revision],
-        'llm-asr':[create_bin_deb,'llm-asr', '1.9', src_folder, revision],
+        'llm-kws':[create_bin_deb,'llm-kws', '1.11', src_folder, revision],
+        'llm-asr':[create_bin_deb,'llm-asr', '1.10', src_folder, revision],
         'llm-llm':[create_bin_deb,'llm-llm', '1.12', src_folder, revision],
         'llm-llm2':[create_bin_deb,'llm-llm2', '1.12', src_folder, revision],
-        'llm-tts':[create_bin_deb,'llm-tts', '1.6', src_folder, revision],
+        'llm-tts':[create_bin_deb,'llm-tts', '1.7', src_folder, revision],
         'llm-melotts':[create_bin_deb,'llm-melotts', '1.10', src_folder, revision],
         'llm-camera':[create_bin_deb,'llm-camera', '1.10', src_folder, revision, 'lib-llm'],
         'llm-vlm':[create_bin_deb,'llm-vlm', '1.12', src_folder, revision],
         'llm-yolo':[create_bin_deb,'llm-yolo', '1.9', src_folder, revision],
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', '1.7', src_folder, revision],
-        'llm-vad':[create_bin_deb,'llm-vad', '1.8', src_folder, revision],
+        'llm-vad':[create_bin_deb,'llm-vad', '1.9', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.8', src_folder, revision],
         'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.11', src_folder, revision],
         'llm-cosy-voice':[create_bin_deb,'llm-cosy-voice', '1.10', src_folder, revision],
@@ -402,10 +402,12 @@ if __name__ == "__main__":
         ## AXCL
         'llm-model-kws-axcl':[create_data_deb,'llm-model-kws-axcl', '0.4', src_folder, revision],
         'llm-model-sense-voice-small-10s-axcl':[create_data_deb,'llm-model-sense-voice-small-10s-axcl', '0.4', src_folder, revision],
+        'llm-model-fire-red-asr-ctc-10s-axcl':[create_data_deb,'llm-model-fire-red-asr-ctc-10s-axcl', '0.4', src_folder, revision],
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
         'llm-model-kokoro-1.0-axcl':[create_data_deb,'llm-model-kokoro-1.0-axcl', '0.4', src_folder, revision],
+        'llm-model-kokoro-1.1-axcl':[create_data_deb,'llm-model-kokoro-1.1-axcl', '0.4', src_folder, revision],
         # VAD model
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.4', src_folder, revision],
         # MeloTTS model

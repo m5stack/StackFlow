@@ -1,7 +1,7 @@
 {
-    "mode": "kokoro-1.0-axcl",
+    "mode": "kokoro-1.1-axcl",
     "type": "tts",
-    "homepage": "https://huggingface.co/Abandon-ht/kokoro-axmodel",
+    "homepage": "https://huggingface.co/Abandon-ht/kokoro-multi-lang-v1_1-axmodel",
     "capabilities": [
         "tts",
         "Chinese",
@@ -16,12 +16,12 @@
     ],
     "mode_param": {
         "model.kokoro.model": [
-            "encoder_token_128.axmodel",
+            "encoder_token_256.axmodel",
             "duration_predictor.onnx",
-            "text_encoder_token_128_frame_198.axmodel",
-            "f0n_shared_frame_198.axmodel",
-            "f0n_head_frame_198.axmodel",
-            "decoder_front_198.axmodel",
+            "text_encoder_token_256_frame_396.axmodel",
+            "f0n_shared_frame_396.axmodel",
+            "f0n_head_frame_396.axmodel",
+            "decoder_front_396.axmodel",
             "vocoder_core.axmodel",
             "vocoder_tail.onnx"
         ],
