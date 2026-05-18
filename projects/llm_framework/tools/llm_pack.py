@@ -415,7 +415,7 @@ if __name__ == "__main__":
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
         'llm-model-kokoro-1.0-ax650':[create_data_deb,'llm-model-kokoro-1.0-ax650', '0.4', src_folder, revision],
-        'llm-model-kokoro-1.1-ax650':[create_data_deb,'llm-model-kokoro-1.1-ax650', '0.4', src_folder, revision],
+        'llm-model-kokoro-1.1-ax650':[create_data_deb,'llm-model-kokoro-1.1-ax650', '0.5', src_folder, revision],
         # VAD model
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.4', src_folder, revision],
         # MeloTTS model
@@ -428,6 +428,7 @@ if __name__ == "__main__":
         'llm-model-melotts-en-us':[create_data_deb,'llm-model-melotts-en-us', '0.6', src_folder, revision],
         'llm-model-melotts-ja-jp':[create_data_deb,'llm-model-melotts-ja-jp', '0.6', src_folder, revision],
         'llm-model-melotts-es-es':[create_data_deb,'llm-model-melotts-es-es', '0.5', src_folder, revision],
+        'llm-model-melotts-ko-kr':[create_data_deb,'llm-model-melotts-ko-kr', '0.5', src_folder, revision],
         ## AX650
         'llm-model-melotts-zh-cn-ax650':[create_data_deb,'llm-model-melotts-zh-cn-ax650', '0.7', src_folder, revision],
         'llm-model-melotts-en-au-ax650':[create_data_deb,'llm-model-melotts-en-au-ax650', '0.7', src_folder, revision],
@@ -437,6 +438,7 @@ if __name__ == "__main__":
         'llm-model-melotts-en-us-ax650':[create_data_deb,'llm-model-melotts-en-us-ax650', '0.7', src_folder, revision],
         'llm-model-melotts-ja-jp-ax650':[create_data_deb,'llm-model-melotts-ja-jp-ax650', '0.7', src_folder, revision],
         'llm-model-melotts-es-es-ax650':[create_data_deb,'llm-model-melotts-es-es-ax650', '0.6', src_folder, revision],
+        'llm-model-melotts-ko-kr-ax650':[create_data_deb,'llm-model-melotts-ko-kr-ax650', '0.6', src_folder, revision],
         # CosyVoice2 model
         ## AX650
         'llm-model-CosyVoice2-0.5B-ax650':[create_data_deb,'llm-model-CosyVoice2-0.5B-ax650', '0.6', src_folder, revision],

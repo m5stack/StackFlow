@@ -16,13 +16,13 @@
     ],
     "mode_param": {
         "model.kokoro.model": [
-            "encoder_token_256.axmodel",
+            "encoder_token_128.axmodel",
             "duration_predictor.onnx",
-            "text_encoder_token_256_frame_396.axmodel",
-            "f0n_shared_frame_396.axmodel",
-            "f0n_head_frame_396.axmodel",
-            "decoder_front_396.axmodel",
-            "vocoder_core.axmodel",
+            "text_encoder_token_128_frame_198.axmodel",
+            "f0n_shared_frame_198.axmodel",
+            "f0n_head_frame_198.axmodel",
+            "decoder_front_198.axmodel",
+            "vocoder_core_396.axmodel",
             "vocoder_tail.onnx"
         ],
         "model.kokoro.voices": "voices.bin",
