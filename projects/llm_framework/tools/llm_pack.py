@@ -499,6 +499,7 @@ if __name__ == "__main__":
         'llm-model-Qwen3.5-2B-ax650':[create_data_deb,'llm-model-Qwen3.5-2B-ax650', '0.6', src_folder, revision],
         'llm-model-Qwen3.5-2B-Int4-ax650':[create_data_deb,'llm-model-Qwen3.5-2B-Int4-ax650', '0.6', src_folder, revision],
         'llm-model-Qwen3.5-4B-Int4-ax650':[create_data_deb,'llm-model-Qwen3.5-4B-Int4-ax650', '0.6', src_folder, revision],
+        'llm-model-HY-MT1.5-1.8B-Int4-ax650':[create_data_deb,'llm-model-HY-MT1.5-1.8B-Int4-ax650', '0.6', src_folder, revision],
         # Llama model
         'llm-model-llama3.2-1B-prefill-ax630c':[create_data_deb,'llm-model-llama3.2-1B-prefill-ax630c', data_version, src_folder, revision],
         'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],
