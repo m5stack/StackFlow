@@ -10,16 +10,18 @@
 
 ```json
 {
-  "request_id": "2",
-  "work_id": "tts",
-  "action": "setup",
-  "object": "tts.setup",
-  "data": {
-    "model": "single-speaker-fast",
-    "response_format": "sys.pcm",
-    "input": "tts.utf-8",
-    "enoutput": false
-  }
+    "request_id": "2",
+    "work_id": "tts",
+    "action": "setup",
+    "object": "tts.setup",
+    "data": {
+        "model": "kokoro-1.1-ax650",
+        "response_format": "sys.pcm",
+        "input": "tts.utf-8",
+        "enoutput": false,
+        "sid": 5,
+        "speed": 1.2
+    }
 }
 ```
 
@@ -27,7 +29,7 @@
 - work_id：配置单元时，为 `tts`。
 - action：调用的方法为 `setup`。
 - object：传输的数据类型为 `tts.setup`。
-- model：使用的模型为 `single-speaker-fast` 中文模型。
+- model：使用的模型为 `kokoro-1.1-ax650` 中文模型。
 - response_format：返回结果为 `sys.pcm`, 系统音频数据，并直接发送到 llm-audio 模块进行播放。
 - input：输入的为 `tts.utf-8`,代表的是从用户输入。
 - enoutput：是否起用用户结果输出。
@@ -36,15 +38,15 @@
 
 ```json
 {
-  "created": 1731488402,
-  "data": "None",
-  "error": {
-    "code": 0,
-    "message": ""
-  },
-  "object": "None",
-  "request_id": "2",
-  "work_id": "tts.1003"
+    "created": 1775720267,
+    "data": "None",
+    "error": {
+        "code": 0,
+        "message": ""
+    },
+    "object": "None",
+    "request_id": "2",
+    "work_id": "tts.1009"
 }
 ```
 
@@ -58,7 +60,7 @@
 ```json
 {
     "request_id": "2",
-    "work_id": "tts.1003",
+    "work_id": "tts.1009",
     "action": "inference",
     "object": "tts.utf-8.stream",
     "data": {
@@ -78,7 +80,7 @@
 ```json
 {
     "request_id": "2",
-    "work_id": "tts.1003",
+    "work_id": "tts.1009",
     "action": "inference",
     "object": "tts.utf-8",
     "data": "今天天气真好！"
@@ -96,7 +98,7 @@
 ```json
 {
   "request_id": "3",
-  "work_id": "tts.1003",
+  "work_id": "tts.1009",
   "action": "link",
   "object": "work_id",
   "data": "kws.1000"
@@ -115,7 +117,7 @@
   },
   "object": "None",
   "request_id": "3",
-  "work_id": "tts.1003"
+  "work_id": "tts.1009"
 }
 ```
 
@@ -134,14 +136,16 @@ error::code 为 0 表示执行成功。
   "action": "setup",
   "object": "tts.setup",
   "data": {
-    "model": "single-speaker-fast",
+    "model": "kokoro-1.1-ax650",
     "response_format": "sys.pcm",
     "input": [
       "tts.utf-8",
       "llm.1002",
       "kws.1000"
     ],
-    "enoutput": false
+    "enoutput": false,
+    "sid": 5,
+    "speed": 1.2
   }
 }
 ```
@@ -155,7 +159,7 @@ error::code 为 0 表示执行成功。
 ```json
 {
   "request_id": "4",
-  "work_id": "tts.1003",
+  "work_id": "tts.1009",
   "action": "unlink",
   "object": "work_id",
   "data": "kws.1000"
@@ -174,7 +178,7 @@ error::code 为 0 表示执行成功。
   },
   "object": "None",
   "request_id": "4",
-  "work_id": "tts.1003"
+  "work_id": "tts.1009"
 }
 ```
 
@@ -189,7 +193,7 @@ error::code 为 0 表示执行成功。
 ```json
 {
   "request_id": "5",
-  "work_id": "tts.1003",
+  "work_id": "tts.1009",
   "action": "pause"
 }
 ```
@@ -206,7 +210,7 @@ error::code 为 0 表示执行成功。
   },
   "object": "None",
   "request_id": "5",
-  "work_id": "tts.1003"
+  "work_id": "tts.1009"
 }
 ```
 
@@ -221,7 +225,7 @@ error::code 为 0 表示执行成功。
 ```json
 {
   "request_id": "6",
-  "work_id": "tts.1003",
+  "work_id": "tts.1009",
   "action": "work"
 }
 ```
@@ -238,7 +242,7 @@ error::code 为 0 表示执行成功。
   },
   "object": "None",
   "request_id": "6",
-  "work_id": "tts.1003"
+  "work_id": "tts.1009"
 }
 ```
 
@@ -253,7 +257,7 @@ error::code 为 0 表示执行成功。
 ```json
 {
   "request_id": "7",
-  "work_id": "tts.1003",
+  "work_id": "tts.1009",
   "action": "exit"
 }
 ```
@@ -270,7 +274,7 @@ error::code 为 0 表示执行成功。
   },
   "object": "None",
   "request_id": "7",
-  "work_id": "tts.1003"
+  "work_id": "tts.1009"
 }
 ```
 
@@ -294,17 +298,17 @@ error::code 为 0 表示执行成功。
 
 ```json
 {
-  "created": 1731652311,
-  "data": [
-    "tts.1003"
-  ],
-  "error": {
-    "code": 0,
-    "message": ""
-  },
-  "object": "tts.tasklist",
-  "request_id": "2",
-  "work_id": "tts"
+    "created": 1775720452,
+    "data": [
+        "tts.1009"
+    ],
+    "error": {
+        "code": 0,
+        "message": ""
+    },
+    "object": "tts.tasklist",
+    "request_id": "2",
+    "work_id": "tts"
 }
 ```
 
@@ -315,7 +319,7 @@ error::code 为 0 表示执行成功。
 ```json
 {
   "request_id": "2",
-  "work_id": "tts.1003",
+  "work_id": "tts.1009",
   "action": "taskinfo"
 }
 ```
@@ -324,22 +328,22 @@ error::code 为 0 表示执行成功。
 
 ```json
 {
-  "created": 1731652344,
-  "data": {
-    "enoutput": false,
-    "inputs_": [
-      "tts.utf-8"
-    ],
-    "model": "single-speaker-fast",
-    "response_format": "sys.pcm"
-  },
-  "error": {
-    "code": 0,
-    "message": ""
-  },
-  "object": "tts.taskinfo",
-  "request_id": "2",
-  "work_id": "tts.1003"
+    "created": 1775720471,
+    "data": {
+        "enoutput": false,
+        "inputs": [
+            "tts.utf-8"
+        ],
+        "model": "kokoro-1.1-ax650",
+        "response_format": "sys.pcm"
+    },
+    "error": {
+        "code": 0,
+        "message": ""
+    },
+    "object": "tts.taskinfo",
+    "request_id": "2",
+    "work_id": "tts.1009"
 }
 ```
 

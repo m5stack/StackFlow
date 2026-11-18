@@ -1,0 +1,5 @@
+menuconfig AX_OPENAI_API_ENABLED
+    bool "Enable openai-api support"
+    default n
+    help
+        enable openai-api support

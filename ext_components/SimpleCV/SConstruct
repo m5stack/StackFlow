@@ -1,0 +1,51 @@
+# component2/SConscript
+Import("env")
+import os
+from pathlib import Path
+
+with open(env["PROJECT_TOOL_S"]) as f:
+    exec(f.read())
+
+_SDK_PATH = os.path.normpath(
+    os.environ.get("SDK_PATH", str(Path(os.getcwd()) / ".." / ".."))
+)
+
+env["GIT_REPO_LISTS"]["SimpleCV"] = {
+    "url": "https://github.com/ZHEQIUSHUI/SimpleCV.git",
+    "commit": "7729953c7c75ffaea441f70e0a9eb62790f3eb2b",
+    "path": str(Path(_SDK_PATH) / "github_source" / "SimpleCV"),
+}
+
+if "CONFIG_AX_SIMPLECV_ENABLED" in os.environ:
+    check_component("SimpleCV")
+    SRCS = []
+    INCLUDE = []
+    PRIVATE_INCLUDE = []
+    REQUIREMENTS = []
+    STATIC_LIB = []
+    DYNAMIC_LIB = []
+    DEFINITIONS = []
+    DEFINITIONS_PRIVATE = []
+    LDFLAGS = []
+    LINK_SEARCH_PATH = []
+
+    INCLUDE += [
+        os.path.join(env["GIT_REPO_LISTS"]["SimpleCV"]["path"], "include"),
+    ]
+
+    env["COMPONENTS"].append(
+        {
+            "target": os.path.basename(env["component_dir"]),
+            "SRCS": SRCS,
+            "INCLUDE": INCLUDE,
+            "PRIVATE_INCLUDE": PRIVATE_INCLUDE,
+            "REQUIREMENTS": REQUIREMENTS,
+            "STATIC_LIB": STATIC_LIB,
+            "DYNAMIC_LIB": DYNAMIC_LIB,
+            "DEFINITIONS": DEFINITIONS,
+            "DEFINITIONS_PRIVATE": DEFINITIONS_PRIVATE,
+            "LDFLAGS": LDFLAGS,
+            "LINK_SEARCH_PATH": LINK_SEARCH_PATH,
+            "REGISTER": "static",
+        }
+    )

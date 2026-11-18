@@ -241,7 +241,7 @@ def create_data_deb(package_name, version, src_folder, revision='m5stack1', depe
     shutil.rmtree(deb_folder)
     return package_name + " creat success!"
 
-def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.8)'):
+def create_bin_deb(package_name, version, src_folder, revision = 'm5stack1', depends = 'lib-llm (>= 1.8), llm-sys'):
     bin_files = glob.glob(os.path.join(src_folder, package_name.replace("-", "_") + "-*"))
     version_info = "0"
     if bin_files:
@@ -372,20 +372,21 @@ if __name__ == "__main__":
     # cpu_count = 50
     Tasks = {
         # Unit
-        'lib-llm':[create_lib_deb,'lib-llm', '1.9', src_folder, revision],
-        'llm-sys':[create_bin_deb,'llm-sys', '1.6', src_folder, revision],
-        'llm-audio':[create_bin_deb,'llm-audio', '1.8', src_folder, revision],
-        'llm-kws':[create_bin_deb,'llm-kws', '1.10', src_folder, revision],
-        'llm-asr':[create_bin_deb,'llm-asr', '1.8', src_folder, revision],
+        'lib-llm':[create_lib_deb,'lib-llm', '1.10', src_folder, revision],
+        'llm-sys':[create_bin_deb,'llm-sys', '1.6', src_folder, revision, 'lib-llm (>= 1.8)'],
+        'llm-audio':[create_bin_deb,'llm-audio', '1.9', src_folder, revision],
+        'llm-kws':[create_bin_deb,'llm-kws', '1.13', src_folder, revision],
+        'llm-asr':[create_bin_deb,'llm-asr', '1.11', src_folder, revision],
         'llm-llm':[create_bin_deb,'llm-llm', '1.12', src_folder, revision],
-        'llm-tts':[create_bin_deb,'llm-tts', '1.6', src_folder, revision],
-        'llm-melotts':[create_bin_deb,'llm-melotts', '1.10', src_folder, revision],
+        'llm-llm2':[create_bin_deb,'llm-llm2', '1.12', src_folder, revision],
+        'llm-tts':[create_bin_deb,'llm-tts', '1.7', src_folder, revision],
+        'llm-melotts':[create_bin_deb,'llm-melotts', '1.11', src_folder, revision],
         'llm-camera':[create_bin_deb,'llm-camera', '1.9', src_folder, revision, 'lib-llm'],
         'llm-vlm':[create_bin_deb,'llm-vlm', '1.11', src_folder, revision],
         'llm-yolo':[create_bin_deb,'llm-yolo', '1.9', src_folder, revision],
         'llm-skel':[create_bin_deb,'llm-skel', version, src_folder, revision],
         'llm-depth-anything':[create_bin_deb,'llm-depth-anything', '1.7', src_folder, revision],
-        'llm-vad':[create_bin_deb,'llm-vad', '1.8', src_folder, revision],
+        'llm-vad':[create_bin_deb,'llm-vad', '1.9', src_folder, revision],
         'llm-whisper':[create_bin_deb,'llm-whisper', '1.8', src_folder, revision],
         'llm-openai-api':[create_bin_deb,'llm-openai-api', '1.10', src_folder, revision],
         'llm-cosy-voice':[create_bin_deb,'llm-cosy-voice', '1.10', src_folder, revision],
@@ -401,7 +402,7 @@ if __name__ == "__main__":
         'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-ax650':[create_data_deb,'llm-model-sherpa-onnx-streaming-zipformer-small-bilingual-zh-en-2023-02-16-ax650', '0.4', src_folder, revision],
         # KWS model
         ## AX630C
-        'llm-model-kws':[create_data_deb,'llm-model-kws', '0.4', src_folder, revision],
+        'llm-model-kws-ax630c':[create_data_deb,'llm-model-kws-ax630c', '0.4', src_folder, revision],
         ## AX650
         'llm-model-kws-ax650':[create_data_deb,'llm-model-kws-ax650', '0.4', src_folder, revision],
         # ASR model
@@ -409,9 +410,12 @@ if __name__ == "__main__":
         'llm-model-sense-voice-small-10s':[create_data_deb,'llm-model-sense-voice-small-10s', '0.4', src_folder, revision],
         ## AX650
         'llm-model-sense-voice-small-10s-ax650':[create_data_deb,'llm-model-sense-voice-small-10s-ax650', '0.4', src_folder, revision],
+        'llm-model-fire-red-asr-ctc-10s-ax650':[create_data_deb,'llm-model-fire-red-asr-ctc-10s-ax650', '0.4', src_folder, revision],
         # TTS model
         'llm-model-single-speaker-english-fast':[create_data_deb,'llm-model-single-speaker-english-fast', '0.3', src_folder, revision],
         'llm-model-single-speaker-fast':[create_data_deb,'llm-model-single-speaker-fast', '0.3', src_folder, revision],
+        'llm-model-kokoro-1.0-ax650':[create_data_deb,'llm-model-kokoro-1.0-ax650', '0.4', src_folder, revision],
+        'llm-model-kokoro-1.1-ax650':[create_data_deb,'llm-model-kokoro-1.1-ax650', '0.5', src_folder, revision],
         # VAD model
         'llm-model-silero-vad':[create_data_deb,'llm-model-silero-vad', '0.4', src_folder, revision],
         # MeloTTS model
@@ -424,6 +428,7 @@ if __name__ == "__main__":
         'llm-model-melotts-en-us':[create_data_deb,'llm-model-melotts-en-us', '0.6', src_folder, revision],
         'llm-model-melotts-ja-jp':[create_data_deb,'llm-model-melotts-ja-jp', '0.6', src_folder, revision],
         'llm-model-melotts-es-es':[create_data_deb,'llm-model-melotts-es-es', '0.5', src_folder, revision],
+        'llm-model-melotts-ko-kr':[create_data_deb,'llm-model-melotts-ko-kr', '0.5', src_folder, revision],
         ## AX650
         'llm-model-melotts-zh-cn-ax650':[create_data_deb,'llm-model-melotts-zh-cn-ax650', '0.7', src_folder, revision],
         'llm-model-melotts-en-au-ax650':[create_data_deb,'llm-model-melotts-en-au-ax650', '0.7', src_folder, revision],
@@ -433,6 +438,7 @@ if __name__ == "__main__":
         'llm-model-melotts-en-us-ax650':[create_data_deb,'llm-model-melotts-en-us-ax650', '0.7', src_folder, revision],
         'llm-model-melotts-ja-jp-ax650':[create_data_deb,'llm-model-melotts-ja-jp-ax650', '0.7', src_folder, revision],
         'llm-model-melotts-es-es-ax650':[create_data_deb,'llm-model-melotts-es-es-ax650', '0.6', src_folder, revision],
+        'llm-model-melotts-ko-kr-ax650':[create_data_deb,'llm-model-melotts-ko-kr-ax650', '0.6', src_folder, revision],
         # CosyVoice2 model
         ## AX650
         'llm-model-CosyVoice2-0.5B-ax650':[create_data_deb,'llm-model-CosyVoice2-0.5B-ax650', '0.6', src_folder, revision],
@@ -471,7 +477,7 @@ if __name__ == "__main__":
         'llm-model-qwen2.5-0.5B-prefill-20e':[create_data_deb,'llm-model-qwen2.5-0.5B-prefill-20e', data_version, src_folder, revision],
         'llm-model-qwen2.5-0.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-0.5B-p256-ax630c', '0.4', src_folder, revision],
         'llm-model-qwen2.5-0.5B-Int4-ax630c':[create_data_deb,'llm-model-qwen2.5-0.5B-Int4-ax630c', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-HA-0.5B-ctx-ax630c':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-ax630c', '0.5', src_folder, revision],
+        'llm-model-qwen2.5-HA-0.5B-ctx-ax630c':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-ax630c', '0.7', src_folder, revision],
         'llm-model-qwen2.5-1.5B-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-ax630c', '0.3', src_folder, revision],
         'llm-model-qwen2.5-1.5B-p256-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-p256-ax630c', '0.4', src_folder, revision],
         'llm-model-qwen2.5-1.5B-Int4-ax630c':[create_data_deb,'llm-model-qwen2.5-1.5B-Int4-ax630c', '0.4', src_folder, revision],
@@ -480,11 +486,20 @@ if __name__ == "__main__":
         'llm-model-qwen3-vl-2B-Int4-ax630c':[create_data_deb,'llm-model-qwen3-vl-2B-Int4-ax630c', '0.5', src_folder, revision],
         ## AX650
         'llm-model-qwen2.5-0.5B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-0.5B-Int4-ax650', '0.4', src_folder, revision],
-        'llm-model-qwen2.5-HA-0.5B-ctx-ax650':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-ax650', '0.6', src_folder, revision],
+        'llm-model-qwen2.5-HA-0.5B-ctx-ax650':[create_data_deb,'llm-model-qwen2.5-HA-0.5B-ctx-ax650', '0.7', src_folder, revision],
         'llm-model-qwen2.5-1.5B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-1.5B-Int4-ax650', '0.4', src_folder, revision],
         'llm-model-qwen2.5-3B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-3B-Int4-ax650', '0.4', src_folder, revision],
         'llm-model-qwen2.5-7B-Int4-ax650':[create_data_deb,'llm-model-qwen2.5-7B-Int4-ax650', '0.4', src_folder, revision],
         'llm-model-qwen3-vl-2B-Int4-ax650':[create_data_deb,'llm-model-qwen3-vl-2B-Int4-ax650', '0.5', src_folder, revision],
+        'llm-model-qwen3-vl-2B-Int4-P1536-ax650':[create_data_deb,'llm-model-qwen3-vl-2B-Int4-P1536-ax650', '0.5', src_folder, revision],
+        'llm-model-Qwen3-0.6B-ax650':[create_data_deb,'llm-model-Qwen3-0.6B-ax650', '0.5', src_folder, revision],
+        'llm-model-Qwen3-1.7B-ax650':[create_data_deb,'llm-model-Qwen3-1.7B-ax650', '0.5', src_folder, revision],
+        'llm-model-Qwen3.5-0.8B-ax650':[create_data_deb,'llm-model-Qwen3.5-0.8B-ax650', '0.6', src_folder, revision],
+        'llm-model-Qwen3.5-0.8B-Int4-ax650':[create_data_deb,'llm-model-Qwen3.5-0.8B-Int4-ax650', '0.6', src_folder, revision],
+        'llm-model-Qwen3.5-2B-ax650':[create_data_deb,'llm-model-Qwen3.5-2B-ax650', '0.6', src_folder, revision],
+        'llm-model-Qwen3.5-2B-Int4-ax650':[create_data_deb,'llm-model-Qwen3.5-2B-Int4-ax650', '0.6', src_folder, revision],
+        'llm-model-Qwen3.5-4B-Int4-ax650':[create_data_deb,'llm-model-Qwen3.5-4B-Int4-ax650', '0.6', src_folder, revision],
+        'llm-model-HY-MT1.5-1.8B-Int4-ax650':[create_data_deb,'llm-model-HY-MT1.5-1.8B-Int4-ax650', '0.6', src_folder, revision],
         # Llama model
         'llm-model-llama3.2-1B-prefill-ax630c':[create_data_deb,'llm-model-llama3.2-1B-prefill-ax630c', data_version, src_folder, revision],
         'llm-model-llama3.2-1B-p256-ax630c':[create_data_deb,'llm-model-llama3.2-1B-p256-ax630c', '0.4', src_folder, revision],

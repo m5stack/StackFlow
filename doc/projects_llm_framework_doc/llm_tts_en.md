@@ -11,16 +11,18 @@ Send JSON:
 
 ```json
 {
-  "request_id": "2",
-  "work_id": "tts",
-  "action": "setup",
-  "object": "tts.setup",
-  "data": {
-    "model": "single-speaker-english-fast",
-    "response_format": "sys.pcm",
-    "input": "tts.utf-8",
-    "enoutput": false
-  }
+    "request_id": "2",
+    "work_id": "tts",
+    "action": "setup",
+    "object": "tts.setup",
+    "data": {
+        "model": "kokoro-1.0-ax650",
+        "response_format": "sys.pcm",
+        "input": "tts.utf-8",
+        "enoutput": false,
+        "sid": 5,
+        "speed": 1.2
+    }
 }
 ```
 
@@ -28,7 +30,7 @@ Send JSON:
 - work_id: For configuring the unit, it is `tts`.
 - action: The method to call is `setup`.
 - object: The type of data being transmitted is `tts.setup`.
-- model: The model used is the `single-speaker-english-fast` English model.
+- model: The model used is the `kokoro-1.0-ax650` English model.
 - response_format: The returned result is `sys.pcm`, system audio data, which is directly sent to the llm-audio module
   for playback.
 - input: Input is `tts.utf-8`, representing user input.
@@ -38,15 +40,15 @@ Response JSON:
 
 ```json
 {
-  "created": 1731488402,
-  "data": "None",
-  "error": {
-    "code": 0,
-    "message": ""
-  },
-  "object": "None",
-  "request_id": "2",
-  "work_id": "tts.1003"
+    "created": 1775719938,
+    "data": "None",
+    "error": {
+        "code": 0,
+        "message": ""
+    },
+    "object": "None",
+    "request_id": "2",
+    "work_id": "tts.1008"
 }
 ```
 
@@ -60,7 +62,7 @@ Response JSON:
 ```json
 {
     "request_id": "2",
-    "work_id": "tts.1003",
+    "work_id": "tts.1008",
     "action": "inference",
     "object": "tts.utf-8.stream",
     "data": {
@@ -80,7 +82,7 @@ Response JSON:
 ```json
 {
     "request_id": "2",
-    "work_id": "tts.1003",
+    "work_id": "tts.1008",
     "action": "inference",
     "object": "tts.utf-8",
     "data": "What's ur name?"
@@ -99,7 +101,7 @@ Send JSON:
 ```json
 {
   "request_id": "3",
-  "work_id": "tts.1003",
+  "work_id": "tts.1008",
   "action": "link",
   "object": "work_id",
   "data": "kws.1000"
@@ -118,7 +120,7 @@ Response JSON:
   },
   "object": "None",
   "request_id": "3",
-  "work_id": "tts.1003"
+  "work_id": "tts.1008"
 }
 ```
 
@@ -139,14 +141,16 @@ Example:
   "action": "setup",
   "object": "tts.setup",
   "data": {
-    "model": "single-speaker-fast",
+    "model": "kokoro-1.0-ax650",
     "response_format": "sys.pcm",
     "input": [
       "tts.utf-8",
       "llm.1002",
       "kws.1000"
     ],
-    "enoutput": false
+    "enoutput": false,
+    "sid": 5,
+    "speed": 1.2
   }
 }
 ```
@@ -160,7 +164,7 @@ Send JSON:
 ```json
 {
   "request_id": "4",
-  "work_id": "tts.1003",
+  "work_id": "tts.1008",
   "action": "unlink",
   "object": "work_id",
   "data": "kws.1000"
@@ -179,7 +183,7 @@ Response JSON:
   },
   "object": "None",
   "request_id": "4",
-  "work_id": "tts.1003"
+  "work_id": "tts.1008"
 }
 ```
 
@@ -194,7 +198,7 @@ Send JSON:
 ```json
 {
   "request_id": "5",
-  "work_id": "llm.1003",
+  "work_id": "tts.1008",
   "action": "pause"
 }
 ```
@@ -211,7 +215,7 @@ Response JSON:
   },
   "object": "None",
   "request_id": "5",
-  "work_id": "llm.1003"
+  "work_id": "tts.1008"
 }
 ```
 
@@ -226,7 +230,7 @@ Send JSON:
 ```json
 {
   "request_id": "6",
-  "work_id": "llm.1003",
+  "work_id": "tts.1008",
   "action": "work"
 }
 ```
@@ -243,7 +247,7 @@ Response JSON:
   },
   "object": "None",
   "request_id": "6",
-  "work_id": "llm.1003"
+  "work_id": "tts.1008"
 }
 ```
 
@@ -258,7 +262,7 @@ Send JSON:
 ```json
 {
   "request_id": "7",
-  "work_id": "llm.1003",
+  "work_id": "tts.1008",
   "action": "exit"
 }
 ```
@@ -275,7 +279,7 @@ Response JSON:
   },
   "object": "None",
   "request_id": "7",
-  "work_id": "llm.1003"
+  "work_id": "tts.1008"
 }
 ```
 
@@ -299,17 +303,17 @@ Response JSON:
 
 ```json
 {
-  "created": 1731652311,
-  "data": [
-    "tts.1003"
-  ],
-  "error": {
-    "code": 0,
-    "message": ""
-  },
-  "object": "tts.tasklist",
-  "request_id": "2",
-  "work_id": "tts"
+    "created": 1775720096,
+    "data": [
+        "tts.1008"
+    ],
+    "error": {
+        "code": 0,
+        "message": ""
+    },
+    "object": "tts.tasklist",
+    "request_id": "2",
+    "work_id": "tts"
 }
 ```
 
@@ -320,7 +324,7 @@ Send JSON:
 ```json
 {
   "request_id": "2",
-  "work_id": "tts.1003",
+  "work_id": "tts.1008",
   "action": "taskinfo"
 }
 ```
@@ -329,22 +333,23 @@ Response JSON:
 
 ```json
 {
-  "created": 1731652344,
-  "data": {
-    "enoutput": false,
-    "inputs_": [
-      "tts.utf-8"
-    ],
-    "model": "single-speaker-fast",
-    "response_format": "sys.pcm"
-  },
-  "error": {
-    "code": 0,
-    "message": ""
-  },
-  "object": "tts.taskinfo",
-  "request_id": "2",
-  "work_id": "tts.1003"
+    "created": 1775720117,
+    "data": {
+        "enoutput": false,
+        "inputs": [
+            "tts.utf-8",
+            "kws.1000"
+        ],
+        "model": "kokoro-1.0-ax650",
+        "response_format": "sys.pcm"
+    },
+    "error": {
+        "code": 0,
+        "message": ""
+    },
+    "object": "tts.taskinfo",
+    "request_id": "2",
+    "work_id": "tts.1008"
 }
 ```
 

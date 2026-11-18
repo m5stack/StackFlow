@@ -1,0 +1,5 @@
+menuconfig KALDI_DECODER_ENABLED
+    bool "Enable kaldi-decoder support"
+    default n
+    help
+        enable kaldi-decoder support

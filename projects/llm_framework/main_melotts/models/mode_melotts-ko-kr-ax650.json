@@ -1,0 +1,29 @@
+{
+    "mode": "melotts-ko-kr-ax650",
+    "type": "tts",
+    "homepage": "https://github.com/ml-inory/melotts.axera/tree/main/model_convert",
+    "compile_flage": "pulsar2 build --input decoder-ko.onnx --config config_decoder_u16.json --output_dir decoder_ko --output_name decoder-ko.axmodel --target_hardware AX620E --npu_mode NPU2 --compiler.check 0",
+    "pulsar_version": "5.1-patch1-cd6c30b4",
+    "capabilities": [
+        "tts",
+        "Korean"
+    ],
+    "input_type": [
+        "tts.utf-8"
+    ],
+    "output_type": [
+        "tts.wav",
+        "sys.play.0_1"
+    ],
+    "mode_param": {
+        "encoder": "encoder-kr.ort",
+        "decoder": "decoder-kr.axmodel",
+        "gbin": "g-kr.bin",
+        "tokens": "tokens-kr.txt",
+        "lexicon": "lexicon-kr.txt",
+        "spacker_speed": 1.2,
+        "mode_rate": 44100,
+        "audio_rate": 48000,
+        "awake_delay": 1000
+    }
+}

@@ -1,0 +1,5 @@
+menuconfig AX_SIMPLECV_ENABLED
+    bool "Enable SimpleCV support"
+    default n
+    help
+        enable SimpleCV support

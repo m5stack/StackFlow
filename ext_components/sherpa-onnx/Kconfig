@@ -1,0 +1,5 @@
+menuconfig SHERPA_ONNX_ENABLED
+    bool "Enable sherpa-onnx support"
+    default n
+    help
+        enable sherpa-onnx support
